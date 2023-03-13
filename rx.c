@@ -17,6 +17,7 @@
 */
 #ifndef _RX_H
 #define _RX_H
+#define _CRT_SECURE_NO_WARNINGS
 
 #ifdef _RX_STANDALONE
 # include "cc\cc.c"
