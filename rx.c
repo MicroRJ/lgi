@@ -2,13 +2,12 @@
 **
 ** -+- rx -+-
 **
-** Copyright(C) J. Dayan Rodriguez, 2022, All rights reserved.
+** Copyright(C) Dayan Rodriguez, 2022, All rights reserved.
 **
 ** Simple render API for when you just want to see something.
 **
 ** - load and render images
-** - draw text
-**
+** - draw crappy text
 **
 ** rx is not production ready nor production quality.
 **
@@ -130,11 +129,13 @@ typedef struct rxvertex_t
 
 typedef int rxindex_t;
 
+// Todo: remove this, this would be for a higher level API?
 typedef enum rxdraw_k
 { rxdraw_kCLIP,
   rxdraw_kPRIM,
 } rxdraw_k;
 
+// Todo: remove this, this would be for a higher level API?
 typedef struct rxdraw_t rxdraw_t;
 typedef struct rxdraw_t
 {     rxdraw_k kind;
@@ -203,7 +204,7 @@ typedef struct rx_t
   int vertex_buffer_index;
   int  index_buffer_index;
 
-  // Note: this ain't none of our business!
+  // Todo: remove this, this would be for a higher level API?
   rxdraw_t  draw_buffer[0x100];
   int       draw_buffer_index;
 } rx_t;
@@ -512,6 +513,13 @@ rxwindow_callback_win32(HWND NativeWindow,UINT Message,WPARAM wParam,LPARAM lPar
 
 void rxinit(const wchar_t *window_title)
 {
+#ifdef _RX_STANDALONE
+  // -- Todo: remove this!
+  ccdebugnone=cctrue;
+  ccini();
+#endif
+
+
   UINT DriverModeFlags=
     D3D11_CREATE_DEVICE_DEBUG| // -- Note: COMMENT THIS OUT TO USE INTEL'S GRAPHIC ANALYZER
     D3D11_CREATE_DEVICE_SINGLETHREADED|D3D11_CREATE_DEVICE_BGRA_SUPPORT;
@@ -650,11 +658,8 @@ void rxinit(const wchar_t *window_title)
   if(SUCCEEDED(D3DCompile(ShaderCode,strlen(ShaderCode),"rx::vertex-shader",0,0,"MainVS","vs_5_0",
     CompilationFlags,0,&ShaderBlob,&MessageBlob)))
   {
-  } else
-  {
   }
 #endif
-
 
   D3D11_INPUT_ELEMENT_DESC LayoutElements[]=
   { (D3D11_INPUT_ELEMENT_DESC){"POSITION",0,DXGI_FORMAT_R32G32_FLOAT,0,D3D11_APPEND_ALIGNED_ELEMENT,D3D11_INPUT_PER_VERTEX_DATA,0},
