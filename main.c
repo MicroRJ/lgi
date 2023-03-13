@@ -3,7 +3,7 @@
 
 int main(int c, char **v)
 {
-	int counter=0;
+  int counter=0;
   {
     rxinit(L"Font Visualizer");
     rxload_font("fonts\\UnifrakturCook\\UnifrakturCook-Bold.ttf");
