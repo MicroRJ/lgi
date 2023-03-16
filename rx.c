@@ -14,6 +14,17 @@
 ** Much better libraries:
 ** erkkah/tigr
 ** raysan5/raylib
+**
+** Merge Notes:
+** - Added vector types
+** - Added default white texture for rect-drawing
+** - Added 'local_texture', to be renamed?
+** - 'load_texture' now takes in a 'local_texture'
+** - Added 'rxcreate_texture_ex' to simplify 'create' and 'load'
+** - Made constant buffer be dynamic to allow for updates
+** - Renamed 'rxdraw_t' to 'rxcommand_t'
+** - Now commands are more productive and specific
+** - Added vertex mode, made text rendering much more efficient
 */
 #ifndef _RX_H
 #define _RX_H
@@ -92,9 +103,19 @@
 
 #include "rxps.hlsl"
 #include "rxvs.hlsl"
+#include "rxm.c"
+
+#define rxPI_F 3.14159265358979323846f
+
+#define rxrad2deg(r) ((r)/rxPI_F*180.f)
+#define rxdeg2rad(d) ((d)/180.f*rxPI_F)
 
 #define     rxRGB8 DXGI_FORMAT_R8_UNORM
 #define rxRGBA8888 DXGI_FORMAT_R8G8B8A8_UNORM
+
+typedef ID3D11DeviceChild   * rxunknown_t;
+typedef ID3D11View          * rxbindview_t;
+typedef ID3D11Resource      * rxresource_t;
 
 typedef struct rxsampler_t rxsampler_t;
 typedef struct rxsampler_t
@@ -102,15 +123,19 @@ typedef struct rxsampler_t
   ID3D11SamplerState        * Sampler;
 } rxsampler_t;
 
-typedef void *rxbindview_t;
-typedef void *rxresource_t;
+typedef struct rxlocal_texture_t rxlocal_texture_t;
+typedef struct rxlocal_texture_t
+{  int   size_x, size_y;
+   int   format;
+   int   stride;
+  void * memory;
+} rxlocal_texture_t;
 
 typedef struct rxtexture_t rxtexture_t;
 typedef struct rxtexture_t
-{ rxresource_t resource;
-  rxbindview_t bindview;
-           int size_x, size_y;
+{          int size_x, size_y;
            int format;
+  rxbindview_t bindview;
 } rxtexture_t;
 
 // Note:
@@ -121,36 +146,53 @@ typedef struct rxborrowed_t
           int  stride;
 } rxborrowed_t;
 
+typedef struct rxcolor_t rxcolor_t;
+typedef struct rxcolor_t
+{
+  unsigned char r;
+  unsigned char g;
+  unsigned char b;
+  unsigned char a;
+} rxcolor_t;
+
+#define rxcolor_kWHITE (rxcolor_t){0xff,0xff,0xff,0xff}
+#define rxcolor_kRED   (rxcolor_t){0xff,0xff,0xff,0xff}
+#define rxcolor_kGREEN (rxcolor_t){0xff,0xff,0xff,0xff}
+#define rxcolor_kBLUE  (rxcolor_t){0xff,0xff,0xff,0xff}
+
 typedef struct rxvertex_t rxvertex_t;
 typedef struct rxvertex_t
 { float x, y;
-  unsigned int color;
   float u, v;
+  unsigned char r,g,b,a;
 } rxvertex_t;
-
-typedef int rxindex_t;
-
-// Todo: remove this, this would be for a higher level API?
-typedef enum rxdraw_k
-{ rxdraw_kCLIP,
-  rxdraw_kPRIM,
-} rxdraw_k;
-
-// Todo: remove this, this would be for a higher level API?
-typedef struct rxdraw_t rxdraw_t;
-typedef struct rxdraw_t
-{     rxdraw_k kind;
-  rxbindview_t bindview;
-   rxsampler_t sampler;
-           int offset;
-           int length;
-           int x,y,w,h;
-} rxdraw_t;
 
 typedef struct rxuniform_t rxuniform_t;
 typedef struct rxuniform_t
-{ float e[4][4];
+{
+  rxmatrix_t e;
 } rxuniform_t;
+
+typedef int rxindex_t;
+
+typedef enum rxdraw_k
+{ rxdraw_kCLIP,
+  rxdraw_kINDEXED,
+  rxdraw_kCLEAR,
+  rxdraw_kMATRIX,
+  rxdraw_kSAMPLER,
+  rxdraw_kTEXTURE,
+} rxdraw_k;
+
+typedef struct rxcommand_t rxcommand_t;
+typedef struct rxcommand_t
+{    rxdraw_k  kind;
+  rxunknown_t  unknown;
+  rxuniform_t  uniform;
+          int  offset;
+          int  length;
+          int  x,y,w,h;
+} rxcommand_t;
 
 typedef struct rx_t rx_t;
 typedef struct rx_t
@@ -167,6 +209,21 @@ typedef struct rx_t
   int       size_y;
   int       center_x;
   int       center_y;
+
+  int in_vertex_mode;
+
+  rxcommand_t *command;
+
+  float sample_xcoord;
+  float sample_ycoord;
+
+  int color_r;
+  int color_g;
+  int color_b;
+  int color_a;
+
+  // Todo:
+  int window_events[0x100];
 
   rxtexture_t     font_atlas;
   stbtt_bakedchar font_glyph[256];
@@ -200,28 +257,61 @@ typedef struct rx_t
   rxsampler_t linear_sampler;
   rxsampler_t point_sampler;
 
-  int        *  index_buffer;
-  rxvertex_t * vertex_buffer;
-  int vertex_buffer_index;
-  int  index_buffer_index;
+  rxuniform_t * uniform;
 
-  // Todo: remove this, this would be for a higher level API?
-  rxdraw_t  draw_buffer[0x100];
-  int       draw_buffer_index;
+   rxvertex_t * vertex_buffer;
+          int   vertex_buffer_index;
+
+    rxindex_t * index_buffer;
+          int   index_buffer_index;
+
+  rxcommand_t   command_buffer[0x1000];
+  int           command_buffer_index;
+
+  ccclocktick_t start_ticks;
+  ccclocktick_t frame_ticks;
+
+  ccclocktick_t total_ticks;
+  ccclocktick_t delta_ticks;
+
+  ccf64_t total_seconds;
+  ccf64_t delta_seconds;
+
+  rxf32x4_t   clear_color;
+  rxtexture_t white;
 } rx_t;
 
 static rx_t rx;
 
-// Note: this would be more internal use?
+// Todo: support different formats
+rxlocal_texture_t rxload_local_texture(const char *name)
+{
+  rxlocal_texture_t t;
+  t.format=rxRGBA8888;
+  t.memory=stbi_load(name,&t.size_x,&t.size_y,0,4);
+  t.stride=t.size_x*4;
+
+  return t;
+}
+
+// Todo: to be removed!
 void *rxborrow_resource(void *resource)
 {
+#if 0
+  // Note: we could do this for extra safety
+  rxunknown_t unknown=(rxunknown_t)resource;
+  ID3D11ShaderResourceView *Resource;
+  IUnknown_QueryInterface(unknown,&IID_ID3D11ShaderResourceView,(void**)&Resource);
+#endif
+
   D3D11_MAPPED_SUBRESOURCE m;
   ID3D11DeviceContext_Map(rx.Context,(ID3D11Resource*)resource,0,D3D11_MAP_WRITE_DISCARD,0,&m);
+
+  ccassert(m.pData != 0);
 
   return m.pData;
 }
 
-// Note: this would be more internal use?
 void rxreturn_resource(void *resource)
 {
   ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)resource,0);
@@ -234,97 +324,105 @@ void rxreturn(rxborrowed_t borrowed)
 
 rxborrowed_t rxborrow_texture(rxtexture_t texture)
 {
-  D3D11_MAPPED_SUBRESOURCE m;
-  ID3D11DeviceContext_Map(rx.Context,(ID3D11Resource*)texture.resource,0,D3D11_MAP_WRITE_DISCARD,0,&m);
+  ID3D11Resource *Resource;
+  ID3D11View_GetResource(texture.bindview,&Resource);
+
+  D3D11_MAPPED_SUBRESOURCE MappedAccess;
+  ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
 
   rxborrowed_t result;
-  result.resource=texture.resource;
-  result.stride=m.RowPitch;
-  result.memory=m.pData;
+  result.resource=Resource;
+  result.  stride=MappedAccess.RowPitch;
+  result.  memory=MappedAccess.pData;
+
+  ccassert(result.stride != 0);
+  ccassert(result.memory != 0);
+  return result;
+}
+
+void rxdelete_texture(rxtexture_t texture)
+{
+  ID3D11Resource *Resource;
+  ID3D11View_GetResource(texture.bindview,&Resource);
+  ID3D11Resource_Release(Resource);
+}
+
+// Note:
+// I keep thinking about splitting these types of functions into individual 'create' and 'bind',
+// but what's the point if the resource has to be created with explicit bind flags.
+// For that reason, I think it's best that a resource is at least partially typed or categorized by
+// its bind attributes and any bind objects be created at initialization time.
+// More sensitive resource should have their own, correspondingly sensitive functions that tailor
+// to any peculiar attributes.
+rxtexture_t
+rxcreate_texture_ex(int w, int h, int f, int s, void *m)
+{
+  ccassert(w >= 1 ||
+    cctraceerr("invalid width"));
+
+  ccassert(h >= 1 ||
+    cctraceerr("invalid height"));
+
+  D3D11_TEXTURE2D_DESC TextureI;
+  ZeroMemory(&TextureI,sizeof(TextureI));
+  TextureI.         Width=(unsigned int)w;
+  TextureI.        Height=(unsigned int)h;
+  TextureI.     MipLevels=1;
+  TextureI.     ArraySize=1;
+  TextureI.        Format=f;
+  TextureI.    SampleDesc.  Count=1;
+  TextureI.    SampleDesc.Quality=0;
+  TextureI.         Usage=D3D11_USAGE_DYNAMIC;
+  TextureI.     MiscFlags=0;
+  TextureI.     BindFlags=D3D11_BIND_SHADER_RESOURCE;
+  TextureI.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
+
+  D3D11_SUBRESOURCE_DATA SubresourceI;
+  ZeroMemory(&SubresourceI,sizeof(SubresourceI));
+  SubresourceI.    pSysMem=m;
+  SubresourceI.SysMemPitch=s;
+
+  ID3D11Texture2D *Texture2D;
+  ID3D11Device_CreateTexture2D(rx.Device,&TextureI,m?&SubresourceI:NULL,&Texture2D);
+
+  D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewI;
+  ZeroMemory(&ShaderResourceViewI,sizeof(ShaderResourceViewI));
+  ShaderResourceViewI.       Format=DXGI_FORMAT_UNKNOWN;
+  ShaderResourceViewI.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
+  ShaderResourceViewI.    Texture2D.MostDetailedMip=0;
+  ShaderResourceViewI.    Texture2D.      MipLevels=1;
+
+  ID3D11ShaderResourceView *ShaderResourceView;
+  ID3D11Device_CreateShaderResourceView(rx.Device,
+    (ID3D11Resource *)Texture2D,&ShaderResourceViewI,&ShaderResourceView);
+
+  rxtexture_t result;
+  result.  size_x=w;
+  result.  size_y=h;
+  result.  format=f;
+  result.bindview=(ID3D11View*)ShaderResourceView;
   return result;
 }
 
 rxtexture_t rxcreate_texture(int w, int h, int f)
-{ D3D11_TEXTURE2D_DESC i;
-  ZeroMemory(&i,sizeof(i));
-  i.Width=(unsigned int)w;
-  i.Height=(unsigned int)h;
-  i.MipLevels=1;
-  i.ArraySize=1;
-  i.Format=f;
-  i.SampleDesc.Count=1;
-  i.SampleDesc.Quality=0;
-  i.Usage=D3D11_USAGE_DYNAMIC;
-  i.MiscFlags=0;
-  i.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-  i.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
-
-  rxtexture_t r;
-  r.size_x=w;
-  r.size_y=h;
-  r.format=f;
-
-  ID3D11Device_CreateTexture2D(rx.Device,&i,NULL,(ID3D11Texture2D**)&r.resource);
-
-  D3D11_SHADER_RESOURCE_VIEW_DESC v;
-  ZeroMemory(&v,sizeof(v));
-  v.Format=DXGI_FORMAT_UNKNOWN;
-  v.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
-  v.Texture2D.MostDetailedMip=0;
-  v.Texture2D.MipLevels=1;
-
-  ID3D11Device_CreateShaderResourceView(rx.Device,
-    (ID3D11Resource *)r.resource,&v,(ID3D11ShaderResourceView**)&r.bindview);
-  return r;
+{
+  return rxcreate_texture_ex(w,h,f,0,0);
 }
 
-rxtexture_t rxload_texture(int w, int h, DXGI_FORMAT f, int s, void *m)
-{ D3D11_TEXTURE2D_DESC TextureInfo;
-  ZeroMemory(&TextureInfo,sizeof(TextureInfo));
-  TextureInfo.Width=(unsigned int)w;
-  TextureInfo.Height=(unsigned int)h;
-  TextureInfo.MipLevels=1;
-  TextureInfo.ArraySize=1;
-  TextureInfo.Format=f;
-  TextureInfo.SampleDesc.Count=1;
-  TextureInfo.SampleDesc.Quality=0;
-  TextureInfo.Usage=D3D11_USAGE_DYNAMIC;
-  TextureInfo.MiscFlags=0;
-  TextureInfo.BindFlags=D3D11_BIND_SHADER_RESOURCE;
-  TextureInfo.CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
-
-  D3D11_SUBRESOURCE_DATA SubresourceInfo;
-  ZeroMemory(&SubresourceInfo,sizeof(SubresourceInfo));
-  SubresourceInfo.pSysMem=m;
-  SubresourceInfo.SysMemPitch=s;
-
-  rxtexture_t r;
-  r.size_x=w;
-  r.size_y=h;
-  r.format=f;
-
-  ID3D11Device_CreateTexture2D(rx.Device,&TextureInfo,&SubresourceInfo,(ID3D11Texture2D**)&r.resource);
-
-  D3D11_SHADER_RESOURCE_VIEW_DESC ViewInfo;
-  ZeroMemory(&ViewInfo,sizeof(ViewInfo));
-  ViewInfo.Format=DXGI_FORMAT_UNKNOWN;
-  ViewInfo.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
-  ViewInfo.Texture2D.MostDetailedMip=0;
-  ViewInfo.Texture2D.MipLevels=1;
-
-  ID3D11Device_CreateShaderResourceView(rx.Device,(ID3D11Resource *)r.resource,&ViewInfo,
-    (ID3D11ShaderResourceView**)&r.bindview);
-  return r;
+rxtexture_t rxload_texture(rxlocal_texture_t local)
+{
+  return rxcreate_texture_ex(local.size_x,local.size_y,local.format,local.stride,local.memory);
 }
 
 rxtexture_t rxload_texture_file(const char *name)
-{ int x,y,n;
-  unsigned char *m;
-  rxtexture_t r;
-  m=stbi_load(name,&x,&y,&n,4);
-  r=rxload_texture(x,y,DXGI_FORMAT_R8G8B8A8_UNORM,x*4,m);
-  stbi_image_free(m);
-  return r;
+{
+  rxlocal_texture_t local=rxload_local_texture(name);
+
+  rxtexture_t texture=rxload_texture(local);
+
+  stbi_image_free(local.memory);
+
+  return texture;
 }
 
 // Todo: legit font packer!
@@ -348,7 +446,8 @@ void rxload_font(const char *name)
 
   rx.font_atlas=rxcreate_texture(w,h,rxRGBA8888);
 
-  unsigned char *m=rxborrow_resource(rx.font_atlas.resource);
+  rxborrowed_t b=rxborrow_texture(rx.font_atlas);
+  unsigned char *m=b.memory;
   for(int i=0;i<w*h;++i)
   { unsigned char c=buffer[i];
     m[i*4+0]=c;
@@ -356,121 +455,255 @@ void rxload_font(const char *name)
     m[i*4+2]=c;
     m[i*4+3]=c;
   }
-  rxreturn_resource(rx.font_atlas.resource);
+  rxreturn(b);
 
   ccfree(buffer);
 }
 
-void rxdraw_texture_ex(rxtexture_t texture, rxsampler_t sampler,
-  float x, float y, float w, float h, float tx, float ty, float tw, float th)
-{ rxdraw_t *draw=rx.draw_buffer+rx.draw_buffer_index++;
-  draw->kind=rxdraw_kPRIM;
-  draw->offset=rx.vertex_buffer_index;
-  draw->length=6;
-  draw->bindview=texture.bindview;
-  draw->sampler=sampler;
+rxcommand_t *rxcommand(rxdraw_k kind)
+{
+  rxcommand_t *draw=rx.command_buffer+rx.command_buffer_index++;
+  draw->kind=kind;
 
-  int *index=rx.index_buffer+rx.index_buffer_index;
-  rx.index_buffer_index+=6;
-
-  index[0]=0;index[3]=0;
-  index[1]=1;index[4]=2;
-  index[2]=2;index[5]=3;
-
-  rxvertex_t *vert=rx.vertex_buffer+rx.vertex_buffer_index;
-  rx.vertex_buffer_index+=4;
-
-  vert[0]=(rxvertex_t){x+0,y+0,0xffffffff,tx   ,ty+th};
-  vert[1]=(rxvertex_t){x+0,y+h,0xffffffff,tx   ,ty   };
-  vert[2]=(rxvertex_t){x+w,y+h,0xffffffff,tx+tw,ty   };
-  vert[3]=(rxvertex_t){x+w,y+0,0xffffffff,tx+tw,ty+th};
+  return draw;
 }
 
-void rxdraw_texture(rxtexture_t texture, rxsampler_t sampler, int x, int y, int w, int h)
+void rxclear(rxf32x4_t clear)
 {
-  rxdraw_texture_ex(texture,sampler,
-    (float)x,(float)y,(float)w,(float)h,0,0,1,1);
+  rx.clear_color=clear;
+}
+
+void rxdraw_matrix(rxmatrix_t matrix)
+{
+  rxcommand_t *draw=rxcommand(rxdraw_kMATRIX);
+  draw->uniform.e=matrix;
+}
+
+void rxdraw_sampler(rxsampler_t sampler)
+{
+  rxcommand_t *draw=rxcommand(rxdraw_kSAMPLER);
+  draw->unknown=(rxunknown_t)sampler.Sampler;
+}
+
+void rxdraw_texture(rxtexture_t texture)
+{
+  rxcommand_t *draw=rxcommand(rxdraw_kTEXTURE);
+  draw->unknown=(rxunknown_t)texture.bindview;
+}
+
+void rxvertex_mode()
+{
+  ccassert(!rx.in_vertex_mode);
+
+  rx.sample_xcoord=0;
+  rx.sample_ycoord=0;
+
+  rx.color_r=0;
+  rx.color_g=0;
+  rx.color_b=0;
+  rx.color_a=0;
+
+  rx.in_vertex_mode=cctrue;
+
+  rx.command=rxcommand(rxdraw_kINDEXED);
+  rx.command->offset=rx.vertex_buffer_index;
+  rx.command->length=0;
+}
+
+void rxindex(rxindex_t value)
+{
+  ccassert(rx.in_vertex_mode);
+  ccassert(rx.command!=0);
+
+  rxindex_t *index=rx.index_buffer+rx.index_buffer_index++;
+  *index=value;
+
+  rx.command->length++;
+}
+
+void rxvertex_color_rgba(int color_r, int color_g, int color_b, int color_a)
+{
+  rx.color_r=color_r;
+  rx.color_g=color_g;
+  rx.color_b=color_b;
+  rx.color_a=color_a;
+}
+
+void rxvertex_color(rxcolor_t color)
+{
+  rx.color_r=color.r;
+  rx.color_g=color.g;
+  rx.color_b=color.b;
+  rx.color_a=color.a;
+}
+
+void rxvertex_texture_coords(float sample_xcoord, float sample_ycoord)
+{
+  rx.sample_xcoord=sample_xcoord;
+  rx.sample_ycoord=sample_ycoord;
+}
+
+void rxvertex_ex(float x, float y, float xcoord, float ycoord)
+{
+  ccassert(rx.in_vertex_mode);
+  ccassert(rx.command!=0);
+
+  rxvertex_t *vertex=rx.vertex_buffer+rx.vertex_buffer_index++;
+  vertex->x=x;
+  vertex->y=y;
+  vertex->u=xcoord;
+  vertex->v=ycoord;
+  vertex->r=(unsigned char)rx.color_r;
+  vertex->g=(unsigned char)rx.color_g;
+  vertex->b=(unsigned char)rx.color_b;
+  vertex->a=(unsigned char)rx.color_a;
+}
+
+void rxvertex(float x, float y)
+{
+  rxvertex_ex(x,y,rx.sample_xcoord,rx.sample_ycoord);
+}
+
+void rxvertex_mode_end()
+{
+  ccassert(rx.in_vertex_mode);
+
+  rx.in_vertex_mode=ccfalse;
+  rx.command=ccnull;
+}
+
+void rxdraw_skinned_unnormalized(
+  rxtexture_t texture, rxcolor_t color, float x, float y, float w, float h, float tx, float ty, float tw, float th)
+{
+  rxdraw_texture(texture);
+
+  rxvertex_mode();
+    rxvertex_color(color);
+
+    rxvertex_ex(x+0,y+0,tx   ,ty+th);
+    rxvertex_ex(x+0,y+h,tx   ,ty   );
+    rxvertex_ex(x+w,y+h,tx+tw,ty   );
+    rxvertex_ex(x+w,y+0,tx+tw,ty+th);
+
+    rxindex(0);
+    rxindex(1);
+    rxindex(2);
+    rxindex(0);
+    rxindex(2);
+    rxindex(3);
+  rxvertex_mode_end();
+}
+
+void rxdraw_skinned_ex(
+  rxtexture_t texture, rxcolor_t color, float x, float y, float w, float h, float tx, float ty, float tw, float th)
+{
+  int size_x=texture.size_x;
+  int size_y=texture.size_y;
+  rxdraw_skinned_unnormalized(texture,color,x,y,w,h,tx/(float)size_x,ty/(float)size_y,tw/(float)size_x,th/(float)size_y);
+}
+
+
+void rxdraw_skinned(rxtexture_t texture, float x, float y, float w, float h)
+{
+  rxcolor_t white=(rxcolor_t){0xff,0xff,0xff,0xff};
+  rxdraw_skinned_unnormalized(texture,white,x,y,w,h,0,0,1,1);
+}
+
+void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
+{
+  rxdraw_sampler(rx.point_sampler);
+  rxdraw_skinned_unnormalized(rx.white,color,x,y,w,h,0,0,1,1);
+}
+
+void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
+{
+  // Todo:!
+  rxdraw_rect(color,x+0,y+h,w+2,2);
+  rxdraw_rect(color,x+0,y+0,w+0,2);
+  rxdraw_rect(color,x+w,y+0,2,h+0);
+  rxdraw_rect(color,x+0,y+0,2,h+0);
 }
 
 void rxdraw_text(int x, int y, float h, const char *string)
-{ float nx=1.f/rx.font_atlas.size_x;
-  float ny=1.f/rx.font_atlas.size_y;
+{
+  rxtexture_t texture=rx.font_atlas;
+
+  float xnormalize=1.f/texture.size_x;
+  float ynormalize=1.f/texture.size_y;
+  float render_scale=h/rx.font_height;
+
   float ox=(float)x;
   float oy=(float)y;
-  float s=h/rx.font_height;
-  int code;
-  for(code=*string;code!=0;code=*++string)
-  { stbtt_bakedchar baked=rx.font_glyph[code-32];
-    float gx=(float)(baked.x0);
-    float gy=(float)(baked.y0);
-    float gw=(float)(baked.x1-baked.x0);
-    float gh=(float)(baked.y1-baked.y0);
-    float dx=ox;
-    float dy=oy-(gh+baked.yoff)*s;
-    rxdraw_texture_ex(rx.font_atlas,rx.linear_sampler,
-      dx,dy,gw*s,gh*s,
-      gx*nx,gy*ny,gw*nx,gh*ny);
-    ox+=(float)baked.xadvance*s;
+
+  rxdraw_texture(texture);
+
+  rxvertex_mode();
+    rxvertex_color(rxcolor_kWHITE);
+
+  for(int index=0; *string; ++index)
+  {
+    int code=*string++;
+
+    stbtt_bakedchar baked=rx.font_glyph[code-32];
+
+    float sample_x0=xnormalize*baked.x0;
+    float sample_y0=ynormalize*baked.y0;
+    float sample_x1=xnormalize*baked.x1;
+    float sample_y1=ynormalize*baked.y1;
+
+    float baseline_yoffset=baked.y1-baked.y0+baked.yoff;
+
+    float render_x0=ox;
+    float render_y0=oy-baseline_yoffset*render_scale;
+    float render_x1=render_x0+(baked.x1-baked.x0)*render_scale;
+    float render_y1=render_y0+(baked.y1-baked.y0)*render_scale;
+
+    rxvertex_ex(render_x0,render_y0,sample_x0,sample_y1);
+    rxvertex_ex(render_x0,render_y1,sample_x0,sample_y0);
+    rxvertex_ex(render_x1,render_y1,sample_x1,sample_y0);
+    rxvertex_ex(render_x1,render_y0,sample_x1,sample_y1);
+
+    rxindex(index*4+0);
+    rxindex(index*4+1);
+    rxindex(index*4+2);
+    rxindex(index*4+0);
+    rxindex(index*4+2);
+    rxindex(index*4+3);
+
+    ox+=(float)baked.xadvance*render_scale;
   }
+
+  rxvertex_mode_end();
 }
 
-void rxwindow()
+// Todo: update the viewport and frame buffer!
+void rxresize(int w, int h)
 {
-  MSG message;
-  while(PeekMessage(&message,NULL,0,0,PM_REMOVE))
-  { TranslateMessage(&message);
-    DispatchMessageW(&message);
-  }
-
-  RECT client;
-  GetClientRect(rx.Window,&client);
-  rx.size_x=client.right-client.left;
-  rx.size_y=client.bottom-client.top;
-  rx.center_x=rx.size_x>>1;
-  rx.center_y=rx.size_y>>1;
+  RECT Client;
+  Client.left=0;
+  Client.top=0;
+  Client.right=w;
+  Client.bottom=h;
+  AdjustWindowRect(&Client,WS_OVERLAPPEDWINDOW,FALSE);
+  SetWindowPos(rx.Window,HWND_NOTOPMOST,0,0,Client.right,Client.bottom,SWP_NOMOVE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
 }
 
-void rxtick()
+void rxresize_uniformbuffer(size_t size_in_bytes)
 {
-  rxreturn_resource(rx.VertexBuffer);
-  rxreturn_resource(rx.IndexBuffer);
-
-  rxwindow();
-
-  float Color[4]={0.f,0.f,0.f,1.f};
-  ID3D11DeviceContext_ClearRenderTargetView(rx.Context,rx.OffscreenBufferView,Color);
-  ID3D11DeviceContext_OMSetRenderTargets(rx.Context,1,&rx.OffscreenBufferView,0);
-
-  rxdraw_t *draw;
-  int index_offset=0;
-  for (draw=rx.draw_buffer;draw<rx.draw_buffer+rx.draw_buffer_index;++draw)
-  { if(draw->kind==rxdraw_kCLIP)
-    {
-      // Todo:!
-    } else
-    if(draw->kind==rxdraw_kPRIM)
-    { ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,&draw->sampler.Sampler);
-      ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,1,
-        (ID3D11ShaderResourceView**)&draw->bindview);
-      ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
-      index_offset+=draw->length;
-    }
+  if(rx.UniformBuffer)
+  {
+    ID3D11Buffer_Release(rx.UniformBuffer);
   }
 
-  ID3D11DeviceContext_ResolveSubresource(rx.Context,
-    (ID3D11Resource*)rx.RenderBuffer,0,(ID3D11Resource*)rx.OffscreenBuffer,0,DXGI_FORMAT_R8G8B8A8_UNORM);
+  D3D11_BUFFER_DESC BufferI;
+  BufferI.              Usage=D3D11_USAGE_DYNAMIC;
+  BufferI.     CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
+  BufferI.          MiscFlags=0;
+  BufferI.StructureByteStride=0;
+  BufferI.          BindFlags=D3D11_BIND_CONSTANT_BUFFER;
+  BufferI.          ByteWidth=(UINT)size_in_bytes;
 
-  IDXGISwapChain_Present(rx.SwapChain,1u,0);
-  WaitForSingleObjectEx(rx.FrameAwait,33,TRUE);
-
-  ShowWindow(rx.Window,SW_SHOW);
-
-  rx.vertex_buffer_index=0;
-  rx.index_buffer_index=0;
-  rx.draw_buffer_index=0;
-
-  rx.vertex_buffer=rxborrow_resource(rx.VertexBuffer);
-  rx.index_buffer=rxborrow_resource(rx.IndexBuffer);
+  ID3D11Device_CreateBuffer(rx.Device,&BufferI,NULL,&rx.UniformBuffer);
 }
 
 void rxresize_indexbuffer(size_t size_in_bytes)
@@ -507,9 +740,176 @@ void rxresize_vertexbuffer(size_t size_in_bytes)
   ID3D11Device_CreateBuffer(rx.Device,&i,NULL,&rx.VertexBuffer);
 }
 
+void rxtime()
+{
+  ccclocktick_t ticks=ccclocktick();
+
+  rx.total_ticks=ticks-rx.start_ticks;
+  rx.total_seconds=ccclocksecs(rx.total_ticks);
+
+  rx.delta_ticks=ticks-rx.frame_ticks;
+  rx.delta_seconds=ccclocksecs(rx.delta_ticks);
+
+  rx.frame_ticks=ticks;
+}
+
+void rxwindow()
+{
+  MSG message;
+  while(PeekMessage(&message,NULL,0,0,PM_REMOVE))
+  { TranslateMessage(&message);
+    DispatchMessageW(&message);
+  }
+
+  RECT client;
+  GetClientRect(rx.Window,&client);
+  rx.size_x=client.right-client.left;
+  rx.size_y=client.bottom-client.top;
+  rx.center_x=rx.size_x>>1;
+  rx.center_y=rx.size_y>>1;
+}
+
+void rxpull_resources()
+{
+  rx.      uniform=rxborrow_resource(rx.UniformBuffer);
+  rx.vertex_buffer=rxborrow_resource(rx.VertexBuffer);
+  rx. index_buffer=rxborrow_resource(rx.IndexBuffer);
+}
+
+void rxpush_resources()
+{
+  rxreturn_resource(rx.UniformBuffer);
+  rxreturn_resource(rx. VertexBuffer);
+  rxreturn_resource(rx.  IndexBuffer);
+}
+
+int rxtick()
+{
+  rxmatrix_t matrix=rxmatrix_identity();
+  matrix.m[0][0]=+2.0f/(rx.size_x);
+  matrix.m[1][1]=+2.0f/(rx.size_y);
+  matrix.m[2][2]=+0.5f;
+  matrix.m[3][0]=-1.0f;
+  matrix.m[3][1]=-1.0f;
+  rx.uniform->e=matrix;
+
+  rxpush_resources();
+
+  rxwindow();
+
+  ID3D11DeviceContext_ClearRenderTargetView(rx.Context,
+    rx.OffscreenBufferView,(float*)&rx.clear_color);
+
+  int index_offset=0;
+  rxcommand_t *draw;
+  for (draw=rx.command_buffer;draw<rx.command_buffer+rx.command_buffer_index;++draw)
+  { if(draw->kind==rxdraw_kCLIP)
+    {
+      // Todo:!
+    } else
+    if(draw->kind==rxdraw_kMATRIX)
+    {
+      rxuniform_t t;
+      t.e=rxmatrix_mulM(draw->uniform.e,matrix);
+
+      void *memory=rxborrow_resource(rx.UniformBuffer);
+      memcpy(memory,&t,sizeof(t));
+      rxreturn_resource(rx.UniformBuffer);
+
+    } else
+    if(draw->kind==rxdraw_kSAMPLER)
+    {
+      ccassert(draw->unknown!=0);
+
+      ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,(ID3D11SamplerState**)&draw->unknown);
+    } else
+    if(draw->kind==rxdraw_kTEXTURE)
+    {
+      ccassert(draw->unknown!=0);
+
+      ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,1,(ID3D11ShaderResourceView**)&draw->unknown);
+    } else
+    if(draw->kind==rxdraw_kINDEXED)
+    {
+      ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
+      index_offset+=draw->length;
+    }
+  }
+
+  // Note: disable this if MSAA is off
+  ID3D11DeviceContext_ResolveSubresource(rx.Context,
+    (ID3D11Resource*)rx.RenderBuffer,0,(ID3D11Resource*)rx.OffscreenBuffer,0,DXGI_FORMAT_R8G8B8A8_UNORM);
+
+  IDXGISwapChain_Present(rx.SwapChain,1u,0);
+  WaitForSingleObjectEx(rx.FrameAwait,33,TRUE);
+
+  if(!rx.Visible)
+  {
+    rx.Visible=cctrue;
+    ShowWindow(rx.Window,SW_SHOW);
+  }
+
+  rx.vertex_buffer_index=0;
+  rx.index_buffer_index=0;
+  rx.command_buffer_index=0;
+
+  rxpull_resources();
+
+  rxtime();
+
+  return !rx.Quitted;
+}
+
+int rxwindow_event_win32(UINT Message, WPARAM wParam, LPARAM lParam)
+{ switch(Message)
+  { case WM_CLOSE:
+    case WM_QUIT:
+    { PostQuitMessage(0);
+      rx.Quitted=TRUE;
+    } break;
+    case WM_MOUSEMOVE:
+    {
+    } break;
+    case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
+    case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
+    case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
+    case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
+    { rx.window_events[wParam]=1;
+
+      if(!rx.ClickFocused)
+      { rx.ClickFocused=TRUE;
+        SetCapture((HWND)rx.Window);
+      }
+    } break;
+    case WM_LBUTTONUP: case WM_RBUTTONUP:
+    case WM_MBUTTONUP: case WM_XBUTTONUP:
+    { rx.window_events[wParam]=0;
+
+      rx.ClickFocused=FALSE;
+      ReleaseCapture();
+    } break;
+    case WM_KEYUP:
+    case WM_KEYDOWN:
+    { rx.window_events[wParam]=Message==WM_KEYDOWN;
+    } break;
+    default:
+    { return FALSE;
+    } break;
+  }
+  return TRUE;
+}
+
 LRESULT CALLBACK
-rxwindow_callback_win32(HWND NativeWindow,UINT Message,WPARAM wParam,LPARAM lParam)
-{ return DefWindowProcW(NativeWindow,Message,wParam,lParam);
+rxwindow_callback_win32(HWND Window,UINT Message,WPARAM wParam,LPARAM lParam)
+{
+  LRESULT result=rxwindow_event_win32(Message,wParam,lParam);
+
+  if(!result)
+  {
+    result=DefWindowProcW(Window,Message,wParam,lParam);
+  }
+
+  return result;
 }
 
 void rxinit(const wchar_t *window_title)
@@ -552,6 +952,7 @@ void rxinit(const wchar_t *window_title)
   rx.Window=CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,WindowClass.lpszClassName,window_title,
     WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,
       NULL,NULL,WindowClass.hInstance,NULL);
+
 
   rxwindow();
 
@@ -664,8 +1065,8 @@ void rxinit(const wchar_t *window_title)
 
   D3D11_INPUT_ELEMENT_DESC LayoutElements[]=
   { (D3D11_INPUT_ELEMENT_DESC){"POSITION",0,DXGI_FORMAT_R32G32_FLOAT,0,D3D11_APPEND_ALIGNED_ELEMENT,D3D11_INPUT_PER_VERTEX_DATA,0},
-    (D3D11_INPUT_ELEMENT_DESC){"COLOR",0,DXGI_FORMAT_R8G8B8A8_UNORM,0,D3D11_APPEND_ALIGNED_ELEMENT,D3D11_INPUT_PER_VERTEX_DATA,0},
     (D3D11_INPUT_ELEMENT_DESC){"TEXCOORD",0,DXGI_FORMAT_R32G32_FLOAT,0,D3D11_APPEND_ALIGNED_ELEMENT,D3D11_INPUT_PER_VERTEX_DATA,0},
+    (D3D11_INPUT_ELEMENT_DESC){"COLOR",0,DXGI_FORMAT_R8G8B8A8_UNORM,0,D3D11_APPEND_ALIGNED_ELEMENT,D3D11_INPUT_PER_VERTEX_DATA,0},
   };
 
   ID3D11Device_CreateInputLayout(rx.Device,LayoutElements,ARRAYSIZE(LayoutElements),
@@ -687,49 +1088,11 @@ void rxinit(const wchar_t *window_title)
   SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
   ID3D11Device_CreateSamplerState(rx.Device,&SamplerInfo,&rx.point_sampler.Sampler);
 
-  {
-    rxuniform_t uniform;
-    uniform.e[0][0]=2.0f/(rx.size_x);
-    uniform.e[0][1]=0.f;
-    uniform.e[0][2]=0.f;
-    uniform.e[0][3]=0.f;
+  rxresize_uniformbuffer(sizeof(rxuniform_t));
+  rxresize_indexbuffer(sizeof(rxindex_t)*0x1000*4);
+  rxresize_vertexbuffer(sizeof(rxvertex_t)*0x1000*4);
 
-    uniform.e[1][0]=0.f;
-    uniform.e[1][1]=2.0f/(rx.size_y);
-    uniform.e[1][2]=0.f;
-    uniform.e[1][3]=0.f;
-
-    uniform.e[2][0]=0.f;
-    uniform.e[2][1]=0.f;
-    uniform.e[2][2]=.5f;
-    uniform.e[2][3]=0.f;
-
-    uniform.e[3][0]=-1.f;
-    uniform.e[3][1]=-1.f;
-    uniform.e[3][2]=.0f;
-    uniform.e[3][3]=1.f;
-
-
-    D3D11_BUFFER_DESC BufferInfo;
-    BufferInfo.Usage=D3D11_USAGE_DEFAULT;
-    BufferInfo.BindFlags=D3D11_BIND_CONSTANT_BUFFER;
-    BufferInfo.CPUAccessFlags=0;
-    BufferInfo.MiscFlags=0;
-    BufferInfo.ByteWidth=sizeof(uniform);
-    BufferInfo.StructureByteStride=0;
-
-    D3D11_SUBRESOURCE_DATA SubresourceInfo;
-    SubresourceInfo.pSysMem=&uniform;
-    SubresourceInfo.SysMemPitch=0;
-    SubresourceInfo.SysMemSlicePitch=0;
-    ID3D11Device_CreateBuffer(rx.Device,&BufferInfo,&SubresourceInfo,&rx.UniformBuffer);
-  }
-
-  rxresize_indexbuffer(sizeof(rxindex_t)*1024);
-  rxresize_vertexbuffer(sizeof(rxvertex_t)*1024);
-
-  rx.vertex_buffer=rxborrow_resource(rx.VertexBuffer);
-  rx.index_buffer=rxborrow_resource(rx.IndexBuffer);
+  rxpull_resources();
 
   D3D11_VIEWPORT Viewport;
   ZeroMemory(&Viewport,sizeof(Viewport));
@@ -737,20 +1100,24 @@ void rxinit(const wchar_t *window_title)
   Viewport.Height=(float)rx.size_y;
   Viewport.MinDepth=0;
   Viewport.MaxDepth=1;
-
   unsigned int Stride=sizeof(rxvertex_t);
   unsigned int Offset=0;
   ID3D11DeviceContext_RSSetState(rx.Context,rx.RasterizerState);
   ID3D11DeviceContext_RSSetViewports(rx.Context,1,&Viewport);
   ID3D11DeviceContext_OMSetBlendState(rx.Context,rx.BlendState,0x00,0xFFFFFFFu);
+  ID3D11DeviceContext_OMSetRenderTargets(rx.Context,1,&rx.OffscreenBufferView,0);
   ID3D11DeviceContext_IASetInputLayout(rx.Context,rx.VertexShaderInputLayout);
   ID3D11DeviceContext_IASetVertexBuffers(rx.Context,0,1,&rx.VertexBuffer,&Stride,&Offset);
   ID3D11DeviceContext_IASetIndexBuffer(rx.Context,rx.IndexBuffer,DXGI_FORMAT_R32_UINT,0);
   ID3D11DeviceContext_IASetPrimitiveTopology(rx.Context,D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
   ID3D11DeviceContext_VSSetConstantBuffers(rx.Context,0,1,&rx.UniformBuffer);
-  ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,0,1,&rx.UniformBuffer);
   ID3D11DeviceContext_VSSetShader(rx.Context,rx.VertexShader,0x00,0);
+  ID3D11DeviceContext_VSSetSamplers(rx.Context,0,1,&rx.linear_sampler.Sampler);
+
+  ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,0,1,&rx.UniformBuffer);
   ID3D11DeviceContext_PSSetShader(rx.Context,rx.PixelShader,0x00,0);
+  ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,&rx.linear_sampler.Sampler);
 
   D3D11_RECT RootClip;
   RootClip.left=0;
@@ -758,5 +1125,17 @@ void rxinit(const wchar_t *window_title)
   RootClip.right=0xffffff;
   RootClip.bottom=0xffffff;
   ID3D11DeviceContext_RSSetScissorRects(rx.Context,1,&RootClip);
+
+  rxclear(rxf32x4(.2,.2,.2,1));
+
+  rx.white=rxcreate_texture(16,16,rxRGBA8888);
+
+  rxborrowed_t t=rxborrow_texture(rx.white);
+  memset(t.memory,0xff,t.stride*rx.white.size_y);
+  rxreturn(t);
+
+  rx.start_ticks=ccclocktick();
+  rx.frame_ticks=rx.start_ticks;
+  rxtime();
 }
 #endif

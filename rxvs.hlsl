@@ -8,8 +8,8 @@
 // Name                 Index   Mask Register SysValue  Format   Used
 // -------------------- ----- ------ -------- -------- ------- ------
 // POSITION                 0   xy          0     NONE   float   xy  
-// COLOR                    0   xyzw        1     NONE   float   xyzw
-// TEXCOORD                 0   xy          2     NONE   float   xy  
+// TEXCOORD                 0   xy          1     NONE   float   xy  
+// COLOR                    0   xyzw        2     NONE   float   xyzw
 //
 //
 // Output signature:
@@ -24,8 +24,8 @@ vs_5_0
 dcl_globalFlags refactoringAllowed
 dcl_constantbuffer CB0[4], immediateIndexed
 dcl_input v0.xy
-dcl_input v1.xyzw
-dcl_input v2.xy
+dcl_input v1.xy
+dcl_input v2.xyzw
 dcl_output_siv o0.xyzw, position
 dcl_output o1.xyzw
 dcl_output o2.xy
@@ -33,18 +33,18 @@ dcl_temps 1
 mul r0.xyzw, v0.yyyy, cb0[1].xyzw
 mad r0.xyzw, cb0[0].xyzw, v0.xxxx, r0.xyzw
 add o0.xyzw, r0.xyzw, cb0[3].xyzw
-mov o1.xyzw, v1.xyzw
-mov o2.xy, v2.xyxx
+mov o1.xyzw, v2.xyzw
+mov o2.xy, v1.xyxx
 ret 
 // Approximately 0 instruction slots used
 #endif
 
 const BYTE rx_vs_shader_bytecode[] =
 {
-     68,  88,  66,  67,  71, 101, 
-     22, 130, 128,  94, 247,  12, 
-     75, 120,  87, 200, 111, 218, 
-     21, 209,   1,   0,   0,   0, 
+     68,  88,  66,  67,  18,  19, 
+     95, 102,  67, 139, 233,  46, 
+    163,  98, 173,  63,  45, 149, 
+    198,   2,   1,   0,   0,   0, 
      28,   2,   0,   0,   3,   0, 
       0,   0,  44,   0,   0,   0, 
     156,   0,   0,   0,  16,   1, 
@@ -58,15 +58,15 @@ const BYTE rx_vs_shader_bytecode[] =
      89,   0,   0,   0,   0,   0, 
       0,   0,   0,   0,   0,   0, 
       3,   0,   0,   0,   1,   0, 
-      0,   0,  15,  15,   0,   0, 
-     95,   0,   0,   0,   0,   0, 
+      0,   0,   3,   3,   0,   0, 
+     98,   0,   0,   0,   0,   0, 
       0,   0,   0,   0,   0,   0, 
       3,   0,   0,   0,   2,   0, 
-      0,   0,   3,   3,   0,   0, 
+      0,   0,  15,  15,   0,   0, 
      80,  79,  83,  73,  84,  73, 
-     79,  78,   0,  67,  79,  76, 
-     79,  82,   0,  84,  69,  88, 
+     79,  78,   0,  84,  69,  88, 
      67,  79,  79,  82,  68,   0, 
+     67,  79,  76,  79,  82,   0, 
      79,  83,  71,  78, 108,   0, 
       0,   0,   3,   0,   0,   0, 
       8,   0,   0,   0,  80,   0, 
@@ -95,9 +95,9 @@ const BYTE rx_vs_shader_bytecode[] =
       0,   0,  95,   0,   0,   3, 
      50,  16,  16,   0,   0,   0, 
       0,   0,  95,   0,   0,   3, 
-    242,  16,  16,   0,   1,   0, 
+     50,  16,  16,   0,   1,   0, 
       0,   0,  95,   0,   0,   3, 
-     50,  16,  16,   0,   2,   0, 
+    242,  16,  16,   0,   2,   0, 
       0,   0, 103,   0,   0,   4, 
     242,  32,  16,   0,   0,   0, 
       0,   0,   1,   0,   0,   0, 
@@ -126,9 +126,9 @@ const BYTE rx_vs_shader_bytecode[] =
       3,   0,   0,   0,  54,   0, 
       0,   5, 242,  32,  16,   0, 
       1,   0,   0,   0,  70,  30, 
-     16,   0,   1,   0,   0,   0, 
+     16,   0,   2,   0,   0,   0, 
      54,   0,   0,   5,  50,  32, 
      16,   0,   2,   0,   0,   0, 
-     70,  16,  16,   0,   2,   0, 
+     70,  16,  16,   0,   1,   0, 
       0,   0,  62,   0,   0,   1
 };
