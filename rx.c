@@ -9,22 +9,44 @@
 ** - load and render images
 ** - draw crappy text
 **
-** rx is not production ready nor production quality.
+** 'rx' is not production ready nor production quality.
 **
-** Much better libraries:
+** Much better libraries and actually competent:
 ** erkkah/tigr
 ** raysan5/raylib
 **
-** Merge Notes:
-** - Added vector types
-** - Added default white texture for rect-drawing
-** - Added 'local_texture', to be renamed?
-** - 'load_texture' now takes in a 'local_texture'
-** - Added 'rxcreate_texture_ex' to simplify 'create' and 'load'
-** - Made constant buffer be dynamic to allow for updates
-** - Renamed 'rxdraw_t' to 'rxcommand_t'
-** - Now commands are more productive and specific
-** - Added vertex mode, made text rendering much more efficient
+**
+** this file may only include the following:
+**
+** - a global data structure for consolidating necessary, common and
+** convenient attributes for frame by frame graphic operations
+**
+** - a functional, convenient and simple interface to aid in communicating
+** tasks to the graphics device in a coordinated manner.
+**
+** - a simple interface for loading images and font files to allow displaying
+**   text and textures out of the box.
+**
+** - other interface functions that are presented indirectly by the
+** mutual inclusion of 'cc.c'.
+**
+** - it may not have any other source file inclusions other than the default
+** shaders, and Sean's 'stb_image','stb_image_write','stb_truetype' single header files.
+**
+** merge notes:
+** ++ matrix with only the necessary basic operations to apply transforms
+** ++ default white texture for rect-drawing, (to reuse the same shader)
+** ++ 'local_texture', to be renamed?
+** ++ 'load_texture' now takes in a 'local_texture'
+** ++ 'rxcreate_texture_ex' to simplify 'create' and 'load'
+** ++ made constant buffer be dynamic to allow for updates
+** -+ rename 'rxdraw_t' to 'rxcommand_t'
+** ++ now commands are more productive and specific
+** ++ vertex mode, made text rendering much more efficient
+** ++ frame counter
+** ++ removed unnecessary structures that has leaked in from other headers
+** ++ added a default font in the source tree, 'avenue-pixel', although this is not my preferred approach
+** ++ added 'rxex.c' where extensions will be added
 */
 #ifndef _RX_H
 #define _RX_H
@@ -38,12 +60,6 @@
 # define STBI_REALLOC(size,memory)  ccrealloc(size,memory)
 # define STBI_FREE(memory)          ccfree(memory)
 # include "stb_image.h"
-
-# define STB_IMAGE_RESIZE_IMPLEMENTATION
-# define STBIR_MALLOC(size,user)         ccmalloc(size)
-# define STBIR_REALLOC(size,memory,user) ccrealloc(size,memory)
-# define STBIR_FREE(memory,user)         ccfree(memory)
-# include "stb_image_resize.h"
 
 # define STB_IMAGE_WRITE_IMPLEMENTATION
 # define STBIW_MALLOC(size)         ccmalloc(size)
@@ -103,15 +119,27 @@
 
 #include "rxps.hlsl"
 #include "rxvs.hlsl"
-#include "rxm.c"
 
 #define rxPI_F 3.14159265358979323846f
 
-#define rxrad2deg(r) ((r)/rxPI_F*180.f)
-#define rxdeg2rad(d) ((d)/180.f*rxPI_F)
+// if more functionality desired, it shall be presented in an extensions source file,
+// functionality included here is minimum required for common rendering operations.
+typedef struct rxmatrix_t rxmatrix_t;
+typedef struct rxmatrix_t
+{ float m[4][4];
+} rxmatrix_t;
+rxmatrix_t rxmatrix_identity();
+rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
 
+// Todo: to be removed!
 #define     rxRGB8 DXGI_FORMAT_R8_UNORM
 #define rxRGBA8888 DXGI_FORMAT_R8G8B8A8_UNORM
+
+typedef enum rxevent_k
+{
+  rxevent_kLBUTTON,
+  rxevent_kRBUTTON,
+} rxevent_k;
 
 typedef ID3D11DeviceChild   * rxunknown_t;
 typedef ID3D11View          * rxbindview_t;
@@ -133,9 +161,9 @@ typedef struct rxlocal_texture_t
 
 typedef struct rxtexture_t rxtexture_t;
 typedef struct rxtexture_t
-{          int size_x, size_y;
-           int format;
-  rxbindview_t bindview;
+{         int size_x, size_y;
+          int format;
+  rxunknown_t unknown;
 } rxtexture_t;
 
 // Note:
@@ -210,6 +238,8 @@ typedef struct rx_t
   int       center_x;
   int       center_y;
 
+  int tick_count;
+
   int in_vertex_mode;
 
   rxcommand_t *command;
@@ -222,8 +252,16 @@ typedef struct rx_t
   int color_b;
   int color_a;
 
+  float clear_r;
+  float clear_g;
+  float clear_b;
+  float clear_a;
+
   // Todo:
   int window_events[0x100];
+
+  int xcursor;
+  int ycursor;
 
   rxtexture_t     font_atlas;
   stbtt_bakedchar font_glyph[256];
@@ -265,7 +303,7 @@ typedef struct rx_t
     rxindex_t * index_buffer;
           int   index_buffer_index;
 
-  rxcommand_t   command_buffer[0x1000];
+  rxcommand_t   command_buffer[0x10000];
   int           command_buffer_index;
 
   ccclocktick_t start_ticks;
@@ -276,8 +314,6 @@ typedef struct rx_t
 
   ccf64_t total_seconds;
   ccf64_t delta_seconds;
-
-  rxf32x4_t   clear_color;
   rxtexture_t white;
 } rx_t;
 
@@ -324,8 +360,9 @@ void rxreturn(rxborrowed_t borrowed)
 
 rxborrowed_t rxborrow_texture(rxtexture_t texture)
 {
+  // todo: ensure this is a valid view
   ID3D11Resource *Resource;
-  ID3D11View_GetResource(texture.bindview,&Resource);
+  ID3D11View_GetResource((ID3D11View*)texture.unknown,&Resource);
 
   D3D11_MAPPED_SUBRESOURCE MappedAccess;
   ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
@@ -342,8 +379,10 @@ rxborrowed_t rxborrow_texture(rxtexture_t texture)
 
 void rxdelete_texture(rxtexture_t texture)
 {
+  // todo: ensure this is a valid view
   ID3D11Resource *Resource;
-  ID3D11View_GetResource(texture.bindview,&Resource);
+  ID3D11View_GetResource((ID3D11View*)texture.unknown,&Resource);
+
   ID3D11Resource_Release(Resource);
 }
 
@@ -397,10 +436,10 @@ rxcreate_texture_ex(int w, int h, int f, int s, void *m)
     (ID3D11Resource *)Texture2D,&ShaderResourceViewI,&ShaderResourceView);
 
   rxtexture_t result;
-  result.  size_x=w;
-  result.  size_y=h;
-  result.  format=f;
-  result.bindview=(ID3D11View*)ShaderResourceView;
+  result. size_x=w;
+  result. size_y=h;
+  result. format=f;
+  result.unknown=(rxunknown_t)ShaderResourceView;
   return result;
 }
 
@@ -468,11 +507,15 @@ rxcommand_t *rxcommand(rxdraw_k kind)
   return draw;
 }
 
-void rxclear(rxf32x4_t clear)
+void rxclear(float r, float g, float b, float a)
 {
-  rx.clear_color=clear;
+  rx.clear_r=r;
+  rx.clear_g=g;
+  rx.clear_b=b;
+  rx.clear_a=a;
 }
 
+// todo: properly integrate this!
 void rxdraw_matrix(rxmatrix_t matrix)
 {
   rxcommand_t *draw=rxcommand(rxdraw_kMATRIX);
@@ -488,7 +531,7 @@ void rxdraw_sampler(rxsampler_t sampler)
 void rxdraw_texture(rxtexture_t texture)
 {
   rxcommand_t *draw=rxcommand(rxdraw_kTEXTURE);
-  draw->unknown=(rxunknown_t)texture.bindview;
+  draw->unknown=texture.unknown;
 }
 
 void rxvertex_mode()
@@ -635,10 +678,11 @@ void rxdraw_text(int x, int y, float h, const char *string)
   float ox=(float)x;
   float oy=(float)y;
 
+  rxdraw_sampler(rx.point_sampler);
   rxdraw_texture(texture);
 
   rxvertex_mode();
-    rxvertex_color(rxcolor_kWHITE);
+  rxvertex_color(rxcolor_kWHITE);
 
   for(int index=0; *string; ++index)
   {
@@ -785,6 +829,9 @@ void rxpush_resources()
 
 int rxtick()
 {
+  rx.tick_count++;
+
+  // todo: this is temporary!
   rxmatrix_t matrix=rxmatrix_identity();
   matrix.m[0][0]=+2.0f/(rx.size_x);
   matrix.m[1][1]=+2.0f/(rx.size_y);
@@ -797,8 +844,10 @@ int rxtick()
 
   rxwindow();
 
+  float clear_color[]={rx.clear_r,rx.clear_g,rx.clear_b,rx.clear_a};
+
   ID3D11DeviceContext_ClearRenderTargetView(rx.Context,
-    rx.OffscreenBufferView,(float*)&rx.clear_color);
+    rx.OffscreenBufferView,clear_color);
 
   int index_offset=0;
   rxcommand_t *draw;
@@ -810,7 +859,7 @@ int rxtick()
     if(draw->kind==rxdraw_kMATRIX)
     {
       rxuniform_t t;
-      t.e=rxmatrix_mulM(draw->uniform.e,matrix);
+      t.e=rxmatrix_multiply(draw->uniform.e,matrix);
 
       void *memory=rxborrow_resource(rx.UniformBuffer);
       memcpy(memory,&t,sizeof(t));
@@ -869,13 +918,17 @@ int rxwindow_event_win32(UINT Message, WPARAM wParam, LPARAM lParam)
     } break;
     case WM_MOUSEMOVE:
     {
+      int xcursor=GET_X_LPARAM(lParam);
+      int ycursor=GET_Y_LPARAM(lParam);
+
+      rx.xcursor=xcursor;
+      rx.ycursor=rx.size_y-ycursor;
     } break;
     case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
     case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
     case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
     case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
-    { rx.window_events[wParam]=1;
-
+    { rx.window_events[rxevent_kLBUTTON]=1;
       if(!rx.ClickFocused)
       { rx.ClickFocused=TRUE;
         SetCapture((HWND)rx.Window);
@@ -883,7 +936,7 @@ int rxwindow_event_win32(UINT Message, WPARAM wParam, LPARAM lParam)
     } break;
     case WM_LBUTTONUP: case WM_RBUTTONUP:
     case WM_MBUTTONUP: case WM_XBUTTONUP:
-    { rx.window_events[wParam]=0;
+    { rx.window_events[rxevent_kLBUTTON]=0;
 
       rx.ClickFocused=FALSE;
       ReleaseCapture();
@@ -953,6 +1006,7 @@ void rxinit(const wchar_t *window_title)
     WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,
       NULL,NULL,WindowClass.hInstance,NULL);
 
+  SetCursor(LoadCursorA(NULL,IDC_ARROW));
 
   rxwindow();
 
@@ -1089,8 +1143,8 @@ void rxinit(const wchar_t *window_title)
   ID3D11Device_CreateSamplerState(rx.Device,&SamplerInfo,&rx.point_sampler.Sampler);
 
   rxresize_uniformbuffer(sizeof(rxuniform_t));
-  rxresize_indexbuffer(sizeof(rxindex_t)*0x1000*4);
-  rxresize_vertexbuffer(sizeof(rxvertex_t)*0x1000*4);
+  rxresize_indexbuffer(sizeof(rxindex_t)*0x10000);
+  rxresize_vertexbuffer(sizeof(rxvertex_t)*0x10000);
 
   rxpull_resources();
 
@@ -1120,13 +1174,13 @@ void rxinit(const wchar_t *window_title)
   ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,&rx.linear_sampler.Sampler);
 
   D3D11_RECT RootClip;
-  RootClip.left=0;
-  RootClip.top=0;
-  RootClip.right=0xffffff;
+  RootClip.left  =0;
+  RootClip.top   =0;
+  RootClip.right =0xffffff;
   RootClip.bottom=0xffffff;
   ID3D11DeviceContext_RSSetScissorRects(rx.Context,1,&RootClip);
 
-  rxclear(rxf32x4(.2,.2,.2,1));
+  rxclear(.2f,.2f,.2f,1.f);
 
   rx.white=rxcreate_texture(16,16,rxRGBA8888);
 
@@ -1138,4 +1192,30 @@ void rxinit(const wchar_t *window_title)
   rx.frame_ticks=rx.start_ticks;
   rxtime();
 }
+
+rxmatrix_t rxmatrix_identity()
+{
+  rxmatrix_t r;
+  r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
+  r.m[0][1]=0.f;r.m[1][1]=1.f;r.m[2][1]=0.f;r.m[3][1]=0.f;
+  r.m[0][2]=0.f;r.m[1][2]=0.f;r.m[2][2]=1.f;r.m[3][2]=0.f;
+  r.m[0][3]=0.f;r.m[1][3]=0.f;r.m[2][3]=0.f;r.m[3][3]=1.f;
+  return r;
+}
+
+// todo: remove loop, make intrinsic
+rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
+{ rxmatrix_t result;
+  for(int r=0; r<4; ++r)
+  { for(int c=0; c<4; ++c)
+    {  result.m[r][c] =
+        (a.m[r][0]*b.m[0][c]) +
+        (a.m[r][1]*b.m[1][c]) +
+        (a.m[r][2]*b.m[2][c]) +
+        (a.m[r][3]*b.m[3][c]);
+    }
+  }
+  return result;
+}
+
 #endif
