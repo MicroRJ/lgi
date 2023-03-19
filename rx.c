@@ -47,7 +47,9 @@
 ** -- unnecessary structures that has leaked in from other headers
 ** ++ a default font in the source tree, 'avenue-pixel', although this is not my preferred approach
 ** ++ 'rxex.c' where extensions will be added
-** ++ 'rxload_vertex_shader_file' loads a shader and create an input layout automatically using the reflection api!
+** ++ 'rxcompile_shader_file' compiles a shader from file
+** ++ 'rxload_vertex_shader' loads a shader and create an input layout automatically using the reflection api!
+** ++ 'rxload_pixel_shader'
 */
 #ifndef _RX_H
 #define _RX_H
@@ -125,6 +127,20 @@
 
 #define rxPI_F 3.14159265358979323846f
 
+#ifdef _CCDEBUG
+#define RX_SHADER_COMPILATION_FLAGS\
+  D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|\
+                     D3DCOMPILE_DEBUG|\
+         D3DCOMPILE_SKIP_OPTIMIZATION|\
+       D3DCOMPILE_WARNINGS_ARE_ERRORS
+#else
+#define RX_SHADER_COMPILATION_FLAGS\
+  D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|\
+         D3DCOMPILE_ENABLE_STRICTNESS|\
+       D3DCOMPILE_OPTIMIZATION_LEVEL3
+#endif
+
+
 // if more functionality desired, it shall be presented in an extensions source file,
 // functionality included here is minimum required for common rendering operations.
 typedef struct rxmatrix_t rxmatrix_t;
@@ -148,11 +164,16 @@ typedef ID3D11DeviceChild   * rxunknown_t;
 typedef ID3D11View          * rxbindview_t;
 typedef ID3D11Resource      * rxresource_t;
 
+typedef struct rxblobber_t rxblobber_t;
+typedef struct rxblobber_t
+{
+  ID3DBlob   *unknown;
+} rxblobber_t;
+
 typedef struct rxshader_t rxshader_t;
 typedef struct rxshader_t
 {
-  rxunknown_t         unknown;
-  ID3D11InputLayout  *layout; // note: only for vertex shaders!
+  rxunknown_t unknown;
 } rxshader_t;
 
 typedef struct rxsampler_t rxsampler_t;
@@ -471,6 +492,79 @@ rxtexture_t rxload_texture_file(const char *name)
   return texture;
 }
 
+void rxdelete_bytecode(rxblobber_t bytecode)
+{
+  if(bytecode.unknown)
+    bytecode.unknown->lpVtbl->Release(bytecode.unknown);
+}
+
+rxblobber_t rxcompile_shader_file(const char *name, const char *main, const char *model)
+{
+  void *file=ccopenfile(name,"r");
+
+  unsigned int size=0;
+  void *data=ccpullfile(file,0,&size);
+
+  ID3DBlob *BytecodeBlob,*MessagesBlob;
+
+  // todo: proper model!
+  if(FAILED(D3DCompile(data,size,name,0,0,main,model,
+      RX_SHADER_COMPILATION_FLAGS,0,&BytecodeBlob,&MessagesBlob)))
+    cctraceerr("'%s': there were compilation errors", name);
+
+  rxblobber_t blobber;
+  blobber.unknown=BytecodeBlob;
+
+  ccfree(data);
+  ccclosefile(file);
+
+  return blobber;
+}
+
+rxshader_t rxcreate_vertex_shader(rxblobber_t bytecode)
+{
+  ID3D11VertexShader *VertexShader;
+  if(FAILED(
+      ID3D11Device_CreateVertexShader(rx.Device,
+        bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
+        bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
+          NULL,&VertexShader)))
+  {
+    // todo: better logging
+    cctraceerr("there were compilation errors");
+  }
+
+  rxshader_t result;
+  result.unknown=(rxunknown_t)(VertexShader);
+  return result;
+}
+
+rxshader_t rxcreate_pixel_shader(rxblobber_t bytecode)
+{
+  ID3D11PixelShader *PixelShader;
+
+  if(FAILED(
+      ID3D11Device_CreatePixelShader(rx.Device,
+        bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
+        bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
+          NULL,&PixelShader)))
+  {
+    // todo: better logging
+    cctraceerr("there were compilation errors");
+  }
+
+  rxshader_t result;
+  result.unknown=(rxunknown_t)(PixelShader);
+  return result;
+}
+
+rxshader_t rxload_pixel_shader(const char *name, const char *main)
+{
+  // todo: release bytecode!
+  rxblobber_t bytecode=rxcompile_shader_file(name,main,"ps_5_0");
+  rxshader_t result=rxcreate_pixel_shader(bytecode);
+  return result;
+}
 //
 // todo: to know which shaders are in this file, we can make the user
 // define some macros, this way we can use pre-process to know!
@@ -479,35 +573,15 @@ rxtexture_t rxload_texture_file(const char *name)
 // it is reliable in principle, with a little bit more work it can be more robust!
 // note: with more cleverness, you can extend this to make it work
 // for all shader types!
-rxshader_t rxload_vertex_shader_file(const char *name, const char *main)
+// todo: has some leaks!
+rxshader_t rxload_vertex_shader(const char *name, const char *main)
 {
-  rxshader_t result;
-  result.unknown=0;
 
-  void *file=ccopenfile(name,"r");
+  rxblobber_t bytecode=rxcompile_shader_file(name,main,"vs_5_0");
+  rxshader_t result=rxcreate_vertex_shader(bytecode);
 
-  unsigned int size=0;
-  void *data=ccpullfile(file,0,&size);
-
-  UINT CompilationFlags=
-#if 1
-  // D3DCOMPILE_PACK_MATRIX_ROW_MAJOR|
-                  D3DCOMPILE_DEBUG|
-      D3DCOMPILE_SKIP_OPTIMIZATION|
-    D3DCOMPILE_WARNINGS_ARE_ERRORS
-#else
-   |D3DCOMPILE_ENABLE_STRICTNESS|
-  D3DCOMPILE_OPTIMIZATION_LEVEL3
-#endif
-  ;
-
-  ID3DBlob *ShaderBlob,*MessageBlob;
-
-  // todo: proper model!
-  if(FAILED(D3DCompile(data,size,name,0,0,main,"vs_5_0",
-      CompilationFlags,0,&ShaderBlob,&MessageBlob))) goto error_compilation;
-
-  ccfree(data);
+  ccassert(bytecode.unknown != 0);
+  ccassert(result.unknown != 0);
 
   // note:
   // I thought that I could use this to hack my way into directly creating the input layout, however,
@@ -515,22 +589,18 @@ rxshader_t rxload_vertex_shader_file(const char *name, const char *main)
   // that I know whether this is optional or not!
   ID3DBlob *BlobPart;
   if(FAILED(D3DGetBlobPart(
-      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
-      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
-        D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart))) goto error_input_signature;
-
-  if(FAILED(
-      ID3D11Device_CreateVertexShader(rx.Device,
-      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
-      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
-      NULL,(ID3D11VertexShader**)&result.unknown))) goto error_create_vertex_shader;
+      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
+      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
+        D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart)))
+    goto error_input_signature;
 
   ID3D11ShaderReflection* Reflection;
   if(FAILED(
       D3DReflect(
-      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
-      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
-        &IID_ID3D11ShaderReflection,(void**)&Reflection))) goto error_reflection;
+      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
+      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
+        &IID_ID3D11ShaderReflection,(void**)&Reflection)))
+    goto error_reflection;
 
 
   D3D11_SHADER_DESC ShaderInfo;
@@ -569,23 +639,23 @@ rxshader_t rxload_vertex_shader_file(const char *name, const char *main)
     Element->InstanceDataStepRate=0;
   }
 
-  ID3D11InputLayout *Layout;
+  ID3D11InputLayout *InputLayout;
   if(FAILED(
       ID3D11Device_CreateInputLayout(rx.Device,ElementArray,ParameterCount,
-        ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
-        ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
-          (ID3D11InputLayout**)&result.layout))) goto error_input_layout;
+      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
+      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
+        &InputLayout)))
+    goto error_input_layout;
 
-  goto success;
+  ccassert(InputLayout != 0);
 
-error_compilation:
-  cctraceerr("there were compiler errors");
-  goto error;
+  result.unknown->lpVtbl->SetPrivateData(result.unknown,
+    &IID_ID3D11InputLayout,sizeof(void*),(void*)InputLayout);
+
+goto leave;
+
 error_input_signature:
   cctraceerr("there was an error extracting the input signature");
-  goto error;
-error_create_vertex_shader:
-  cctraceerr("there was an error creating the vertex shader");
   goto error;
 error_reflection:
   cctraceerr("there was an error with the reflection interface");
@@ -595,8 +665,7 @@ error_input_layout:
   goto error;
 error:
 
-success:
-  ccclosefile(file);
+leave:
   return result;
 }
 
@@ -671,10 +740,10 @@ void rxdraw_texture(rxtexture_t texture)
   draw->unknown=texture.unknown;
 }
 
-void rxdraw_shader(rxtexture_t texture)
+void rxdraw_shader(rxshader_t shader)
 {
-  rxcommand_t *draw=rxcommand(rxdraw_kTEXTURE);
-  draw->unknown=texture.unknown;
+  rxcommand_t *draw=rxcommand(rxdraw_kSHADER);
+  draw->unknown=shader.unknown;
 }
 
 void rxvertex_mode()
@@ -989,42 +1058,49 @@ int rxtick()
 
   float clear_color[]={rx.clear_r,rx.clear_g,rx.clear_b,rx.clear_a};
 
+  // todo: this should also be a command, will be when needed?
   ID3D11DeviceContext_ClearRenderTargetView(rx.Context,
     rx.OffscreenBufferView,clear_color);
 
   int index_offset=0;
   rxcommand_t *draw;
   for (draw=rx.command_buffer;draw<rx.command_buffer+rx.command_buffer_index;++draw)
-  { if(draw->kind==rxdraw_kCLIP)
-    {
-      // Todo:!
-    } else
-    if(draw->kind==rxdraw_kMATRIX)
-    {
-      rxuniform_t t;
-      t.e=rxmatrix_multiply(draw->uniform.e,matrix);
+  { switch(draw->kind)
+    { case rxdraw_kCLIP:
+      break;
+      case rxdraw_kMATRIX:
+        rxuniform_t t;
+        t.e=rxmatrix_multiply(draw->uniform.e,matrix);
+        void *memory=rxborrow_resource(rx.UniformBuffer);
+        memcpy(memory,&t,sizeof(t));
+        rxreturn_resource(rx.UniformBuffer);
+      break;
+      case rxdraw_kSHADER:
+        ccassert(draw->unknown!=0);
 
-      void *memory=rxborrow_resource(rx.UniformBuffer);
-      memcpy(memory,&t,sizeof(t));
-      rxreturn_resource(rx.UniformBuffer);
+        // note: probably not the fastest thing, but it is what I needed at the moment
+        IUnknown *Shader;
+        if(SUCCEEDED(IUnknown_QueryInterface(draw->unknown,&IID_ID3D11VertexShader,&Shader)))
+          ID3D11DeviceContext_VSSetShader(rx.Context,(ID3D11VertexShader*)Shader,0x00,0);
+        else
+        if(SUCCEEDED(IUnknown_QueryInterface(draw->unknown,&IID_ID3D11PixelShader,&Shader)))
+          ID3D11DeviceContext_PSSetShader(rx.Context,(ID3D11PixelShader*)Shader,0x00,0);
+        else
+          cctracewar("unsupported interface, not a shader, or unsupported shader type",0);
 
-    } else
-    if(draw->kind==rxdraw_kSAMPLER)
-    {
-      ccassert(draw->unknown!=0);
-
-      ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,(ID3D11SamplerState**)&draw->unknown);
-    } else
-    if(draw->kind==rxdraw_kTEXTURE)
-    {
-      ccassert(draw->unknown!=0);
-
-      ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,1,(ID3D11ShaderResourceView**)&draw->unknown);
-    } else
-    if(draw->kind==rxdraw_kINDEXED)
-    {
-      ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
-      index_offset+=draw->length;
+      break;
+      case rxdraw_kSAMPLER:
+        ccassert(draw->unknown!=0);
+        ID3D11DeviceContext_PSSetSamplers(rx.Context,0,1,(ID3D11SamplerState**)&draw->unknown);
+      break;
+      case rxdraw_kTEXTURE:
+        ccassert(draw->unknown!=0);
+        ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,1,(ID3D11ShaderResourceView**)&draw->unknown);
+      break;
+      case rxdraw_kINDEXED:
+        ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
+        index_offset+=draw->length;
+      break;
     }
   }
 
