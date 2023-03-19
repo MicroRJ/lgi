@@ -1,3 +1,8 @@
+#ifdef RX_COMPILER
+# include pixel_shader
+# include vertex_shader
+#endif
+
 cbuffer ConstBuffer : register(b0)
 { float4x4 ProjectionMatrix;
 };

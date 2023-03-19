@@ -44,9 +44,10 @@
 ** ++ now commands are more productive and specific
 ** ++ vertex mode, made text rendering much more efficient
 ** ++ frame counter
-** ++ removed unnecessary structures that has leaked in from other headers
-** ++ added a default font in the source tree, 'avenue-pixel', although this is not my preferred approach
-** ++ added 'rxex.c' where extensions will be added
+** -- unnecessary structures that has leaked in from other headers
+** ++ a default font in the source tree, 'avenue-pixel', although this is not my preferred approach
+** ++ 'rxex.c' where extensions will be added
+** ++ 'rxload_vertex_shader_file' loads a shader and create an input layout automatically using the reflection api!
 */
 #ifndef _RX_H
 #define _RX_H
@@ -107,8 +108,10 @@
 #include <ws2tcpip.h>
 #include <Winsock2.h>
 
-// #pragma warning(disable:4115)
-// #include <d3dcompiler.h>
+
+#pragma warning(disable:4115)
+#include <d3dcompiler.h>
+
 #include <dxgidebug.h>
 #include <dxgi.h>
 #include <dxgi1_4.h>
@@ -144,6 +147,13 @@ typedef enum rxevent_k
 typedef ID3D11DeviceChild   * rxunknown_t;
 typedef ID3D11View          * rxbindview_t;
 typedef ID3D11Resource      * rxresource_t;
+
+typedef struct rxshader_t rxshader_t;
+typedef struct rxshader_t
+{
+  rxunknown_t         unknown;
+  ID3D11InputLayout  *layout; // note: only for vertex shaders!
+} rxshader_t;
 
 typedef struct rxsampler_t rxsampler_t;
 typedef struct rxsampler_t
@@ -210,6 +220,7 @@ typedef enum rxdraw_k
   rxdraw_kMATRIX,
   rxdraw_kSAMPLER,
   rxdraw_kTEXTURE,
+  rxdraw_kSHADER,
 } rxdraw_k;
 
 typedef struct rxcommand_t rxcommand_t;
@@ -386,13 +397,9 @@ void rxdelete_texture(rxtexture_t texture)
   ID3D11Resource_Release(Resource);
 }
 
-// Note:
-// I keep thinking about splitting these types of functions into individual 'create' and 'bind',
-// but what's the point if the resource has to be created with explicit bind flags.
-// For that reason, I think it's best that a resource is at least partially typed or categorized by
-// its bind attributes and any bind objects be created at initialization time.
-// More sensitive resource should have their own, correspondingly sensitive functions that tailor
-// to any peculiar attributes.
+// note:
+// resources are partially typed by their usage flags, by default, all 'rxtexture_t' are created
+// accessible to shaders only.
 rxtexture_t
 rxcreate_texture_ex(int w, int h, int f, int s, void *m)
 {
@@ -464,6 +471,135 @@ rxtexture_t rxload_texture_file(const char *name)
   return texture;
 }
 
+//
+// todo: to know which shaders are in this file, we can make the user
+// define some macros, this way we can use pre-process to know!
+//
+// note: this function uses reflection to create an input layout automatically, it is not complete but i think
+// it is reliable in principle, with a little bit more work it can be more robust!
+// note: with more cleverness, you can extend this to make it work
+// for all shader types!
+rxshader_t rxload_vertex_shader_file(const char *name, const char *main)
+{
+  rxshader_t result;
+  result.unknown=0;
+
+  void *file=ccopenfile(name,"r");
+
+  unsigned int size=0;
+  void *data=ccpullfile(file,0,&size);
+
+  UINT CompilationFlags=
+#if 1
+  // D3DCOMPILE_PACK_MATRIX_ROW_MAJOR|
+                  D3DCOMPILE_DEBUG|
+      D3DCOMPILE_SKIP_OPTIMIZATION|
+    D3DCOMPILE_WARNINGS_ARE_ERRORS
+#else
+   |D3DCOMPILE_ENABLE_STRICTNESS|
+  D3DCOMPILE_OPTIMIZATION_LEVEL3
+#endif
+  ;
+
+  ID3DBlob *ShaderBlob,*MessageBlob;
+
+  // todo: proper model!
+  if(FAILED(D3DCompile(data,size,name,0,0,main,"vs_5_0",
+      CompilationFlags,0,&ShaderBlob,&MessageBlob))) goto error_compilation;
+
+  ccfree(data);
+
+  // note:
+  // I thought that I could use this to hack my way into directly creating the input layout, however,
+  // you can't really? but I guess we still check this to ensure there's an input signature present, not
+  // that I know whether this is optional or not!
+  ID3DBlob *BlobPart;
+  if(FAILED(D3DGetBlobPart(
+      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
+      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
+        D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart))) goto error_input_signature;
+
+  if(FAILED(
+      ID3D11Device_CreateVertexShader(rx.Device,
+      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
+      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
+      NULL,(ID3D11VertexShader**)&result.unknown))) goto error_create_vertex_shader;
+
+  ID3D11ShaderReflection* Reflection;
+  if(FAILED(
+      D3DReflect(
+      ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
+      ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
+        &IID_ID3D11ShaderReflection,(void**)&Reflection))) goto error_reflection;
+
+
+  D3D11_SHADER_DESC ShaderInfo;
+  Reflection->lpVtbl->GetDesc(Reflection,&ShaderInfo);
+
+  int ParameterCount=ShaderInfo.InputParameters;
+
+  D3D11_SIGNATURE_PARAMETER_DESC ElementInfo;
+
+  // todo: fixme
+  D3D11_INPUT_ELEMENT_DESC ElementArray[0x20];
+
+  for(int ElementIndex=0;ElementIndex<ParameterCount;++ElementIndex)
+  {
+    Reflection->lpVtbl->GetInputParameterDesc(Reflection,ElementIndex,&ElementInfo);
+
+    D3D11_INPUT_ELEMENT_DESC *Element=ElementArray+ElementIndex;
+    Element-> SemanticName=ElementInfo.SemanticName;
+    Element->SemanticIndex=ElementInfo.SemanticIndex;
+
+    // todo: support other formats!
+    if(ElementInfo.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32)
+    {
+      switch(ElementInfo.Mask)
+      { case 0b0001: Element->Format=0;                          break;
+        case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;   break;
+        case 0b0111: Element->Format=0;                          break;
+        case 0b1111: Element->Format=DXGI_FORMAT_R8G8B8A8_UNORM; break;
+      }
+    } else
+      ccassert(!"not implemented");
+
+    Element->           InputSlot=0;
+    Element->   AlignedByteOffset=D3D11_APPEND_ALIGNED_ELEMENT;
+    Element->      InputSlotClass=D3D11_INPUT_PER_VERTEX_DATA;
+    Element->InstanceDataStepRate=0;
+  }
+
+  ID3D11InputLayout *Layout;
+  if(FAILED(
+      ID3D11Device_CreateInputLayout(rx.Device,ElementArray,ParameterCount,
+        ShaderBlob->lpVtbl->GetBufferPointer(ShaderBlob),
+        ShaderBlob->lpVtbl->GetBufferSize(ShaderBlob),
+          (ID3D11InputLayout**)&result.layout))) goto error_input_layout;
+
+  goto success;
+
+error_compilation:
+  cctraceerr("there were compiler errors");
+  goto error;
+error_input_signature:
+  cctraceerr("there was an error extracting the input signature");
+  goto error;
+error_create_vertex_shader:
+  cctraceerr("there was an error creating the vertex shader");
+  goto error;
+error_reflection:
+  cctraceerr("there was an error with the reflection interface");
+  goto error;
+error_input_layout:
+  cctraceerr("there was an error creating the input layout");
+  goto error;
+error:
+
+success:
+  ccclosefile(file);
+  return result;
+}
+
 // Todo: legit font packer!
 // Todo: we will need a dedicated shader for font rendering!
 // Todo: support for multiple fonts!
@@ -507,6 +643,7 @@ rxcommand_t *rxcommand(rxdraw_k kind)
   return draw;
 }
 
+// todo: this should be a command instead, and it should is 'rxcolor_t'
 void rxclear(float r, float g, float b, float a)
 {
   rx.clear_r=r;
@@ -529,6 +666,12 @@ void rxdraw_sampler(rxsampler_t sampler)
 }
 
 void rxdraw_texture(rxtexture_t texture)
+{
+  rxcommand_t *draw=rxcommand(rxdraw_kTEXTURE);
+  draw->unknown=texture.unknown;
+}
+
+void rxdraw_shader(rxtexture_t texture)
 {
   rxcommand_t *draw=rxcommand(rxdraw_kTEXTURE);
   draw->unknown=texture.unknown;
