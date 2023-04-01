@@ -1,31 +1,31 @@
-#ifdef RX_COMPILER
-# include pixel_shader
-# include vertex_shader
-#endif
-
-cbuffer ConstBuffer : register(b0)
-{ float4x4 ProjectionMatrix;
+cbuffer _ : register(b0)
+{ float4x4 _xyzworldtoclip;
+	float2     screen_xysize;
+	float2    mouse_xycursor;
 };
 struct VS_INPUT
-{ float2 pos : POSITION;
-  float2 uv  : TEXCOORD0;
-  float4 col : COLOR0;
+{ float2   xyz:POSITION;
+  float2    uv:TEXCOORD0;
+  float4 color:COLOR0;
 };
 struct PS_INPUT
-{ float4 pos : SV_POSITION;
-  float4 col : COLOR0;
-  float2 uv  : TEXCOORD0;
+{ float4      xyz:SV_POSITION;
+  float4    color:COLOR0;
+  float2       uv:TEXCOORD0;
 };
-PS_INPUT MainVS(VS_INPUT input)
-{ PS_INPUT output;
-  output.pos = mul( ProjectionMatrix, float4(input.pos.xy, 0.f, 1.f));
-  output.col = input.col;
-  output.uv  = input.uv;
-  return output;
+PS_INPUT MainVS(VS_INPUT i)
+{
+	PS_INPUT o;
+  o.     xyz=mul(_xyzworldtoclip,float4(i.xyz, 0.f, 1.f));
+  o.   color=i.color;
+  o.      uv=i.uv;
+  return o;
 }
 SamplerState      sampler0;
 Texture2D<float4> texture0;
-float4 MainPS(PS_INPUT input) : SV_Target
-{ float4 out_col=input.col*texture0.Sample(sampler0,input.uv);
-  return out_col;
+float4 MainPS(PS_INPUT i) : SV_Target
+{
+  float4 color=i.color*texture0.Sample(sampler0,i.uv);
+  return color;
 }
+
