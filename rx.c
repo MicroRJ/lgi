@@ -47,6 +47,7 @@
 // todo: bind different textures to the shader to avoid having to switch them multiple times per frame?
 //
 // lastest branch: march 30, 23: rx-iq
+// lastest branch: april 10, 23: rx-mz
 //
 #ifndef _RX_H
 #define _RX_H
@@ -99,6 +100,10 @@
 #pragma warning(disable:4244)
 # endif
 
+# ifdef _RX_NO_DOUBLE_TO_FLOAT_WARNING
+#pragma warning(disable:4305)
+# endif
+
 // todo: this is provisional
 #ifndef RX_COMMAND_BUFFER_SIZE
 #define RX_COMMAND_BUFFER_SIZE 0x1000
@@ -119,6 +124,12 @@
 #define rxABS(v)   ((v)<(0)?-(v):(v))
 #define rxMIN(x,y) ((x)<(y)? (x):(y))
 #define rxMAX(x,y) ((x)>(y)? (x):(y))
+
+// merge: added 'rxclamp'
+float rxclamp(float val, float min, float max)
+{
+  return val < min ? min : val > max ? max : val;
+}
 
 // todo?: there should be a macro for row-vs-col matrices!
 #ifdef _CCDEBUG
@@ -193,6 +204,7 @@ typedef struct rxcolor_t
 } rxcolor_t;
 
 const rxcolor_t  rxcolor_kWHITE={0xff,0xff,0xff,0xff};
+const rxcolor_t   rxcolor_kGRAY={0x80,0x80,0x80,0xff};
 const rxcolor_t  rxcolor_kBLACK={0x00,0x00,0x00,0xff};
 const rxcolor_t    rxcolor_kRED={0xff,0x00,0x00,0xff};
 const rxcolor_t  rxcolor_kGREEN={0x00,0xff,0x00,0xff};
@@ -204,6 +216,11 @@ typedef struct rxpoint16_t
 {
   short x,y;
 } rxpoint16_t;
+typedef struct rxvector2_t rxvector2_t;
+typedef struct rxvector2_t
+{
+  float x,y;
+} rxvector2_t;
 typedef struct rxvector3_t rxvector3_t;
 typedef struct rxvector3_t
 {
@@ -251,7 +268,6 @@ typedef struct rxcontents_t
 { unsigned  int  length;
   void         * memory;
   ccclocktick_t  loaded;
-            int  slaves;
 } rxcontents_t;
 
 // note: the parameters we need to restore the instance,
@@ -405,7 +421,7 @@ typedef int rxindex_t;
 
 typedef void (*rxcustom_t)();
 
-// todo: union!
+// todo!!: union
 typedef struct rxcommand_t rxcommand_t;
 typedef struct rxcommand_t
 {      rx_k              kind;
@@ -432,6 +448,10 @@ ccglobal ID3D11DeviceChild *   LastBufferSetByUser;
 typedef struct rx_t rx_t;
 typedef struct rx_t
 {
+  // note:
+  HANDLE LiveReloadDirectory;
+  HANDLE LiveReloadEvent;
+
   // note:
             int   tick_count;
   ccclocktick_t   start_ticks;
@@ -649,19 +669,20 @@ void rxdelete_shader(rxshader_t shader)
   IUnknown_Release(shader.unknown);
 }
 
-ccclocktick_t rxtime_contents_loaded(const char *name)
+int rxinstance_invalidated(rxinstance_t *instance)
 {
-  ccassert(name != 0);
+  rxcontents_t *contents=cctblgetS(rx.contents_table,instance->master);
 
-  rxcontents_t *contents=cctblgetS(rx.contents_table,name);
-  ccassert(ccerrnon());
-
-  return contents->loaded;
+  return ccerrnit() || contents->loaded > instance->loaded;
 }
 
-// todo: this is incredibly inefficient, we should instead
-// register the volume this file is in and check for file
-// changes, if so reload all affected contents.
+int rxcontents_registered(const char *name)
+{
+  cctblgetS(rx.contents_table,name);
+
+  return ccerrnon();
+}
+
 rxcontents_t rxreload_contents(const char *name)
 {
   ccassert(name    != 0);
@@ -716,37 +737,24 @@ rxinstance_t *rxreloadable_resource(rxunknown_t unknown)
 
 void rxreload_resource(rxshader_t *shader)
 {
-  rxinstance_t resource=*rxreloadable_resource(shader->unknown);
+  rxinstance_t *instance=rxreloadable_resource(shader->unknown);
 
-  ccassert(resource.master[0] != 0);
-
-  cctblgetS(rx.contents_table,resource.master);
-  ccassert(ccerrnon());
-
-  rxcontents_t contents=rxreload_contents(resource.master);
-
-  ccassert(contents.memory != 0);
-  ccassert(contents.length != 0);
-
-  if(contents.loaded > resource.loaded)
+  if(rxinstance_invalidated(instance))
   {
     rxshader_t new_shader=(rxshader_t){0};
 
+    // todo!:
     if(rxshader_typeof_vertex(*shader))
-      new_shader=rxload_vertex_shader(resource.master,resource.restore.shader_entry);
+      new_shader=rxload_vertex_shader(instance->master,instance->restore.shader_entry);
     else
     if(rxshader_typeof_pixel(*shader))
-      new_shader=rxload_pixel_shader(resource.master,resource.restore.shader_entry);
+      new_shader=rxload_pixel_shader(instance->master,instance->restore.shader_entry);
     else
       ccassert(!"error");
 
     if(new_shader.unknown != 0)
     {
-      rxinstance_t *new_resource=rxreloadable_resource(new_shader.unknown);
-      new_resource->loaded=rxtime_contents_loaded(resource.master);
-
       rxdelete_shader(*shader);
-
       *shader=new_shader;
     }
   }
@@ -761,9 +769,12 @@ rxinclude_reloadable_instance(rxunknown_t unknown, const char *master)
   rxinstance_t *instance=cctblputP(rx.resource_table,unknown);
   ccassert(ccerrnon());
 
+  rxcontents_t *contents=cctblgetS(rx.contents_table,master);
+  ccassert(ccerrnon());
+
   instance->unknown=unknown;
   instance-> master=master;
-  instance-> loaded=rx.total_ticks;
+  instance-> loaded=contents->loaded;
 
   return &instance->restore;
 }
@@ -1982,9 +1993,78 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
   return result;
 }
 
+void rxpull_live_reload_changes()
+{
+  if(!rx.LiveReloadDirectory)
+    return;
+
+  FILE_NOTIFY_INFORMATION *Entry;
+
+  ccglobal char   EntryBuffer[(sizeof(* Entry) + MAX_PATH) << 4];
+  ccglobal  int IsEventActive;
+
+  if(!IsEventActive)
+  {
+    OVERLAPPED Overlapped;
+    ZeroMemory(&Overlapped,sizeof(Overlapped));
+
+    Overlapped.hEvent=rx.LiveReloadEvent;
+
+    if(ReadDirectoryChangesW(
+        rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),TRUE,
+          FILE_NOTIFY_CHANGE_FILE_NAME|FILE_NOTIFY_CHANGE_DIR_NAME|FILE_NOTIFY_CHANGE_LAST_WRITE|FILE_NOTIFY_CHANGE_SIZE,
+            NULL,&Overlapped,NULL))
+    {
+      IsEventActive = TRUE;
+    }
+  }
+
+  if(IsEventActive)
+  { switch(WaitForSingleObject(rx.LiveReloadEvent,0))
+    { case WAIT_OBJECT_0:
+      {
+        OVERLAPPED Overlapped;
+        ZeroMemory(&Overlapped,sizeof(Overlapped));
+        Overlapped.hEvent=rx.LiveReloadEvent;
+
+        DWORD BytesRead;
+        GetOverlappedResult(rx.LiveReloadDirectory,&Overlapped,&BytesRead,FALSE);
+
+        for(char *EntryCursor = EntryBuffer;
+              EntryCursor < EntryBuffer + sizeof(EntryBuffer);)
+        {
+
+          Entry = (FILE_NOTIFY_INFORMATION*)(EntryCursor);
+
+          char FileName[MAX_PATH];
+
+          if(WideCharToMultiByte(CP_UTF8,0,Entry->FileName,Entry->FileNameLength,
+              FileName,sizeof(FileName),NULL,FALSE))
+          {
+            if(rxcontents_registered(FileName))
+            {
+              rxreload_contents(FileName);
+            }
+          }
+
+          if(!Entry->NextEntryOffset)
+            break;
+
+          EntryCursor += Entry->NextEntryOffset;
+        }
+
+        IsEventActive = FALSE;
+      } break;
+    }
+  }
+
+}
+
 int rxtick()
 {
   rx.tick_count++;
+
+  rxpull_live_reload_changes();
 
   rxwindow();
 
@@ -2039,8 +2119,8 @@ int rxtick()
   // todo!!: this is still in the works!
   // note: apply our 'effect' render pass to the last target
   {
-    rxreload_resource(&rx.candle_vertex_shader);
-    rxreload_resource(&rx. candle_pixel_shader);
+    // rxreload_resource(&rx.candle_vertex_shader);
+    // rxreload_resource(&rx. candle_pixel_shader);
 
            rxshader_t vertex_shader=rx.candle_vertex_shader;
            rxshader_t  pixel_shader=rx. candle_pixel_shader;
@@ -2448,6 +2528,17 @@ void rxinit(const wchar_t *window_title)
   rxtime();
 
   rxinit_default_font();
+
+
+  // note: shader reloading
+  {
+    rx.LiveReloadDirectory=CreateFileA(".",
+      FILE_LIST_DIRECTORY,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,NULL,
+        OPEN_EXISTING,FILE_FLAG_BACKUP_SEMANTICS|FILE_FLAG_OVERLAPPED,NULL);
+    rx.LiveReloadEvent=CreateEvent(NULL,FALSE,0,NULL);
+  }
+
+  rxpull_live_reload_changes();
 }
 
 //
@@ -2608,11 +2699,11 @@ void rxinit_default_font()
 
 rxvector3_t rxvector_xyz(float x, float y, float z)
 {
-	rxvector3_t r;
+  rxvector3_t r;
   r.x = x;
   r.y = y;
   r.z = z;
- 	return r;
+  return r;
 }
 
 rxvector3_t rxvector_xy(float x, float y)
@@ -2637,7 +2728,7 @@ rxvector3_t rxvector_z(float z)
 
 rxvector3_t rxvector(float xyz)
 {
-	return rxvector_xyz(xyz,xyz,xyz);
+  return rxvector_xyz(xyz,xyz,xyz);
 }
 
 float rxvector_dot(rxvector3_t a, rxvector3_t b)
