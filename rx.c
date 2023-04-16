@@ -2608,11 +2608,11 @@ void rxinit_default_font()
 
 rxvector3_t rxvector_xyz(float x, float y, float z)
 {
-	rxvector3_t r;
+  rxvector3_t r;
   r.x = x;
   r.y = y;
   r.z = z;
- 	return r;
+  return r;
 }
 
 rxvector3_t rxvector_xy(float x, float y)
@@ -2637,7 +2637,7 @@ rxvector3_t rxvector_z(float z)
 
 rxvector3_t rxvector(float xyz)
 {
-	return rxvector_xyz(xyz,xyz,xyz);
+  return rxvector_xyz(xyz,xyz,xyz);
 }
 
 float rxvector_dot(rxvector3_t a, rxvector3_t b)
