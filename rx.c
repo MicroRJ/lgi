@@ -48,6 +48,7 @@
 //
 // lastest branch: march 30, 23: rx-iq
 // lastest branch: april 10, 23: rx-mz
+// lastest branch: april 15, 23: rx-iq
 //
 #ifndef _RX_H
 #define _RX_H
@@ -152,9 +153,13 @@ float rxclamp(float val, float min, float max)
 
 typedef enum rx_k
 {
-   rx_kVERTEX_SHADER,
-    rx_kPIXEL_SHADER,
+         rx_kINVALID,
+
   rx_kCOMPUTE_SHADER,
+    rx_kPIXEL_SHADER,
+   rx_kVERTEX_SHADER,
+
+    rx_kINPUT_LAYOUT,
 
   rx_kUNIFORM_BUFFER,
    rx_kSTRUCT_BUFFER,
@@ -268,6 +273,10 @@ typedef struct rxcontents_t
 { unsigned  int  length;
   void         * memory;
   ccclocktick_t  loaded;
+  // note: we keep track of whether the contents of this file
+  // are erroneous, in which case all instances bound to this
+  // file shouldn't be reloaded/restored.
+  unsigned          is_erroneous: 1;
 } rxcontents_t;
 
 // note: the parameters we need to restore the instance,
@@ -279,13 +288,16 @@ typedef struct rxrestore_t
   const    char *shader_entry;
 } rxrestore_t;
 
-// todo!!: add type-info here!
 typedef struct rxinstance_t rxinstance_t;
 typedef struct rxinstance_t
-{ rxunknown_t     unknown;
-  rxrestore_t     restore;
-  const    char *  master;
-  ccclocktick_t    loaded;
+{ rx_k                  sort;
+  rxunknown_t         unknown;
+  rxinstance_t       *working;
+  unsigned     is_restoreable: 1;
+  unsigned         is_deleted: 1;
+  const    char   *    master;
+  ccclocktick_t        loaded;
+  rxrestore_t         restore;
 } rxinstance_t;
 
 typedef struct rxblobber_t rxblobber_t;
@@ -402,19 +414,22 @@ typedef struct rxshadow_t
 
 // note: we have some extra 'useless' info here for quick prototyping or for demoscene type stuff,
 // this is what shader-toy does!
+// merge: switched to using floating point values instead!
 typedef struct rxuniform_t rxuniform_t;
-typedef struct rxuniform_t
+typedef struct __declspec(align(16)) rxuniform_t
 {
-  // todo: rename 'worldtoclip' or 'toclip'
+  // todo!!!: rename
   rxmatrix_t e;
 
-  int   screen_xsize;
-  int   screen_ysize;
-  int  mouse_xcursor;
-  int  mouse_ycursor;
-  int   shadow_tally;
-  int   candle_tally;
-  int   padding[2];
+  float    screen_xsize;
+  float    screen_ysize;
+  float   mouse_xcursor;
+  float   mouse_ycursor;
+  double  total_seconds;
+  double  delta_seconds;
+  int      shadow_tally;
+  int      candle_tally;
+  int           padding[2];
 } rxuniform_t;
 
 typedef int rxindex_t;
@@ -469,10 +484,9 @@ typedef struct rx_t
   float           font_xsize;
 
   // note: these are cc-hash-tables
-  rxinstance_t       *resource_table;
+  rxinstance_t       *instance_table;
   rxcontents_t       *contents_table;
 
-              rxuniform_t               uniform;
 
   rxmatrix_t                        view_matrix;
   rxmatrix_t                       world_matrix;
@@ -548,7 +562,7 @@ typedef struct rx_t
   int       center_x;
   int       center_y;
 
-
+  // todo!!: remove!
   float clear_r;
   float clear_g;
   float clear_b;
@@ -597,6 +611,109 @@ typedef struct rx_t
 // though, rx.this, rx.that
 ccglobal rx_t rx;
 
+int rxcontents_registered(const char *name)
+{
+  cctblgetS(rx.contents_table,name);
+
+  return ccerrnon();
+}
+
+rxcontents_t rxreload_contents(const char *name)
+{
+  ccassert(name    != 0);
+  ccassert(name[0] != 0);
+
+  rxcontents_t *contents=cctblsetS(rx.contents_table,name);
+  ccassert(ccerrnon());
+
+  void *file=ccopenfile(name,"r");
+
+  unsigned long length=0;
+  void *memory=ccpullfile(file,0,&length);
+
+  ccclosefile(file);
+
+  if(length != 0 && memory != 0)
+  {
+    if((contents->length == 0) || (contents->memory == 0) ||
+        (contents->length != length) || memcmp(memory,contents->memory,length))
+    {
+      ccdebuglog(ccformat("'%s': reloaded contents",name));
+
+      contents->      loaded=rx.total_ticks;
+      contents->is_erroneous=ccfalse;
+    }
+
+    if(contents->memory)
+    {
+      ccfree(contents->memory);
+    }
+
+    contents->memory=memory;
+    contents->length=length;
+  } else
+    ccdebuglog("could not read file, this happens when you read the file 165 times a second");
+
+  return *contents;
+}
+
+void rxdelete_instance(rxunknown_t unknown)
+{
+  ccassert(unknown != 0);
+
+  rxinstance_t *i = cctblremP(rx.instance_table,unknown);
+  ccassert(ccerrnon());
+
+  ccassert(i->is_deleted != cctrue);
+
+  // todo!!: temporary
+  ccassert(i->unknown == unknown);
+
+  // ccdebuglog("%i, %p ~ %p", i->sort, i->unknown, unknown);
+
+  memset(i,0,sizeof(*i));
+  // note: we do this in case some other code holds a reference
+  // to this instance
+  i->is_deleted = cctrue;
+
+  ID3D11DeviceChild_Release(unknown);
+}
+
+rxinstance_t *rxborrow_instance(rxunknown_t unknown)
+{
+  rxinstance_t *i = cctblgetP(rx.instance_table,unknown);
+  ccassert(ccerrnon());
+
+  ccassert(i->is_deleted != cctrue);
+  return i;
+}
+
+rxinstance_t *rxcreate_instance(rx_k sort, rxunknown_t unknown)
+{
+  // ccdebuglog("%i, %p", sort, unknown);
+
+  rxinstance_t *i = cctblputP(rx.instance_table,unknown);
+  ccassert(ccerrnon());
+  i->          sort=sort;
+  i->       unknown=unknown;
+  i->    is_deleted=ccfalse;
+  i->is_restoreable=ccfalse;
+  return i;
+}
+
+rxrestore_t *rxattach_instance_metadata(rxunknown_t unknown, const char *master)
+{
+  rxcontents_t *contents=cctblgetS(rx.contents_table,master);
+  ccassert(ccerrnon());
+
+  rxinstance_t    *instance=rxborrow_instance(unknown);
+  instance-> is_restoreable=cctrue;
+  instance->         master=master;
+  instance->         loaded=contents->loaded;
+
+  return &instance->restore;
+}
+
 // todo!:
 ID3D11VertexShader *rxshader_typeof_vertex(rxshader_t shader)
 {
@@ -639,6 +756,7 @@ void rxdriver_stage_viewport(float w, float h)
   ID3D11DeviceContext_RSSetViewports(rx.Context,1,&Viewport);
 }
 
+// todo!!: to be removed? stored separately?
 ID3D11InputLayout *rxshader_query_input_layout_d3d(rxshader_t shader)
 { ID3D11InputLayout *InputLayout=NULL;
   UINT PrivateDataSize=sizeof(InputLayout);
@@ -651,132 +769,57 @@ void rxshader_store_input_layout_d3d(rxshader_t shader, ID3D11InputLayout *Input
 { ccassert(InputLayout != 0 && InputLayout->lpVtbl != 0);
   UINT PrivateDataSize=sizeof(InputLayout);
   ID3D11DeviceChild_SetPrivateData(shader.unknown,&IID_ID3D11InputLayout,PrivateDataSize,&InputLayout);
-  rxshader_query_input_layout_d3d(shader);
+  // rxshader_query_input_layout_d3d(shader);
 }
 
 void rxdelete_shader(rxshader_t shader)
 {
+  // todo!!:
   if(rxshader_typeof_vertex(shader))
   {
     ID3D11InputLayout *InputLayout=rxshader_query_input_layout_d3d(shader);
 
     if(InputLayout != NULL)
     {
-      IUnknown_Release(InputLayout);
+      rxdelete_instance((rxunknown_t)InputLayout);
+      // IUnknown_Release(InputLayout);
     }
+
   }
 
-  IUnknown_Release(shader.unknown);
+  rxdelete_instance(shader.unknown);
 }
 
-int rxinstance_invalidated(rxinstance_t *instance)
-{
-  rxcontents_t *contents=cctblgetS(rx.contents_table,instance->master);
-
-  return ccerrnit() || contents->loaded > instance->loaded;
-}
-
-int rxcontents_registered(const char *name)
-{
-  cctblgetS(rx.contents_table,name);
-
-  return ccerrnon();
-}
-
-rxcontents_t rxreload_contents(const char *name)
-{
-  ccassert(name    != 0);
-  ccassert(name[0] != 0);
-
-  rxcontents_t *contents=cctblsetS(rx.contents_table,name);
-  ccassert(ccerrnon());
-
-  void *file=ccopenfile(name,"r");
-
-  unsigned long length=0;
-  void *memory=ccpullfile(file,0,&length);
-
-  ccclosefile(file);
-
-  if(length != 0 && memory != 0)
-  {
-    if((contents->length == 0) || (contents->memory == 0) ||
-        (contents->length != length) || memcmp(memory,contents->memory,length))
-    {
-      ccdebuglog(ccformat("'%s': reloaded contents",name));
-
-      contents->loaded=rx.total_ticks;
-    }
-
-    if(contents->memory)
-    {
-      ccfree(contents->memory);
-    }
-
-    contents->memory=memory;
-    contents->length=length;
-  } else
-    ccdebuglog("could not read file, this happens when you read the file 165 times a second");
-
-  return *contents;
-}
 
 rxshader_t rxload_vertex_shader(const char *file, const char *entry);
 rxshader_t  rxload_pixel_shader(const char *file, const char *entry);
 
 rxblobber_t rxcompile_shader_file(const char *name, const char *main, const char *model);
 
-rxinstance_t *rxreloadable_resource(rxunknown_t unknown)
+void rxreload_shader(rxshader_t *shader)
 {
-  rxinstance_t *resource=cctblgetP(rx.resource_table,unknown);
-  ccassert(ccerrnon());
+  rxinstance_t *i=rxborrow_instance(shader->unknown);
+  rxcontents_t *c=cctblgetS(rx.contents_table,i->master);
 
-  ccassert(resource->master[0] != 0);
-  return resource;
-}
-
-void rxreload_resource(rxshader_t *shader)
-{
-  rxinstance_t *instance=rxreloadable_resource(shader->unknown);
-
-  if(rxinstance_invalidated(instance))
+  if(ccerrnit() || (!c->is_erroneous && c->loaded > i->loaded))
   {
-    rxshader_t new_shader=(rxshader_t){0};
+    rxshader_t s=(rxshader_t){0};
 
-    // todo!:
     if(rxshader_typeof_vertex(*shader))
-      new_shader=rxload_vertex_shader(instance->master,instance->restore.shader_entry);
+      s=rxload_vertex_shader(i->master,i->restore.shader_entry);
     else
     if(rxshader_typeof_pixel(*shader))
-      new_shader=rxload_pixel_shader(instance->master,instance->restore.shader_entry);
+      s=rxload_pixel_shader(i->master,i->restore.shader_entry);
     else
       ccassert(!"error");
 
-    if(new_shader.unknown != 0)
+    if(s.unknown != 0)
     {
       rxdelete_shader(*shader);
-      *shader=new_shader;
-    }
+      *shader=s;
+    } else
+      c->is_erroneous=cctrue;
   }
-}
-
-rxrestore_t *
-rxinclude_reloadable_instance(rxunknown_t unknown, const char *master)
-{
-  ccassert(master    != 0);
-  ccassert(master[0] != 0);
-
-  rxinstance_t *instance=cctblputP(rx.resource_table,unknown);
-  ccassert(ccerrnon());
-
-  rxcontents_t *contents=cctblgetS(rx.contents_table,master);
-  ccassert(ccerrnon());
-
-  instance->unknown=unknown;
-  instance-> master=master;
-  instance-> loaded=contents->loaded;
-
-  return &instance->restore;
 }
 
 // todo: this is temporary
@@ -1384,11 +1427,10 @@ rxcreate_render_target(int w, int h, int f)
     // note: not sure if the we care enough about the performance
     // implications of binding to two separate pipeline stages, this is
     // something that I'd have to research...
-    D3D11_BIND_SHADER_RESOURCE|
-      D3D11_BIND_RENDER_TARGET,0,1,0);
+    D3D11_BIND_RENDER_TARGET|
+      D3D11_BIND_SHADER_RESOURCE,0,1,0);
 
-  // note: see xx for safety
-  // ID3D11Device_CheckMultisampleQualityLevels();
+  // note: see ID3D11Device_CheckMultisampleQualityLevels() for safety
 
   if(SUCCEEDED(ID3D11Device_CreateTexture2D(rx.Device,&I,NULL,&Texture)))
   {
@@ -1482,16 +1524,15 @@ rxblobber_t rxcompile_shader(
 
   rxblobber_t blobber=(rxblobber_t){0};
 
+  // note: this is not a registered instance, who cares?
   ID3DBlob *BytecodeBlob,*MessagesBlob;
   if(SUCCEEDED(
       D3DCompile(memory,length,name,0,0,entry,model,
         RX_SHADER_COMPILATION_FLAGS,0,&BytecodeBlob,&MessagesBlob)))
   {
-
     blobber.unknown=BytecodeBlob;
     blobber. memory=BytecodeBlob->lpVtbl->GetBufferPointer(BytecodeBlob);
     blobber. length=BytecodeBlob->lpVtbl->   GetBufferSize(BytecodeBlob);
-
   } else
   {
     ccprintf("<!4%s!>\r\n",
@@ -1514,9 +1555,13 @@ rxshader_t rxcreate_vertex_shader(rxblobber_t bytecode)
 {
   ID3D11VertexShader *DeviceChild = NULL;
 
-  // todo!!: possibly do some logging here?
-  ID3D11Device_CreateVertexShader(rx.Device,
-    bytecode.memory,bytecode.length,NULL,&DeviceChild);
+  if(SUCCEEDED(
+      ID3D11Device_CreateVertexShader(rx.Device,
+        bytecode.memory,bytecode.length,NULL,&DeviceChild)))
+  {
+    rxcreate_instance(rx_kVERTEX_SHADER,(rxunknown_t)DeviceChild);
+  }
+
 
   rxshader_t result=(rxshader_t){(rxunknown_t)(DeviceChild)};
   return result;
@@ -1526,61 +1571,87 @@ rxshader_t rxcreate_pixel_shader(rxblobber_t bytecode)
 {
   ID3D11PixelShader *DeviceChild = NULL;
 
-  // todo!!: possibly do some logging here?
-  ID3D11Device_CreatePixelShader(rx.Device,
-    bytecode.memory,bytecode.length,NULL,&DeviceChild);
+  if(SUCCEEDED(
+      ID3D11Device_CreatePixelShader(rx.Device,
+        bytecode.memory,bytecode.length,NULL,&DeviceChild)))
+  {
+    rxcreate_instance(rx_kPIXEL_SHADER,(rxunknown_t)DeviceChild);
+  }
 
   rxshader_t result=(rxshader_t){(rxunknown_t)(DeviceChild)};
   return result;
 }
 
-rxshader_t rxload_pixel_shader(const char *file, const char *entry)
+rxshader_t rxload_pixel_shader(const char *master, const char *entry)
 {
   // todo!!: we should get this from the device!
   char *model="ps_5_0";
 
-  rxblobber_t bytecode=rxcompile_shader_file(file,entry,model);
-  rxshader_t result=rxcreate_pixel_shader(bytecode);
-  rxdelete_blobbler(bytecode);
+  rxblobber_t bytecode=rxcompile_shader_file(master,entry,model);
 
-  rxrestore_t *restore=rxinclude_reloadable_instance(result.unknown,file);
-  restore->shader_model=model;
-  restore->shader_entry=entry;
+  rxshader_t result=(rxshader_t){0};
+
+  if((bytecode.memory != 0) && (bytecode.length != 0))
+  {
+    result=rxcreate_pixel_shader(bytecode);
+
+    rxdelete_blobbler(bytecode);
+
+    if(result.unknown != 0)
+    {
+      rxrestore_t *restore=rxattach_instance_metadata(result.unknown,master);
+      restore->shader_model=model;
+      restore->shader_entry=entry;
+
+    }
+  }
   return result;
 }
 
 // note: this function uses reflection to create an input layout automatically,
 // it is not complete but i think it is reliable in principle, with a little bit more work it can be more robust!
 // note: with more cleverness, you can extend this to make it work for all shader types!
-rxshader_t rxload_vertex_shader(const char *file, const char *entry)
+// todo!!: leaky!
+rxshader_t rxload_vertex_shader(const char *master, const char *entry)
 {
   // todo!!: we should get this from the device!
   char *model="vs_5_0";
 
-  rxblobber_t bytecode=rxcompile_shader_file(file,entry,model);
-  rxshader_t result=rxcreate_vertex_shader(bytecode);
+  rxblobber_t bytecode=rxcompile_shader_file(master,entry,model);
 
-  rxrestore_t *restore=rxinclude_reloadable_instance(result.unknown,file);
-  restore->shader_model=model;
-  restore->shader_entry=entry;
+  rxshader_t result=(rxshader_t){0};
 
-  // note:
-  // I thought that I could use this to create the input layout directly, however, you can't really?
-  // I guess we still check this to ensure there's an input signature present, not
-  // that I know whether that's optional or not!
+  if((bytecode.memory != 0) && (bytecode.length != 0))
+  {
+    result=rxcreate_vertex_shader(bytecode);
+
+    if(result.unknown != 0)
+    {
+      rxrestore_t *restore=rxattach_instance_metadata(result.unknown,master);
+      restore->shader_model=model;
+      restore->shader_entry=entry;
+
+      goto create_input_layout;
+    }
+  }
+
+  goto error;
+
+  // note: the shader was compiled and create successfully!
+create_input_layout:
+
+  // note: unfortunately you can't use this to create the input layout directly...
   ID3DBlob *BlobPart;
   if(FAILED(D3DGetBlobPart(
-      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
-      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
-        D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart)))
+        bytecode.memory,bytecode.length,
+          D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart)))
     goto error_input_signature;
 
   ID3D11ShaderReflection* Reflection;
   if(FAILED(
       D3DReflect(
-      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
-      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
-        &IID_ID3D11ShaderReflection,(void**)&Reflection)))
+        bytecode.memory,bytecode.length,
+          &IID_ID3D11ShaderReflection,(void**)&Reflection)))
     goto error_reflection;
 
 
@@ -1610,6 +1681,8 @@ rxshader_t rxload_vertex_shader(const char *file, const char *entry)
         case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;   break;
         case 0b0111: Element->Format=0;                          break;
         case 0b1111: Element->Format=DXGI_FORMAT_R8G8B8A8_UNORM; break;
+        default:
+          ccassert(!"not impl");
       }
     } else
       ccassert(!"not implemented");
@@ -1623,25 +1696,25 @@ rxshader_t rxload_vertex_shader(const char *file, const char *entry)
   ID3D11InputLayout *InputLayout;
   if(FAILED(
       ID3D11Device_CreateInputLayout(rx.Device,ElementArray,ParameterCount,
-      bytecode.unknown->lpVtbl->GetBufferPointer(bytecode.unknown),
-      bytecode.unknown->lpVtbl->   GetBufferSize(bytecode.unknown),
-        &InputLayout)))
+        bytecode.memory,bytecode.length,&InputLayout)))
     goto error_input_layout;
 
   ccassert(InputLayout != 0);
 
+  // todo!!!:
+  rxcreate_instance(rx_kINPUT_LAYOUT,(rxunknown_t)InputLayout);
   rxshader_store_input_layout_d3d(result,InputLayout);
 
 goto leave;
 
 error_input_signature:
-  ccdebuglog("there was an error extracting the input signature");
+  cctracewar("'%s': there was a problem extracting the input signature",master);
   goto error;
 error_reflection:
-  ccdebuglog("there was an error with the reflection interface");
+  cctracewar("'%s': there was a problem with the reflection interface",master);
   goto error;
 error_input_layout:
-  ccdebuglog("there was an error creating the input layout");
+  cctracewar("'%s': there was a problem creating the input layout",master);
   goto error;
 error:
 
@@ -1972,10 +2045,12 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
       {
         rxuniform_t t;
         t.e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
-        t. screen_xsize=rx.size_x;
-        t. screen_ysize=rx.size_y;
-        t.mouse_xcursor=rx.xcursor;
-        t.mouse_ycursor=rx.ycursor;
+        t. screen_xsize=(float)(rx.size_x);
+        t. screen_ysize=(float)(rx.size_y);
+        t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
+        t.mouse_ycursor=(float)(rx.ycursor) / rx.size_y; // todo!!:
+        t.total_seconds=rx.total_seconds;
+        t.delta_seconds=rx.delta_seconds;
         t.shadow_tally=rx.shadow_tally;
         t.candle_tally=rx.candle_tally;
 
@@ -1999,44 +2074,42 @@ void rxpull_live_reload_changes()
     return;
 
   FILE_NOTIFY_INFORMATION *Entry;
+                     char *EntryCursor;
 
   ccglobal char   EntryBuffer[(sizeof(* Entry) + MAX_PATH) << 4];
   ccglobal  int IsEventActive;
 
+  OVERLAPPED Overlapped;
+  ZeroMemory(&Overlapped,sizeof(Overlapped));
+  Overlapped.hEvent=rx.LiveReloadEvent;
+
   if(!IsEventActive)
   {
-    OVERLAPPED Overlapped;
-    ZeroMemory(&Overlapped,sizeof(Overlapped));
-
-    Overlapped.hEvent=rx.LiveReloadEvent;
+    memset(EntryBuffer,0,sizeof(EntryBuffer));
 
     if(ReadDirectoryChangesW(
-        rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),TRUE,
-          FILE_NOTIFY_CHANGE_FILE_NAME|FILE_NOTIFY_CHANGE_DIR_NAME|FILE_NOTIFY_CHANGE_LAST_WRITE|FILE_NOTIFY_CHANGE_SIZE,
-            NULL,&Overlapped,NULL))
+        rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),
+                                   TRUE, // note: watch the sub-tree as well!
+                                      0
+           //|FILE_NOTIFY_CHANGE_FILE_NAME
+           // |FILE_NOTIFY_CHANGE_DIR_NAME
+         |FILE_NOTIFY_CHANGE_LAST_WRITE
+               // |FILE_NOTIFY_CHANGE_SIZE
+                 ,NULL,&Overlapped,NULL))
     {
       IsEventActive = TRUE;
     }
   }
 
   if(IsEventActive)
-  { switch(WaitForSingleObject(rx.LiveReloadEvent,0))
-    { case WAIT_OBJECT_0:
-      {
-        OVERLAPPED Overlapped;
-        ZeroMemory(&Overlapped,sizeof(Overlapped));
-        Overlapped.hEvent=rx.LiveReloadEvent;
+  { if(WAIT_OBJECT_0 == WaitForSingleObject(rx.LiveReloadEvent,0))
+    { DWORD BytesRead=0;
+      if(GetOverlappedResult(rx.LiveReloadDirectory,&Overlapped,&BytesRead,FALSE))
+      { for(EntryCursor=EntryBuffer;EntryCursor<EntryBuffer+sizeof(EntryBuffer);)
+        { Entry=(FILE_NOTIFY_INFORMATION*)(EntryCursor);
 
-        DWORD BytesRead;
-        GetOverlappedResult(rx.LiveReloadDirectory,&Overlapped,&BytesRead,FALSE);
-
-        for(char *EntryCursor = EntryBuffer;
-              EntryCursor < EntryBuffer + sizeof(EntryBuffer);)
-        {
-
-          Entry = (FILE_NOTIFY_INFORMATION*)(EntryCursor);
-
-          char FileName[MAX_PATH];
+          char FileName[MAX_PATH+4];
+          memset(FileName,0,sizeof(FileName));
 
           if(WideCharToMultiByte(CP_UTF8,0,Entry->FileName,Entry->FileNameLength,
               FileName,sizeof(FileName),NULL,FALSE))
@@ -2054,7 +2127,7 @@ void rxpull_live_reload_changes()
         }
 
         IsEventActive = FALSE;
-      } break;
+      }
     }
   }
 
@@ -2119,8 +2192,8 @@ int rxtick()
   // todo!!: this is still in the works!
   // note: apply our 'effect' render pass to the last target
   {
-    // rxreload_resource(&rx.candle_vertex_shader);
-    // rxreload_resource(&rx. candle_pixel_shader);
+    rxreload_shader(&rx.candle_vertex_shader);
+    rxreload_shader(&rx. candle_pixel_shader);
 
            rxshader_t vertex_shader=rx.candle_vertex_shader;
            rxshader_t  pixel_shader=rx. candle_pixel_shader;
@@ -2175,7 +2248,7 @@ int rxtick()
   IDXGISwapChain_Present(rx.SwapChain,1u,0);
 
   // todo!:
-  WaitForSingleObjectEx(rx.FrameAwait,33,TRUE);
+  WaitForSingleObjectEx(rx.FrameAwait,INFINITE,TRUE);
 
   if(!rx.Visible)
   {
@@ -2849,6 +2922,7 @@ rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
   return result;
 }
 
+// todo!!: this could be made faster, just usind perp!
 rxmatrix_t rxmatrix_rotZ(float angle)
 { rxmatrix_t result=rxmatrix_identity();
   float cosres=cosf(angle);
