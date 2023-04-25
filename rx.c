@@ -437,25 +437,25 @@ typedef void (*rxcustom_t)();
 // todo!!: union
 typedef struct rxcommand_t rxcommand_t;
 typedef struct rxcommand_t
-{      rx_k               kind;
-         const char *     name;
-  rxrender_target_t     target;
-         rxshader_t     shader;
-         rxsampler_t   sampler;
-         rxtexture_t   texture;
-        // rxunknown_t    unknown;
-         rxcustom_t     custom;
-         rxmatrix_t     matrix;
-                int     offset;
-                int     length;
-                int    x,y,w,h;
-      unsigned char    r,g,b,a;
-                int       slot;
+{              rx_k   kind;
+         const char * name;
+  rxrender_target_t   target;
+         rxshader_t   shader;
+        rxsampler_t   sampler;
+        rxtexture_t   texture;
+         rxcustom_t   custom;
+         rxmatrix_t   matrix;
+                int   offset;
+                int   length;
+                int   x,y,w,h;
+      unsigned char   r,g,b,a;
+                int   slot;
 } rxcommand_t;
 
-// todo: to be implemented properly!
-// ccglobal ID3D11DeviceChild *   LastShaderSetByUser;
-ccglobal ID3D11DeviceChild *   LastBufferSetByUser;
+// typedef struct rxvertex_renderer_t rxvertex_renderer_t;
+// typedef struct rxvertex_renderer_t
+// {
+// } rxvertex_renderer_t;
 
 // todo!!: please forgive me!
 typedef struct rx_t rx_t;
@@ -593,16 +593,6 @@ typedef struct rx_t
   rxshader_t default_vertex_shader;
   rxshader_t  default_pixel_shader;
 
-  // todo: rename these to, 'default_xxxx_shader',
-  // have one for each topology?
-  // ID3D11VertexShader  *  VertexShader;
-  // ID3D11PixelShader   *  PixelShader;
-  // ID3D11InputLayout   *  VertexShaderInputLayout;
-
-  // todo: this should depend on draw command!
-  ID3D11DeviceChild *LastShaderSetByUser;
-  ID3D11DeviceChild *LastBufferSetByUser;
-
   rxsampler_t        linear_sampler;
   rxsampler_t         point_sampler;
 
@@ -659,6 +649,16 @@ rxinstance_t *rxcreate_instance(rxinstance_t *i, rx_k sort, rxunknown_t unknown)
   i->      sort=sort;
   i->   unknown=unknown;
   return i;
+}
+
+void rxreturn_resource(void *resource)
+{
+  ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)resource,0);
+}
+
+void rxreturn(rxborrowed_t borrowed)
+{
+  rxreturn_resource(borrowed.resource);
 }
 
 // todo: ensure we're doing this 'safely'!
@@ -1341,7 +1341,6 @@ rxborrowed_t rxborrow_index_buffer(rxindex_buffer_t buffer)
   // todo: actually check that it is a index buffer!
   return rxborrow_typeless_buffer(buffer.unknown);
 }
-
 rxborrowed_t rxborrow_typeless_buffer(rxunknown_t);
 rxborrowed_t rxborrow_struct_buffer(rxstruct_buffer_t buffer)
 {
@@ -1352,14 +1351,11 @@ rxborrowed_t rxborrow_struct_buffer(rxstruct_buffer_t buffer)
   return rxborrow_typeless_buffer((rxunknown_t)resource);
 }
 
-void rxreturn_resource(void *resource)
+void rxmemcpy_uniform_buffer(rxuniform_buffer_t uniform, void *memory, size_t length)
 {
-  ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)resource,0);
-}
-
-void rxreturn(rxborrowed_t borrowed)
-{
-  rxreturn_resource(borrowed.resource);
+  rxborrowed_t b=rxborrow_uniform_buffer(uniform);
+  memcpy(b.memory,memory,length);
+  rxreturn(b);
 }
 
 // todo: support different formats
@@ -1947,6 +1943,16 @@ void rxwindow()
   rx.center_y=rx.size_y>>1;
 }
 
+rxcandle_t *rxeffect_candle()
+{
+  return rx.candle_array + rx.candle_tally++ % rx.candle_threshold;
+}
+
+rxshadow_t *rxeffect_shadow()
+{
+  return rx.shadow_array + rx.shadow_tally++ % rx.shadow_threshold;
+}
+
 void rxrestore_render_stack()
 {
   rx.shader_index=0;
@@ -1964,19 +1970,17 @@ void rxrestore_render_stack()
 
   rxdriver_stage_shader(rx.default_vertex_shader);
   rxdriver_stage_shader(rx. default_pixel_shader);
+
+  rx.world_matrix=rxmatrix_identity();
+  rx. view_matrix=rxmatrix_identity();
+  rx.view_matrix.m[0][0]=+ 2.0f/(rx.size_x);
+  rx.view_matrix.m[1][1]=+ 2.0f/(rx.size_y);
+  rx.view_matrix.m[2][2]=+ 0.5f;
+  rx.view_matrix.m[3][0]=- 1.0f;
+  rx.view_matrix.m[3][1]=- 1.0f;
 }
 
-rxcandle_t *rxeffect_candle()
-{
-  return rx.candle_array + rx.candle_tally++ % rx.candle_threshold;
-}
-
-rxshadow_t *rxeffect_shadow()
-{
-  return rx.shadow_array + rx.shadow_tally++ % rx.shadow_threshold;
-}
-
-// note: this is possibly the slowest thing ever, don't write games like this!
+// todo!!: this is possibly the slowest thing ever, don't write games like this!
 void rxdefault_render_pass()
 { rx.vertex_buffer_writeonly=rxborrow_vertex_buffer(rx.vertex_buffer);
   rx. index_buffer_writeonly= rxborrow_index_buffer(rx. index_buffer);
@@ -2001,6 +2005,7 @@ void rxdefault_render_pass()
   rx.candle_tally=0;
 }
 
+// todo!!: this is possibly the slowest thing ever, don't write games like this!
 void rxdefault_render_pass_end()
 {
   rxreturn(rx.vertex_buffer_writeonly);
@@ -2014,7 +2019,21 @@ void rxdefault_render_pass_end()
 
   rx.shadow_array=ccnull;
   rx.candle_array=ccnull;
+
+  rxuniform_t t;
+  t.            e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
+  t. screen_xsize=(float)(rx.size_x);
+  t. screen_ysize=(float)(rx.size_y);
+  t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
+  t.mouse_ycursor=(float)(rx.ycursor) / rx.size_y; // todo!!:
+  t.total_seconds=rx.total_seconds;
+  t.delta_seconds=rx.delta_seconds;
+  t. shadow_tally=rx.shadow_tally;
+  t. candle_tally=rx.candle_tally;
+
+  rxmemcpy_uniform_buffer(rx.uniform_buffer,&t,sizeof(t));
 }
+
 
 // ccdebuglog("command - %s",draw->master?draw->master:"unnamed");
 int rxexec_command(rxcommand_t *draw, int index_offset)
@@ -2104,28 +2123,6 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
     } break;
     case rx_kINDEXED:
     {
-      // todo: only do this if required!
-      // todo: switch to two buffers instead? one that changes per command, another that changes
-      // per tick?
-      // note: default to our buffer if user didn't change anything...
-      if(!rx.LastBufferSetByUser)
-      {
-        rxuniform_t t;
-        t.e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
-        t. screen_xsize=(float)(rx.size_x);
-        t. screen_ysize=(float)(rx.size_y);
-        t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
-        t.mouse_ycursor=(float)(rx.ycursor) / rx.size_y; // todo!!:
-        t.total_seconds=rx.total_seconds;
-        t.delta_seconds=rx.delta_seconds;
-        t.shadow_tally=rx.shadow_tally;
-        t.candle_tally=rx.candle_tally;
-
-        rxborrowed_t borrowed=rxborrow_uniform_buffer(rx.uniform_buffer);
-        memcpy(borrowed.memory,&t,sizeof(t));
-        rxreturn(borrowed);
-      }
-
       ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
       result += draw->length;
 
@@ -2156,13 +2153,8 @@ void rxpull_live_reload_changes()
 
     if(ReadDirectoryChangesW(
         rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),
-                                   TRUE, // note: watch the sub-tree as well!
-                                      0
-           //|FILE_NOTIFY_CHANGE_FILE_NAME
-           // |FILE_NOTIFY_CHANGE_DIR_NAME
-         |FILE_NOTIFY_CHANGE_LAST_WRITE
-               // |FILE_NOTIFY_CHANGE_SIZE
-                 ,NULL,&Overlapped,NULL))
+          TRUE, // note: watch the sub-tree as well!
+          FILE_NOTIFY_CHANGE_LAST_WRITE,NULL,&Overlapped,NULL))
     {
       IsEventActive = TRUE;
     }
@@ -2208,14 +2200,6 @@ int rxtick()
 
   rxwindow();
 
-  // todo: this should be in the render stack!
-  rx.world_matrix=rxmatrix_identity();
-  rx. view_matrix=rxmatrix_identity();
-  rx.view_matrix.m[0][0]=+ 2.0f/(rx.size_x);
-  rx.view_matrix.m[1][1]=+ 2.0f/(rx.size_y);
-  rx.view_matrix.m[2][2]=+ 0.5f;
-  rx.view_matrix.m[3][0]=- 1.0f;
-  rx.view_matrix.m[3][1]=- 1.0f;
 
   // todo: clear_color
 #if 0
@@ -2224,8 +2208,6 @@ int rxtick()
     rx.Context,rx.DepthBuffer,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
 #endif
 #endif
-  // todo: remove!
-   LastBufferSetByUser=0;
 
   // todo: this is extremely unsafe and unpredictable, get something more robust!
   rxdraw_end();
@@ -2697,12 +2679,33 @@ void rxinit(const wchar_t *window_title)
   rxpull_live_reload_changes();
 }
 
+void load_bitmap8(unsigned char *memory, int stride, unsigned char *source)
+{
+  for(int y=0; y<16; ++y)
+  { unsigned short bitrow=*source++;
+
+    rxcolor_t *color=(rxcolor_t*)memory;
+    for(int x=0; x<8; ++x)
+    { unsigned char bitpixel=255 * (bitrow & 0x1);
+      color->r = bitpixel;
+      color->g = bitpixel;
+      color->b = bitpixel;
+      color->a = bitpixel;
+      ++color;
+      bitrow >>= 1;
+    }
+    memory += stride;
+  }
+}
+
+void rxinit_default_font()
+{
 //
 // please forgive me
 //
 // credits: https://datagoblin.itch.io/monogram
 //
-ccglobal unsigned char rxglobal_monogram[95][16]=
+unsigned char encoded[95][16]=
 { {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
   {0,0,0,0,0,16,16,16,16,16,0,16,0,0,0,0},
   {0,0,0,0,0,40,40,40,0,0,0,0,0,0,0,0},
@@ -2800,27 +2803,6 @@ ccglobal unsigned char rxglobal_monogram[95][16]=
   {0,0,0,0,0,0,0,72,52,0,0,0,0,0,0,0},
 };
 
-void load_bitmap8(unsigned char *memory, int stride, unsigned char *source)
-{
-  for(int y=0; y<16; ++y)
-  { unsigned short bitrow=*source++;
-
-    rxcolor_t *color=(rxcolor_t*)memory;
-    for(int x=0; x<8; ++x)
-    { unsigned char bitpixel=255 * (bitrow & 0x1);
-      color->r = bitpixel;
-      color->g = bitpixel;
-      color->b = bitpixel;
-      color->a = bitpixel;
-      ++color;
-      bitrow >>= 1;
-    }
-    memory += stride;
-  }
-}
-
-void rxinit_default_font()
-{
   rxtexture_t texture=rxcreate_texture(512,256,rxRGBA8888);
 
   rxborrowed_t b=rxborrow_texture(texture);
@@ -2829,7 +2811,7 @@ void rxinit_default_font()
   unsigned char *memory = b.memory;
 
   int index;
-  for(index=0; index<ccCarrlenL(rxglobal_monogram); ++index)
+  for(index=0; index<ccCarrlenL(encoded); ++index)
   { int xcursor=index % 32 * 16;
     int ycursor=index / 32 * 16;
 
@@ -2837,7 +2819,7 @@ void rxinit_default_font()
 
     write=memory+stride*ycursor+xcursor*sizeof(rxcolor_t);
 
-    load_bitmap8(write,stride,rxglobal_monogram[index]);
+    load_bitmap8(write,stride,encoded[index]);
 
     rxpoint16_t p;
     p.x=(short)xcursor;
@@ -2892,6 +2874,15 @@ float rxvector_dot(rxvector3_t a, rxvector3_t b)
   return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
+rxvector3_t rxvector_cross(rxvector3_t a, rxvector3_t b)
+{
+  // note: this is how I memorize the cross product formula, think of rotations around an axis.
+  return rxvector_xyz
+    ( a.y*b.z - a.z*b.y,    // x-axis -> z/y plane
+      a.z*b.x - a.x*b.z,    // y-axis -> x/z plane
+      a.x*b.y - a.y*b.x );  // z-axis -> y/x plane
+}
+
 float rxvector_length(rxvector3_t a)
 {
   return sqrtf(rxvector_dot(a,a));
@@ -2921,6 +2912,15 @@ rxvector3_t rxvector_mul(rxvector3_t a, rxvector3_t b)
   r.x = a.x*b.x;
   r.y = a.y*b.y;
   r.z = a.z*b.z;
+  return r;
+}
+
+rxvector3_t rxvector_downscale(rxvector3_t a, float b)
+{
+  rxvector3_t r;
+  r.x = a.x/b;
+  r.y = a.y/b;
+  r.z = a.z/b;
   return r;
 }
 
