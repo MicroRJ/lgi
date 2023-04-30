@@ -11,15 +11,8 @@ void
 rxdelete_uniform_buffer(
   rxuniform_buffer_t buffer);
 
-void
-rxresize_uniform_buffer(
-  size_t size_in_bytes);
-
 void rxupdate_uniform_buffer(
-  rxuniform_buffer_t uniform,
-      void *memory,
-    size_t  length);
-
+  rxuniform_buffer_t uniform, void *memory, size_t length);
 #endif
 
 #ifdef _RXUNIFORM_BUFFER_IMPLEMENTATION
@@ -52,7 +45,27 @@ rxborrow_typeless_buffer(rxunknown_t buffer)
   return result;
 }
 
+void
+rxdevice_bind_uniform_buffer(
+  rxuniform_buffer_t buffer, int slot)
+{
+  ccassert(buffer.unknown != 0);
 
+  // todo!!:
+  ID3D11Buffer *Buffer;
+  if(SUCCEEDED(ID3D11DeviceChild_QueryInterface(buffer.unknown,&IID_ID3D11Buffer,&Buffer)))
+  { ID3D11DeviceChild_Release(Buffer);
+
+    if(rxshader_typeof_vertex(rx.shader))
+      ID3D11DeviceContext_VSSetConstantBuffers(rx.Context,slot,1,&Buffer);
+    else
+    if(rxshader_typeof_pixel(rx.shader))
+      ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,slot,1,&Buffer);
+    else
+    if(rxshader_typeof_compute(rx.shader))
+      ID3D11DeviceContext_CSSetConstantBuffers(rx.Context,slot,1,&Buffer);
+  }
+}
 
 void
 rxdelete_uniform_buffer(

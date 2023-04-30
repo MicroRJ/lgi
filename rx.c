@@ -1462,7 +1462,11 @@ void rxrestore_render_stack()
   rxdriver_stage_render_target(rx.target);
 
   rxdriver_stage_shader(rx.default_vertex_shader);
+  rxdevice_bind_uniform_buffer(rx.uniform_buffer,0);
+
   rxdriver_stage_shader(rx. default_pixel_shader);
+  rxdevice_bind_uniform_buffer(rx.uniform_buffer,0);
+
 
   rx.world_matrix=rxmatrix_identity();
   rx. view_matrix=rxmatrix_identity();
@@ -1992,6 +1996,10 @@ void rxinit(const wchar_t *window_title)
     rx.default_pixel_shader=
       rxcreate_pixel_shader(NULL,(rxblobber_t){0,(void*)rx_ps_shader_bytecode,sizeof(rx_ps_shader_bytecode)});
 
+    rx.uniform_buffer=rxcreate_uniform_buffer(sizeof(rxuniform_t),NULL);
+    rx.  index_buffer=  rxcreate_index_buffer(sizeof(rxindex_t)  ,RX_INDEX_BUFFER_SIZE);
+    rx. vertex_buffer= rxcreate_vertex_buffer(sizeof(rxvertex_t) ,RX_VERTEX_BUFFER_SIZE);
+
     rxrestore_render_stack();
   }
 
@@ -2100,9 +2108,7 @@ void rxinit(const wchar_t *window_title)
   SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
   ID3D11Device_CreateSamplerState(rx.Device,&SamplerInfo,&rx.point_sampler.unknown);
 
-  rx.uniform_buffer=rxcreate_uniform_buffer(sizeof(rxuniform_t),NULL);
-  rx. index_buffer= rxcreate_index_buffer( sizeof(rxindex_t), RX_INDEX_BUFFER_SIZE);
-  rx.vertex_buffer=rxcreate_vertex_buffer(sizeof(rxvertex_t),RX_VERTEX_BUFFER_SIZE);
+
 
   rxdefault_render_pass();
 
@@ -2128,15 +2134,14 @@ void rxinit(const wchar_t *window_title)
 
   ID3D11DeviceContext_IASetPrimitiveTopology(rx.Context,D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-  ID3D11DeviceContext_VSSetConstantBuffers(rx.Context,0,1,
-    (ID3D11Buffer**)&rx.uniform_buffer.unknown);
+  //ID3D11DeviceContext_VSSetConstantBuffers(rx.Context,0,1,
+  //  (ID3D11Buffer**)&rx.uniform_buffer.unknown);
 
   // ID3D11DeviceContext_VSSetShader(rx.Context,rx.VertexShader,0x00,0);
-
   ID3D11DeviceContext_VSSetSamplers(rx.Context,0,1,&rx.linear_sampler.unknown);
 
-  ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,0,1,
-    (ID3D11Buffer**)&rx.uniform_buffer.unknown);
+  // ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,0,1,
+  //   (ID3D11Buffer**)&rx.uniform_buffer.unknown);
 
   // ID3D11DeviceContext_PSSetShader(rx.Context,rx.PixelShader,0x00,0);
 
