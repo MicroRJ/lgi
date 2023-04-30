@@ -217,111 +217,24 @@ const rxcolor_t  rxcolor_kGREEN={0x00,0xff,0x00,0xff};
 const rxcolor_t rxcolor_kYELLOW={0xff,0xff,0x00,0xff};
 const rxcolor_t   rxcolor_kBLUE={0x00,0x00,0xff,0xff};
 
-typedef struct rxpoint16_t rxpoint16_t;
-typedef struct rxpoint16_t
-{
-  short x,y;
-} rxpoint16_t;
-typedef struct rxvector2_t rxvector2_t;
-typedef struct rxvector2_t
-{
-  float x,y;
-} rxvector2_t;
-typedef struct rxvector3_t rxvector3_t;
-typedef struct rxvector3_t
-{
-  float x,y,z;
-} rxvector3_t;
-typedef struct rxvector4_t rxvector4_t;
-typedef struct rxvector4_t
-{ union
-  { struct
-    {
-      float x,y,z,w;
-    };
-    struct
-    {
-      float r,g,b,a;
-    };
-    rxvector3_t xyz;
-    rxvector3_t rgb;
-  };
-} rxvector4_t;
-rxvector3_t       rxvector(float xyz);
-rxvector3_t   rxvector_xyz(float x, float y, float z);
-rxvector3_t    rxvector_xy(float x, float y);
-rxvector3_t     rxvector_x(float x);
-rxvector3_t     rxvector_y(float y);
-rxvector3_t     rxvector_z(float z);
-typedef struct rxmatrix_t rxmatrix_t;
-typedef struct rxmatrix_t
-{ float m[4][4];
-} rxmatrix_t;
-rxmatrix_t rxmatrix_identity();
-rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
-
 typedef ID3D11DeviceChild   *  rxunknown_t;
-typedef ID3D11Resource      * rxresource_t;
 
-// note:
-// One if the features that I always want to have out of the box is live-reload, especially when
-// working with shaders. The way we do this is by keeping track of every file we load and whether its
-// contents have changed or not, this also means that live-reload works for anything that is bound to
-// a name on disk implicitly when using the default 'rxload-contents' function.
-// todo!!: we should instead hash the file's contents!
-typedef struct rxcontents_t rxcontents_t;
-typedef struct rxcontents_t
-{ unsigned  int  length;
-  void         * memory;
-  ccclocktick_t  loaded;
-  // note: we keep track of whether the contents of this file
-  // are erroneous, in which case all instances bound to this
-  // file shouldn't be reloaded/restored.
-  unsigned          is_erroneous: 1;
-} rxcontents_t;
+#include "rxm.cc"
+#include "rxs.cc"
+#include "rxr.cc"
 
-// note: the parameters we need to restore the instance,
-// could probably have come up with a better name.
-typedef struct rxrestore_t rxrestore_t;
-typedef struct rxrestore_t
-{
-  const    char *shader_model;
-  const    char *shader_entry;
-} rxrestore_t;
+// note: is this is good name?
+typedef struct rxborrowed_t rxborrowed_t;
+typedef struct rxborrowed_t
+{ ID3D11Resource * resource;
+            void * memory;
+ union
+ {        int   stride;
+          int   length;
+ };
+} rxborrowed_t;
 
-typedef struct rxinstance_t rxinstance_t;
-typedef struct rxinstance_t
-{ rx_k                  sort;
-  rxunknown_t         unknown;
-  const    char   *    master;
-  ccclocktick_t        loaded;
-  rxrestore_t         restore;
-} rxinstance_t;
-
-typedef struct rxblobber_t rxblobber_t;
-typedef struct rxblobber_t
-{
-  ID3DBlob    *unknown;
-
-  void    *memory;
-  size_t   length;
-} rxblobber_t;
-
-// note: if vertex shader, input layout stored in private data, we could
-// cache the additional pointer in this struct if too slow!
-// note: to get which type of shader it is we simply query the interface,
-// this behavior is to be removed!
-typedef struct rxshader_t rxshader_t;
-typedef struct rxshader_t
-{
-  rxunknown_t unknown;
-} rxshader_t;
-
-typedef struct rxuniform_buffer_t rxuniform_buffer_t;
-typedef struct rxuniform_buffer_t
-{
-  rxunknown_t unknown;
-} rxuniform_buffer_t;
+#include "rxuniform_buffer.cc"
 
 typedef struct rxvertex_buffer_t rxvertex_buffer_t;
 typedef struct rxvertex_buffer_t
@@ -341,27 +254,7 @@ typedef struct rxstruct_buffer_t
   rxunknown_t unknown;
 } rxstruct_buffer_t;
 
-typedef struct rxsampler_t rxsampler_t;
-typedef struct rxsampler_t
-{
-  ID3D11SamplerState *unknown;
-} rxsampler_t;
-
-// todo: need better name?
-typedef struct rxlocal_texture_t rxlocal_texture_t;
-typedef struct rxlocal_texture_t
-{  int   size_x, size_y;
-   int   format;
-   int   stride;
-  void * memory;
-} rxlocal_texture_t;
-
-typedef struct rxtexture_t rxtexture_t;
-typedef struct rxtexture_t
-{         int size_x, size_y;
-          int format;
-  rxunknown_t unknown;
-} rxtexture_t;
+#include "rxi.cc"
 
 typedef struct rxrender_target_t rxrender_target_t;
 typedef struct rxrender_target_t
@@ -370,25 +263,6 @@ typedef struct rxrender_target_t
   rxunknown_t unknown;
   rxunknown_t asinput;
 } rxrender_target_t;
-
-// note: is this is good name?
-typedef struct rxborrowed_t rxborrowed_t;
-typedef struct rxborrowed_t
-{ rxresource_t  resource;
-         void * memory;
- union
- {        int   stride;
-          int   length;
- };
-} rxborrowed_t;
-
-// todo: migrate to xyz
-typedef struct rxvertex_t rxvertex_t;
-typedef struct rxvertex_t
-{ float x, y;
-  float u, v;
-  unsigned char r,g,b,a;
-} rxvertex_t;
 
 // sharpness: determines the harshness or sharpness of the penumbras, the greater the sharper,
 // the smaller the softer.
@@ -409,28 +283,6 @@ typedef struct rxshadow_t
 { float x, y;
   float w, h;
 } rxshadow_t;
-
-// note: we have some extra 'useless' info here for quick prototyping or for demoscene type stuff,
-// this is what shader-toy does!
-// merge: switched to using floating point values instead!
-typedef struct rxuniform_t rxuniform_t;
-typedef struct __declspec(align(16)) rxuniform_t
-{
-  // todo!!!: rename
-  rxmatrix_t e;
-
-  float    screen_xsize;
-  float    screen_ysize;
-  float   mouse_xcursor;
-  float   mouse_ycursor;
-  double  total_seconds;
-  double  delta_seconds;
-  int      shadow_tally;
-  int      candle_tally;
-  int           padding[2];
-} rxuniform_t;
-
-typedef int rxindex_t;
 
 typedef void (*rxcustom_t)();
 
@@ -482,7 +334,7 @@ typedef struct rx_t
   float           font_xsize;
 
   // note: these are cc-hash-tables
-  rxinstance_t       *instance_table;
+  rxtangible_t       *instance_table;
   rxcontents_t       *contents_table;
 
 
@@ -601,29 +453,18 @@ typedef struct rx_t
 
 ccglobal rx_t rx;
 
+
 void rxdelete_unknown(rxunknown_t unknown)
 {
   if(unknown != 0)
     unknown->lpVtbl->Release(unknown);
 }
 
-void rxdelete_instance(rxunknown_t unknown)
+
+
+rxtangible_t *rxlookup_instance(rxunknown_t u)
 {
-  ccassert(unknown != 0);
-
-  rxinstance_t *i=cctblremP(rx.instance_table,unknown);
-  ccassert(ccerrnon());
-
-  ccassert(i->unknown != NULL);
-
-  ID3D11DeviceChild_Release(i->unknown);
-
-  i->unknown = NULL;
-}
-
-rxinstance_t *rxlookup_instance(rxunknown_t u)
-{
-  rxinstance_t *i = 0;
+  rxtangible_t *i = 0;
 
   if(u != 0)
   {
@@ -634,7 +475,7 @@ rxinstance_t *rxlookup_instance(rxunknown_t u)
   return i;
 }
 
-rxinstance_t *rxcreate_instance(rxinstance_t *i, rx_k sort, rxunknown_t unknown)
+rxtangible_t *rxcreate_instance(rxtangible_t *i, rx_k sort, rxunknown_t unknown)
 {
   // ccdebuglog("%i, %p", sort, unknown);
 
@@ -674,20 +515,7 @@ void rxdelete_index_buffer(rxindex_buffer_t buffer)
 }
 
 // todo: ensure we're doing this 'safely'!
-void rxdelete_uniform_buffer(rxuniform_buffer_t buffer)
-{
-  rxdelete_unknown(buffer.unknown);
-}
 
-// todo: ensure we're doing this 'safely'!
-void rxdelete_texture(rxtexture_t texture)
-{
-  // todo: ensure this is a valid view
-  ID3D11Resource *Resource;
-  ID3D11View_GetResource((ID3D11View*)texture.unknown,&Resource);
-
-  ID3D11Resource_Release(Resource);
-}
 
 int rxcontents_registered(const char *name)
 {
@@ -695,6 +523,14 @@ int rxcontents_registered(const char *name)
 
   return ccerrnon();
 }
+
+#define _RXTEXTURE_IMPLEMENTATION
+#include "rxi.cc"
+#define _RXTANGIBLE_IMPLEMENTATION
+#include "rxr.cc"
+#define _RXUNIFORM_BUFFER_IMPLEMENTATION
+#include "rxuniform_buffer.cc"
+
 
 rxcontents_t *rxreload_contents(const char *name)
 {
@@ -735,47 +571,6 @@ rxcontents_t *rxreload_contents(const char *name)
   return contents;
 }
 
-// todo!:
-int rxunknown_typeof_compute_shader(rxunknown_t unknown)
-{
-  ID3D11ComputeShader *I=NULL;
-  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11ComputeShader,&I)))
-    ID3D11DeviceChild_Release(I);
-  return I!=NULL;
-}
-
-// todo!:
-int rxunknown_typeof_vertex_shader(rxunknown_t unknown)
-{
-  ID3D11VertexShader *I=NULL;
-  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11VertexShader,&I)))
-    ID3D11DeviceChild_Release(I);
-  return I!=NULL;
-}
-
-// todo!:
-int rxunknown_typeof_pixel_shader(rxunknown_t unknown)
-{
-  ID3D11PixelShader *I=NULL;
-  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11PixelShader,&I)))
-    ID3D11DeviceChild_Release(I);
-  return I!=NULL;
-}
-
-int rxshader_typeof_compute(rxshader_t shader)
-{
-  return rxunknown_typeof_compute_shader(shader.unknown);
-}
-
-int rxshader_typeof_vertex(rxshader_t shader)
-{
-  return rxunknown_typeof_vertex_shader(shader.unknown);
-}
-
-int rxshader_typeof_pixel(rxshader_t shader)
-{
-  return rxunknown_typeof_pixel_shader(shader.unknown);
-}
 
 // note: possibly temporary
 void rxdriver_clear_render_target(rxrender_target_t target, float *color)
@@ -838,14 +633,14 @@ void rxdelete_shader(rxunknown_t unknown)
 }
 
 
-rxshader_t rxload_vertex_shader(rxinstance_t *,const char *, const char *);
-rxshader_t  rxload_pixel_shader(rxinstance_t *,const char *, const char *);
+rxshader_t rxload_vertex_shader(rxtangible_t *,const char *, const char *);
+rxshader_t  rxload_pixel_shader(rxtangible_t *,const char *, const char *);
 
 rxblobber_t rxcompile_shader_file(const char *name, const char *main, const char *model);
 
 void rxdriver_stage_shader(rxshader_t shader)
 {
-  rxinstance_t *i=rxlookup_instance(shader.unknown);
+  rxtangible_t *i=rxlookup_instance(shader.unknown);
 
   int should_reload=ccfalse;
 
@@ -906,65 +701,6 @@ void rxdriver_stage_shader(rxshader_t shader)
 leave:;
 
 }
-
-void rxdriver_stage_sampler(rxsampler_t sampler, int slot)
-{
-  ccassert(sampler.unknown != 0);
-
-  // todo!!:
-  if(rxshader_typeof_vertex(rx.shader))
-  {
-    ID3D11DeviceContext_VSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
-    goto leave;
-  }
-
-  if(rxshader_typeof_pixel(rx.shader))
-  {
-    ID3D11DeviceContext_PSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
-    goto leave;
-  }
-
-  if(rxshader_typeof_compute(rx.shader))
-  {
-    ID3D11DeviceContext_CSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
-    goto leave;
-  }
-
-leave:;
-}
-
-void rxdriver_stage_texture(rxtexture_t texture, int slot)
-{
-  ccassert(texture.unknown != 0);
-
-  // todo!!: this should only be done in debug mode
-  ID3D11ShaderResourceView *View;
-  if(SUCCEEDED(
-      IUnknown_QueryInterface(texture.unknown,&IID_ID3D11ShaderResourceView,&View)))
-  {
-    // todo!!:
-    if(rxshader_typeof_vertex(rx.shader))
-    {
-      ID3D11DeviceContext_VSSetShaderResources(rx.Context,slot,1,&View);
-      goto leave;
-    }
-
-    if(rxshader_typeof_pixel(rx.shader))
-    {
-      ID3D11DeviceContext_PSSetShaderResources(rx.Context,slot,1,&View);
-      goto leave;
-    }
-
-    if(rxshader_typeof_compute(rx.shader))
-    {
-      ID3D11DeviceContext_CSSetShaderResources(rx.Context,slot,1,&View);
-      goto leave;
-    }
-  }
-
-leave:;
-}
-
 
 void rxcommand_label(const char *name)
 {
@@ -1321,12 +1057,7 @@ void rxdraw_text(int x, int y, int h, const char *string)
   rxdraw_text_ex(rxcolor_kWHITE,x,y,h,string);
 }
 
-rxborrowed_t rxborrow_typeless_buffer(rxunknown_t);
-rxborrowed_t rxborrow_uniform_buffer(rxuniform_buffer_t buffer)
-{
-  // todo: actually check that it is a constant buffer!
-  return rxborrow_typeless_buffer(buffer.unknown);
-}
+
 
 rxborrowed_t rxborrow_typeless_buffer(rxunknown_t);
 rxborrowed_t rxborrow_vertex_buffer(rxvertex_buffer_t buffer)
@@ -1351,131 +1082,6 @@ rxborrowed_t rxborrow_struct_buffer(rxstruct_buffer_t buffer)
   return rxborrow_typeless_buffer((rxunknown_t)resource);
 }
 
-void rxmemcpy_uniform_buffer(rxuniform_buffer_t uniform, void *memory, size_t length)
-{
-  rxborrowed_t b=rxborrow_uniform_buffer(uniform);
-  memcpy(b.memory,memory,length);
-  rxreturn(b);
-}
-
-// todo: support different formats
-rxlocal_texture_t rxload_local_texture(const char *name)
-{
-  rxlocal_texture_t t;
-  t.format=rxRGBA8888;
-  t.memory=stbi_load(name,&t.size_x,&t.size_y,0,4);
-  t.stride=t.size_x*4;
-
-  return t;
-}
-
-rxborrowed_t rxborrow_texture(rxtexture_t texture)
-{
-  rxborrowed_t result;
-  result.resource=0;
-  result.  stride=0;
-  result.  memory=0;
-
-  // todo: debugonly! ensures this is a valid shader resource view!
-  ID3D11ShaderResourceView *View;
-  if(SUCCEEDED(
-      IUnknown_QueryInterface(texture.unknown,&IID_ID3D11ShaderResourceView,&View)))
-  {
-    ID3D11Resource *Resource;
-    ID3D11ShaderResourceView_GetResource(View,&Resource);
-
-    D3D11_MAPPED_SUBRESOURCE MappedAccess;
-    ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
-
-    result.resource=Resource;
-    result.  stride=MappedAccess.RowPitch;
-    result.  memory=MappedAccess.pData;
-
-    ccassert(result.stride != 0);
-    ccassert(result.memory != 0);
-  }
-
-  return result;
-}
-
-rxuniform_buffer_t
-rxcreate_uniform_buffer(unsigned int size_in_bytes)
-{
-  size_in_bytes=(size_in_bytes+15)/16*16;
-
-  D3D11_BUFFER_DESC BufferI;
-  BufferI.              Usage=D3D11_USAGE_DYNAMIC;
-  BufferI.     CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
-  BufferI.          MiscFlags=0;
-  BufferI.StructureByteStride=0;
-  BufferI.          BindFlags=D3D11_BIND_CONSTANT_BUFFER;
-  BufferI.          ByteWidth=(UINT)size_in_bytes;
-
-  ID3D11Buffer *Buffer;
-  ID3D11Device_CreateBuffer(rx.Device,&BufferI,NULL,&Buffer);
-
-  rxuniform_buffer_t result;
-  result.unknown=(rxunknown_t)(Buffer);
-  return result;
-}
-
-rxborrowed_t
-rxborrow_typeless_buffer(rxunknown_t buffer)
-{
-  rxborrowed_t result;
-  result.resource=0;
-  result.  length=0;
-  result.  memory=0;
-
-  // note: ensures this is a valid buffer!
-  ID3D11Resource *Resource;
-  if(SUCCEEDED(
-      IUnknown_QueryInterface(buffer,&IID_ID3D11Buffer,&Resource)))
-  {
-    D3D11_MAPPED_SUBRESOURCE MappedAccess;
-    ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
-
-    result.resource=Resource;
-    result.  length=MappedAccess.RowPitch;
-    result.  memory=MappedAccess.pData;
-
-    ccassert(result.length != 0);
-    ccassert(result.memory != 0);
-  }
-
-  return result;
-}
-
-// ++ merge: add this to shorten the code a little bit? is this silly?
-D3D11_TEXTURE2D_DESC
-rxtexture2d_legend_d3d11(
-          int                  width,
-          int                 height,
-  DXGI_FORMAT                 format,
-  D3D11_USAGE                  usage,
-          int             bind_flags,
-          int       cpu_access_flags,
-          int multisamples_per_pixel,
-          int                quality )
-{
-  ccassert(width >= 1 || cctraceerr("invalid width"));
-
-  ccassert(height >= 1 || cctraceerr("invalid height"));
-
-  D3D11_TEXTURE2D_DESC I;
-  I.                 Width=width;
-  I.                Height=height;
-  I.             MipLevels=1;
-  I.             ArraySize=1;
-  I.                Format=format;
-  I.SampleDesc.      Count=multisamples_per_pixel;
-  I.SampleDesc.    Quality=quality;
-  I.                 Usage=usage;
-  I.             BindFlags=bind_flags;
-  I.        CPUAccessFlags=cpu_access_flags;
-  I.             MiscFlags=0;
-  return I;
-}
 
 // todo!: this has to be reworked and possibly removed
 rxrender_target_t
@@ -1491,17 +1097,20 @@ rxcreate_render_target(int w, int h, int f)
   result. format=f;
   result.unknown=0;
 
-  D3D11_TEXTURE2D_DESC I;
-  I=rxtexture2d_legend_d3d11(w,h,f,D3D11_USAGE_DEFAULT,
-    // note: not sure if the we care enough about the performance
-    // implications of binding to two separate pipeline stages, this is
-    // something that I'd have to research...
-    D3D11_BIND_RENDER_TARGET|
-      D3D11_BIND_SHADER_RESOURCE,0,1,0);
+  // D3D11_TEXTURE2D_DESC I;
+  // I=rxtexture2d_legend_d3d11(w,h,f,D3D11_USAGE_DEFAULT,
+  //   // note: not sure if the we care enough about the performance
+  //   // implications of binding to two separate pipeline stages, this is
+  //   // something that I'd have to research...
+  //   D3D11_BIND_RENDER_TARGET|
+  //     D3D11_BIND_SHADER_RESOURCE,0,1,0);
 
   // note: see ID3D11Device_CheckMultisampleQualityLevels() for safety
 
-  if(SUCCEEDED(ID3D11Device_CreateTexture2D(rx.Device,&I,NULL,&Texture)))
+  Texture=rxdevice_allocate_texture_ex(w,h,f,0,NULL,
+    D3D11_USAGE_DEFAULT,D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE,0,1,0);
+
+  // if(SUCCEEDED(ID3D11Device_CreateTexture2D(rx.Device,&I,NULL,&Texture)))
   {
     D3D11_RENDER_TARGET_VIEW_DESC V;
     ZeroMemory(&V,sizeof(V));
@@ -1523,114 +1132,11 @@ rxcreate_render_target(int w, int h, int f)
   return result;
 }
 
-rxtexture_t
-rxcreate_texture_ex(int w, int h, int f, int s, void *m)
-{
-  D3D11_TEXTURE2D_DESC TextureI;
-  TextureI=rxtexture2d_legend_d3d11(w,h,f,
-    D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE,1,0);
+#define _RXSHADER_IMPLEMENTATION
+#include "rxs.cc"
 
-  D3D11_SUBRESOURCE_DATA SubresourceI;
-  ZeroMemory(&SubresourceI,sizeof(SubresourceI));
-  SubresourceI.    pSysMem=m;
-  SubresourceI.SysMemPitch=s;
 
-  ID3D11Texture2D *Texture2D;
-  ID3D11Device_CreateTexture2D(rx.Device,&TextureI,m?&SubresourceI:NULL,&Texture2D);
-
-  D3D11_SHADER_RESOURCE_VIEW_DESC ShaderResourceViewI;
-  ZeroMemory(&ShaderResourceViewI,sizeof(ShaderResourceViewI));
-  ShaderResourceViewI.       Format=DXGI_FORMAT_UNKNOWN;
-  ShaderResourceViewI.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
-  ShaderResourceViewI.    Texture2D.MostDetailedMip=0;
-  ShaderResourceViewI.    Texture2D.      MipLevels=1;
-
-  ID3D11ShaderResourceView *ShaderResourceView;
-  ID3D11Device_CreateShaderResourceView(rx.Device,
-    (ID3D11Resource *)Texture2D,&ShaderResourceViewI,&ShaderResourceView);
-
-  rxtexture_t result;
-  result. size_x=w;
-  result. size_y=h;
-  result. format=f;
-  result.unknown=(rxunknown_t)ShaderResourceView;
-  return result;
-}
-
-rxtexture_t rxcreate_texture(int w, int h, int f)
-{
-  return rxcreate_texture_ex(w,h,f,0,0);
-}
-
-rxtexture_t rxload_texture(rxlocal_texture_t local)
-{
-  return rxcreate_texture_ex(local.size_x,local.size_y,local.format,local.stride,local.memory);
-}
-
-rxtexture_t rxload_texture_file(const char *name)
-{
-  rxlocal_texture_t local=rxload_local_texture(name);
-
-  rxtexture_t texture=rxload_texture(local);
-
-  stbi_image_free(local.memory);
-
-  return texture;
-}
-
-void rxdelete_blobbler(rxblobber_t bytecode)
-{
-  if(bytecode.unknown)
-    bytecode.unknown->lpVtbl->Release(bytecode.unknown);
-}
-
-rxblobber_t rxcompile_shader(
-  unsigned int length, void *memory, const char *name, const char *entry, const char *model)
-{
-
-  rxblobber_t blobber=(rxblobber_t){0};
-
-  if(length != 0 && memory != 0)
-  {
-    // note: this is not a registered instance, who cares?
-    ID3DBlob *BytecodeBlob,*MessagesBlob;
-    if(SUCCEEDED(
-        D3DCompile(memory,length,name,0,0,entry,model,
-          RX_SHADER_COMPILATION_FLAGS,0,&BytecodeBlob,&MessagesBlob)))
-    {
-      blobber.unknown=BytecodeBlob;
-      blobber. memory=BytecodeBlob->lpVtbl->GetBufferPointer(BytecodeBlob);
-      blobber. length=BytecodeBlob->lpVtbl->   GetBufferSize(BytecodeBlob);
-    } else
-    {
-      ccprintf("<!4%s!>\r\n",
-        (char*)(MessagesBlob->lpVtbl->GetBufferPointer(MessagesBlob)));
-
-      cctracewar("'%s': there were compilation errors",name);
-    }
-  }
-
-  return blobber;
-}
-
-// note: blobber deferred to calling function
-rxblobber_t rxcompile_shader_file_ex(
-  rxcontents_t *c, const char *master, const char *entry, const char *model)
-{
-  rxblobber_t b=rxcompile_shader(c->length,c->memory,master,entry,model);
-
-  c->is_erroneous=cctrue;
-  if(b.unknown != 0 && b.memory != 0 && b.length != 0)
-    c->is_erroneous=ccfalse;
-  return b;
-}
-
-rxblobber_t rxcompile_shader_file(const char *master, const char *entry, const char *model)
-{
-  return rxcompile_shader_file_ex(rxreload_contents(master),master,entry,model);
-}
-
-rxshader_t rxcreate_vertex_shader(rxinstance_t *i, rxblobber_t bytecode)
+rxshader_t rxcreate_vertex_shader(rxtangible_t *i, rxblobber_t bytecode)
 {
   ID3D11VertexShader     * VertexShader = NULL;
   ID3DBlob               *     BlobPart = NULL;
@@ -1721,7 +1227,7 @@ leave:
   return result;
 }
 
-rxshader_t rxcreate_pixel_shader(rxinstance_t *i, rxblobber_t bytecode)
+rxshader_t rxcreate_pixel_shader(rxtangible_t *i, rxblobber_t bytecode)
 {
   ID3D11PixelShader *DeviceChild = NULL;
 
@@ -1737,7 +1243,7 @@ rxshader_t rxcreate_pixel_shader(rxinstance_t *i, rxblobber_t bytecode)
 
 // note: loads or re-loads a pixel shader
 rxshader_t rxload_pixel_shader(
-  rxinstance_t *i, const char *master, const char *entry)
+  rxtangible_t *i, const char *master, const char *entry)
 {
   // todo!!: we should get this from the device!
   char *model="ps_5_0";
@@ -1754,7 +1260,7 @@ rxshader_t rxload_pixel_shader(
   ccassert( model != 0);
 
   rxcontents_t *c=rxreload_contents(master);
-  rxblobber_t b=rxcompile_shader_file_ex(c,master,entry,model);
+  rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
 
   rxshader_t r=(rxshader_t){0};
 
@@ -1781,7 +1287,7 @@ rxshader_t rxload_pixel_shader(
 
 // note: loads or re-loads a vertex shader
 rxshader_t rxload_vertex_shader(
-  rxinstance_t *i, const char *master, const char *entry)
+  rxtangible_t *i, const char *master, const char *entry)
 {
   // todo!!: we should get this from the device!
   char *model="vs_5_0";
@@ -1798,7 +1304,7 @@ rxshader_t rxload_vertex_shader(
   ccassert( model != 0);
 
   rxcontents_t *c=rxreload_contents(master);
-  rxblobber_t b=rxcompile_shader_file_ex(c,master,entry,model);
+  rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
 
   rxshader_t r=(rxshader_t){0};
 
@@ -1836,19 +1342,6 @@ void rxresize(int w, int h)
   SetWindowPos(rx.Window,HWND_NOTOPMOST,0,0,Client.right,Client.bottom,SWP_NOMOVE|SWP_NOACTIVATE|SWP_FRAMECHANGED);
 }
 
-void rxresize_uniformbuffer(size_t size_in_bytes)
-{
-  rxdelete_uniform_buffer(rx.uniform_buffer);
-
-  D3D11_BUFFER_DESC BufferI;
-  BufferI.              Usage=D3D11_USAGE_DYNAMIC;
-  BufferI.     CPUAccessFlags=D3D11_CPU_ACCESS_WRITE;
-  BufferI.          MiscFlags=0;
-  BufferI.StructureByteStride=0;
-  BufferI.          BindFlags=D3D11_BIND_CONSTANT_BUFFER;
-  BufferI.          ByteWidth=(UINT)size_in_bytes;
-  ID3D11Device_CreateBuffer(rx.Device,&BufferI,NULL,(ID3D11Buffer**)&rx.uniform_buffer.unknown);
-}
 
 rxindex_buffer_t rxcreate_index_buffer(size_t index_size, size_t index_count)
 {
@@ -2020,18 +1513,7 @@ void rxdefault_render_pass_end()
   rx.shadow_array=ccnull;
   rx.candle_array=ccnull;
 
-  rxuniform_t t;
-  t.            e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
-  t. screen_xsize=(float)(rx.size_x);
-  t. screen_ysize=(float)(rx.size_y);
-  t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
-  t.mouse_ycursor=(float)(rx.ycursor) / rx.size_y; // todo!!:
-  t.total_seconds=rx.total_seconds;
-  t.delta_seconds=rx.delta_seconds;
-  t. shadow_tally=rx.shadow_tally;
-  t. candle_tally=rx.candle_tally;
 
-  rxmemcpy_uniform_buffer(rx.uniform_buffer,&t,sizeof(t));
 }
 
 
@@ -2114,15 +1596,29 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
     case rx_kSAMPLER:
     {
 
-      rxdriver_stage_sampler(draw->sampler,draw->slot);
+      rxdevice_bind_sampler(draw->sampler,draw->slot);
 
     } break;
     case rx_kTEXTURE:
     {
-      rxdriver_stage_texture(draw->texture,draw->slot);
+      rxdevice_bind_texture(draw->texture,draw->slot);
     } break;
     case rx_kINDEXED:
     {
+
+      rxuniform_t t;
+      t.            e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
+      t. screen_xsize=(float)(rx.size_x);
+      t. screen_ysize=(float)(rx.size_y);
+      t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
+      t.mouse_ycursor=(float)(rx.ycursor) / rx.size_y; // todo!!:
+      t.total_seconds=rx.total_seconds;
+      t.delta_seconds=rx.delta_seconds;
+      t. shadow_tally=rx.shadow_tally;
+      t. candle_tally=rx.candle_tally;
+
+      rxupdate_uniform_buffer(rx.uniform_buffer,&t,sizeof(t));
+
       ID3D11DeviceContext_DrawIndexed(rx.Context,draw->length,index_offset,draw->offset);
       result += draw->length;
 
@@ -2604,7 +2100,7 @@ void rxinit(const wchar_t *window_title)
   SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
   ID3D11Device_CreateSamplerState(rx.Device,&SamplerInfo,&rx.point_sampler.unknown);
 
-  rxresize_uniformbuffer(sizeof(rxuniform_t));
+  rx.uniform_buffer=rxcreate_uniform_buffer(sizeof(rxuniform_t),NULL);
   rx. index_buffer= rxcreate_index_buffer( sizeof(rxindex_t), RX_INDEX_BUFFER_SIZE);
   rx.vertex_buffer=rxcreate_vertex_buffer(sizeof(rxvertex_t),RX_VERTEX_BUFFER_SIZE);
 
