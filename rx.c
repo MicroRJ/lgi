@@ -76,6 +76,13 @@
 #include     <dxgi1_3.h>
 #pragma warning(pop)
 
+# ifdef _RX_NO_CONVERSION_WARNING
+#pragma warning(disable:4244)
+# endif
+# ifdef _RX_NO_TRUNCATION_WARNING
+#pragma warning(disable:4305)
+# endif
+
 #   ifdef _RX_STANDALONE
 # include "cc\cc.c"
 #  define STB_IMAGE_IMPLEMENTATION
@@ -94,44 +101,30 @@
 #include  "rxps.hlsl"
 #include  "rxvs.hlsl"
 
-// note: this is partially provisional, until we figure what
-// format we want to use for function arguments and whether
-// we want or not to have different functions for different
-// formats!
-# ifdef _RX_NO_INT_TO_FLOAT_WARNING
-#pragma warning(disable:4244)
-# endif
+#pragma warning(push)
 
-# ifdef _RX_NO_DOUBLE_TO_FLOAT_WARNING
+/* suppress some warnings, normally I like to be explicit with casting, but since I use hlsl
+   so often, I've gotten used to using '.' syntax and I've developed an aesthetic for it */
+#pragma warning(disable:4244)
 #pragma warning(disable:4305)
-# endif
+
 
 // todo: this is provisional
 #ifndef RX_COMMAND_BUFFER_SIZE
-#define RX_COMMAND_BUFFER_SIZE 0x1000
+#define RX_COMMAND_BUFFER_SIZE 0x10000
 # endif
-// note: use these as your pre-init parameters you can always change later!
+// note: use these as your pre-init parameters, you can always change later!
 #ifndef RX_INDEX_BUFFER_SIZE
-#define RX_INDEX_BUFFER_SIZE 0x10000
+#define RX_INDEX_BUFFER_SIZE 0x10000*8
 # endif
 #ifndef RX_VERTEX_BUFFER_SIZE
-#define RX_VERTEX_BUFFER_SIZE 0x10000
+#define RX_VERTEX_BUFFER_SIZE 0x10000*8
 #endif
 // note: off by default!
 // #ifndef RX_ENABLE_DEPTH_BUFFER
 // # define RX_ENABLE_DEPTH_BUFFER
 // #endif
 
-#define rxPI_F 3.14159265358979323846f
-#define rxABS(v)   ((v)<(0)?-(v):(v))
-#define rxMIN(x,y) ((x)<(y)? (x):(y))
-#define rxMAX(x,y) ((x)>(y)? (x):(y))
-
-// merge: added 'rxclamp'
-float rxclamp(float val, float min, float max)
-{
-  return val < min ? min : val > max ? max : val;
-}
 
 // todo?: there should be a macro for row-vs-col matrices!
 #ifdef _CCDEBUG
@@ -147,10 +140,11 @@ float rxclamp(float val, float min, float max)
        D3DCOMPILE_OPTIMIZATION_LEVEL3
 #endif
 
+#include "rxm.cc"
+
 // todo: to be removed!
 #define     rxRGB8 DXGI_FORMAT_R8_UNORM
 #define rxRGBA8888 DXGI_FORMAT_R8G8B8A8_UNORM
-
 
 typedef enum rx_k
 {
@@ -196,8 +190,11 @@ typedef enum rx_k
   rx_kINDEXED,
 
   // note: window events!
+  rx_kCONTROL,
   rx_kLBUTTON,
   rx_kRBUTTON,
+  rx_kMBUTTON,
+  rx_kMVWHEEL,
 } rx_k;
 
 typedef struct rxcolor_t rxcolor_t;
@@ -217,24 +214,268 @@ const rxcolor_t  rxcolor_kGREEN={0x00,0xff,0x00,0xff};
 const rxcolor_t rxcolor_kYELLOW={0xff,0xff,0x00,0xff};
 const rxcolor_t   rxcolor_kBLUE={0x00,0x00,0xff,0xff};
 
-typedef ID3D11DeviceChild   *  rxunknown_t;
+typedef ID3D11DeviceChild   *rxunknown_t;
 
-#include "rxm.cc"
-#include "rxs.cc"
-#include "rxr.cc"
+#define rxlabel_kLOADED      1
+#define rxlabel_kERRONEOUS   2
+#define rxlabel_kINVALIDATED 4
+
+typedef struct rxterminal_t rxterminal_t;
+typedef struct rxterminal_t
+{ unsigned  int  length;
+  void         * memory;
+  ccclocktick_t  loaded;
+            int  labels;
+    const char * master;
+} rxterminal_t;
+
+rxterminal_t *
+rxlinker_register_terminal(
+  const char *master);
+
+rxterminal_t *
+rxlinker_onlyquery_terminal(
+  const char *master);
+
+int
+rxlinker_labelshas_terminal(
+  const char *master, int labels);
+
+int
+rxlinker_labelsadd_terminal(
+  const char *master, int labels);
+
+int
+rxlinker_labelsrem_terminal(
+  const char *master, int labels);
+
+rxterminal_t *
+rxlinker_resolve_terminal(
+  const char *master);
+
+typedef enum rxlinkage_k
+{
+  rxlinkage_kSHADER_RESOURCE_VIEW,
+  rxlinkage_kRENDER_TARGET_VIEW,
+  rxlinkage_kVERTEX_LAYOUT,
+  rxlinkage_kCOUNT,
+} rxlinkage_k;
+
+typedef struct rxrestore_t rxrestore_t;
+typedef struct rxrestore_t
+{
+  const    char *shader_model;
+  const    char *shader_entry;
+} rxrestore_t;
+
+typedef struct rxarticle_t rxarticle_t;
+typedef struct rxarticle_t
+{ rx_k                sorting;
+  rxunknown_t         unknown;
+  rxunknown_t         linkage[rxlinkage_kCOUNT];
+  // rxunknown_t         varying[0x10];
+  // rxunknown_t         sampler[0x10];
+  rxrestore_t         restore;
+  const char      *    master;
+  ccclocktick_t        loaded;
+} rxarticle_t;
+
+typedef struct rxblobber_t rxblobber_t;
+typedef struct rxblobber_t
+{
+  ID3DBlob    *unknown;
+
+  void        *memory;
+  size_t       length;
+} rxblobber_t;
 
 // note: is this is good name?
 typedef struct rxborrowed_t rxborrowed_t;
 typedef struct rxborrowed_t
 { ID3D11Resource * resource;
             void * memory;
- union
- {        int   stride;
-          int   length;
- };
+  union
+  {          int   stride;
+             int   length;
+  };
 } rxborrowed_t;
 
-#include "rxuniform_buffer.cc"
+typedef struct rxoffline_texture_t rxoffline_texture_t;
+typedef struct rxoffline_texture_t
+{  int   size_x, size_y;
+   int   format;
+   int   stride;
+  void * memory;
+} rxoffline_texture_t;
+
+rxoffline_texture_t
+rxsummon_texture(
+  const char *name);
+
+typedef struct rxtexture_t rxtexture_t;
+typedef struct rxtexture_t
+{ rxunknown_t unknown;
+        int size_x, size_y;
+        int format;
+} rxtexture_t;
+
+typedef struct rxrender_target_t rxrender_target_t;
+typedef struct rxrender_target_t
+{ union
+  {
+    rxtexture_t texture;
+
+    struct
+    {
+      rxunknown_t unknown;
+              int size_x, size_y;
+              int format;
+    };
+  };
+} rxrender_target_t;
+
+void
+rxrender_target_copy(
+  rxrender_target_t l, rxrender_target_t r);
+
+void
+rxrender_target_apply(
+  rxrender_target_t target, float *clear_color);
+
+ccfunc rxtexture_t
+rxtexture_create_untyped(
+          int             size_x,
+          int             size_y,
+  DXGI_FORMAT             format,
+          int             stride,
+          void           *memory,
+  D3D11_USAGE              usage,
+          int         bind_flags,
+          int  host_access_flags,
+          int       sample_count,
+          int     sample_quality );
+
+ccfunc rxtexture_t
+rxtexture_create_ex(
+          int  size_x,
+          int  size_y,
+  DXGI_FORMAT  format,
+          int  stride,
+        void  *memory);
+
+ccfunc rxtexture_t
+rxtexture_create(
+  int  size_x,
+  int  size_y,
+  int  format);
+
+ccfunc void
+rxtexture_apply(
+  rxtexture_t texture,
+          int    slot);
+
+ccfunc rxborrowed_t
+rxtexture_borrow(
+  rxtexture_t texture);
+
+ccfunc rxtexture_t
+rxtexture_upload(
+  rxoffline_texture_t texture);
+
+ccfunc rxtexture_t
+rxtexture_upload_byname(
+  const char *name);
+
+typedef struct rxsampler_t rxsampler_t;
+typedef struct rxsampler_t
+{
+  ID3D11SamplerState *unknown;
+} rxsampler_t;
+
+ccfunc void
+rxsampler_apply(
+  rxsampler_t sampler,
+          int    slot);
+
+typedef struct rxvertex_layout_t rxvertex_layout_t;
+typedef struct rxvertex_layout_t
+{
+  rxunknown_t unknown;
+} rxvertex_layout_t;
+
+typedef struct rxshader_t rxshader_t;
+typedef struct rxshader_t
+{
+  rxunknown_t unknown;
+} rxshader_t;
+
+typedef struct rxshader_builtin_uniform_t rxshader_builtin_uniform_t;
+typedef struct rxshader_builtin_uniform_t
+{
+  // todo!!!: rename
+  rxmatrix_t e;
+
+  float    screen_xsize;
+  float    screen_ysize;
+  float   mouse_xcursor;
+  float   mouse_ycursor;
+  double  total_seconds;
+  double  delta_seconds;
+  int      shadow_tally;
+  int      candle_tally;
+  int           padding[2];
+} rxshader_builtin_uniform_t;
+
+typedef int rxindex_t;
+
+// todo: migrate to xyz
+typedef struct rxvertex_t rxvertex_t;
+typedef struct rxvertex_t
+{ float x, y;
+  float u, v;
+  unsigned char r,g,b,a;
+} rxvertex_t;
+
+rxblobber_t
+rxcompile_shader_bytecode(
+  unsigned int   bytecode_length,
+          void * bytecode_memory,
+    const char *  entry,
+    const char *  model,
+    const char * master);
+
+rxblobber_t
+rxcompile_shader(
+  const char   *entry,
+  const char   *model,
+  const char  *master);
+
+void
+rxdevice_bind_shader(
+  rxshader_t shader);
+
+rxshader_t
+  rxload_vertex_shader(
+  const char *   entry,
+  const char *  master);
+
+rxshader_t
+  rxload_pixel_shader(
+  const char *   entry,
+  const char *  master);
+
+typedef struct rxuniform_buffer_t rxuniform_buffer_t;
+typedef struct rxuniform_buffer_t
+{
+  rxunknown_t unknown;
+} rxuniform_buffer_t;
+
+void
+rxdelete_uniform_buffer(
+  rxuniform_buffer_t buffer);
+
+void rxupdate_uniform_buffer(
+  rxuniform_buffer_t uniform, void *memory, size_t length);
 
 typedef struct rxvertex_buffer_t rxvertex_buffer_t;
 typedef struct rxvertex_buffer_t
@@ -254,23 +495,13 @@ typedef struct rxstruct_buffer_t
   rxunknown_t unknown;
 } rxstruct_buffer_t;
 
-#include "rxi.cc"
-
-typedef struct rxrender_target_t rxrender_target_t;
-typedef struct rxrender_target_t
-{         int size_x, size_y;
-          int format;
-  rxunknown_t unknown;
-  rxunknown_t asinput;
-} rxrender_target_t;
-
 // sharpness: determines the harshness or sharpness of the penumbras, the greater the sharper,
 // the smaller the softer.
 typedef struct rxcandle_t rxcandle_t;
 typedef struct rxcandle_t
-{ rxvector3_t           xyz;
-  rxvector3_t     direction;
-  rxvector3_t         color;
+{ rxvec3_t           xyz;
+  rxvec3_t     direction;
+  rxvec3_t         color;
   float           intensity;
   float           sharpness;
   float           threshold;
@@ -299,15 +530,10 @@ typedef struct rxcommand_t
          rxmatrix_t   matrix;
                 int   offset;
                 int   length;
-                int   x,y,w,h;
+                int   x0,y0,x1,y1;
       unsigned char   r,g,b,a;
                 int   slot;
 } rxcommand_t;
-
-// typedef struct rxvertex_renderer_t rxvertex_renderer_t;
-// typedef struct rxvertex_renderer_t
-// {
-// } rxvertex_renderer_t;
 
 // todo!!: please forgive me!
 typedef struct rx_t rx_t;
@@ -329,13 +555,13 @@ typedef struct rx_t
   double          delta_seconds;
 
   rxtexture_t     font_atlas;
-  rxpoint16_t     font_glyph[95];
+  rxvec2i16_t     font_glyph[95];
   float           font_ysize;
   float           font_xsize;
 
   // note: these are cc-hash-tables
-  rxtangible_t       *instance_table;
-  rxcontents_t       *contents_table;
+  rxarticle_t       *instance_table;
+  rxterminal_t       *contents_table;
 
 
   rxmatrix_t                        view_matrix;
@@ -453,6 +679,492 @@ typedef struct rx_t
 
 ccglobal rx_t rx;
 
+rxarticle_t *
+rxarticle_create(void *unknown)
+{
+  rxarticle_t *tan=cctblputP(rx.instance_table,unknown);
+  ccassert(ccerrnon());
+
+  tan->unknown=(rxunknown_t)(unknown);
+
+  return tan;
+}
+
+rxarticle_t *
+rxarticle_attach(rxarticle_t *tan, rxlinkage_k lin, void *unknown)
+{
+  tan->linkage[lin]=(rxunknown_t)(unknown);
+
+  return tan;
+}
+
+rxterminal_t *
+rxlinker_register_terminal(
+  const char *master)
+{
+  rxterminal_t *contents=cctblsetS(rx.contents_table,master);
+  ccassert(ccerrnon());
+
+  return contents;
+}
+
+rxterminal_t *
+rxlinker_onlyquery_terminal(
+  const char *master)
+{
+  rxterminal_t *contents=cctblgetS(rx.contents_table,master);
+
+  if(ccerrnit())
+  {
+    contents=ccnull;
+  }
+
+  return contents;
+}
+
+int
+rxlinker_labelshas_terminal(
+  const char *master, int labels)
+{
+  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
+
+  if(contents != 0)
+  {
+    return contents->labels & labels;
+  }
+
+  return 0;
+}
+
+int
+rxlinker_labelsadd_terminal(
+  const char *master, int labels)
+{
+  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
+
+  if(contents != 0)
+  {
+    contents->labels |= labels;
+  }
+
+  return contents != 0;
+}
+
+int
+rxlinker_labelsrem_terminal(
+  const char *master, int labels)
+{
+  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
+
+  if(contents != 0)
+  {
+    contents->labels |= labels;
+  }
+
+  return contents != 0;
+}
+
+rxterminal_t *
+rxlinker_resolve_terminal(
+  const char *master)
+{
+  ccassert(master    != 0);
+  ccassert(master[0] != 0);
+
+  rxterminal_t *contents=rxlinker_register_terminal(master);
+
+  if((~contents->labels&rxlabel_kLOADED)||(contents->labels&rxlabel_kINVALIDATED))
+  {
+    unsigned long length;
+    void *        memory;
+    void *        handle;
+
+    length=0;
+    handle=ccopenfile(master,"r");
+    memory=ccpullfile(handle,0,&length);
+
+
+    ccclosefile(handle);
+
+    if(length != 0 && memory != 0)
+    {
+      if((contents->length!=length)||memcmp(memory,contents->memory,length))
+      {
+        ccdebuglog("'%s': file contents re/loaded",master);
+
+        contents->loaded=rx.total_ticks;
+        contents->labels&=~rxlabel_kERRONEOUS;
+        contents->labels&=~rxlabel_kINVALIDATED;
+        contents->labels|=rxlabel_kLOADED;
+      }
+
+      if(contents->memory)
+      {
+        ccfree(contents->memory);
+      }
+
+      contents->memory=memory;
+      contents->length=length;
+      contents->master=master;
+
+    } else
+      cctracewar("'%s': file contents could not be read",master);
+  }
+
+  return contents;
+}
+
+void rxinvalidate_contents(void)
+{
+  if(!rx.LiveReloadDirectory)
+    return;
+
+  FILE_NOTIFY_INFORMATION *Entry;
+                     char *EntryCursor;
+
+  ccglobal char   EntryBuffer[(sizeof(*Entry)+MAX_PATH) << 4];
+  ccglobal  int IsEventActive;
+
+  OVERLAPPED Overlapped;
+  ZeroMemory(&Overlapped,sizeof(Overlapped));
+  Overlapped.hEvent=rx.LiveReloadEvent;
+
+  if(!IsEventActive)
+  {
+    memset(EntryBuffer,0,sizeof(EntryBuffer));
+
+    if(ReadDirectoryChangesW(
+        rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),
+          TRUE, // note: watch the sub-tree as well!
+          FILE_NOTIFY_CHANGE_LAST_WRITE,NULL,&Overlapped,NULL))
+    {
+      IsEventActive = TRUE;
+    }
+  }
+
+  if(IsEventActive)
+  { if(WAIT_OBJECT_0 == WaitForSingleObject(rx.LiveReloadEvent,0))
+    { DWORD BytesRead=0;
+
+      if(GetOverlappedResult(rx.LiveReloadDirectory,&Overlapped,&BytesRead,FALSE))
+      {
+        for(EntryCursor=EntryBuffer;
+              EntryCursor<EntryBuffer+sizeof(EntryBuffer);)
+        { Entry=(FILE_NOTIFY_INFORMATION*)(EntryCursor);
+
+          char FileName[MAX_PATH+4];
+          memset(FileName,0,sizeof(FileName));
+
+          if(WideCharToMultiByte(CP_UTF8,0,Entry->FileName,Entry->FileNameLength,
+              FileName,sizeof(FileName),NULL,FALSE))
+          {
+            rxlinker_labelsadd_terminal(FileName,rxlabel_kINVALIDATED);
+          }
+
+          if(!Entry->NextEntryOffset)
+            break;
+
+          EntryCursor += Entry->NextEntryOffset;
+        }
+
+        IsEventActive = FALSE;
+      }
+    }
+  }
+}
+
+int
+rxunknown_typeof_compute_shader(rxunknown_t unknown)
+{
+  ID3D11ComputeShader *I=NULL;
+  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11ComputeShader,&I)))
+    ID3D11DeviceChild_Release(I);
+  return I!=NULL;
+}
+
+int
+rxunknown_typeof_vertex_shader(rxunknown_t unknown)
+{
+  ID3D11VertexShader *I=NULL;
+  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11VertexShader,&I)))
+    ID3D11DeviceChild_Release(I);
+  return I!=NULL;
+}
+
+int
+rxunknown_typeof_pixel_shader(rxunknown_t unknown)
+{
+  ID3D11PixelShader *I=NULL;
+  if(SUCCEEDED(IUnknown_QueryInterface(unknown,&IID_ID3D11PixelShader,&I)))
+    ID3D11DeviceChild_Release(I);
+  return I!=NULL;
+}
+
+int
+rxshader_typeof_compute(rxshader_t shader)
+{
+  return rxunknown_typeof_compute_shader(shader.unknown);
+}
+
+int
+rxshader_typeof_vertex(rxshader_t shader)
+{
+  return rxunknown_typeof_vertex_shader(shader.unknown);
+}
+
+int
+rxshader_typeof_pixel(rxshader_t shader)
+{
+  return rxunknown_typeof_pixel_shader(shader.unknown);
+}
+
+void
+rxdelete_blobbler(
+  rxblobber_t bytecode)
+{
+  if(bytecode.unknown)
+  {
+    ID3D11DeviceChild_Release(bytecode.unknown);
+  }
+}
+
+rxblobber_t
+rxcompile_shader_bytecode(
+  unsigned int   length,
+          void * memory,
+    const char *  entry,
+    const char *  model,
+    const char * master)
+{
+  rxblobber_t blobber=(rxblobber_t){0};
+
+  if(length != 0 && memory != 0)
+  {
+    ID3DBlob *BytecodeBlob,*MessagesBlob;
+
+    if(SUCCEEDED(
+        D3DCompile(memory,length,master,0,0,entry,model,
+          RX_SHADER_COMPILATION_FLAGS,0,&BytecodeBlob,&MessagesBlob)))
+    {
+      blobber.unknown=BytecodeBlob;
+      blobber. memory=BytecodeBlob->lpVtbl->GetBufferPointer(BytecodeBlob);
+      blobber. length=BytecodeBlob->lpVtbl->   GetBufferSize(BytecodeBlob);
+
+      ccdebuglog("'%s': compiled shader",master);
+    } else
+    {
+      ccprintf("<!4%s!>\r\n",
+        (char*)(MessagesBlob->lpVtbl->GetBufferPointer(MessagesBlob)));
+      cctracewar("'%s': there were compilation errors",master);
+    }
+  }
+
+  return blobber;
+}
+
+rxshader_t
+rxcreate_shader(
+  rx_k type, size_t bytecode_length, void *bytecode_memory)
+{
+  ID3D11DeviceChild      *      Shader = NULL;
+  ID3DBlob               *    BlobPart = NULL;
+  ID3D11ShaderReflection *  Reflection = NULL;
+  ID3D11InputLayout      * InputLayout = NULL;
+
+  if(type==rx_kVERTEX_SHADER)
+  { if(FAILED(ID3D11Device_CreateVertexShader(rx.Device,
+        bytecode_memory,bytecode_length,NULL,(ID3D11VertexShader**)&Shader)))
+    {
+      cctracewar("create_vertex_shader::error");
+      goto leave;
+    }
+  } else
+  if(type==rx_kPIXEL_SHADER)
+  { if(FAILED(ID3D11Device_CreatePixelShader(rx.Device,
+        bytecode_memory,bytecode_length,NULL,(ID3D11PixelShader**)&Shader)))
+    {
+      cctracewar("create_pixel_shader::error");
+      goto leave;
+    }
+  }
+
+  if(FAILED(
+      D3DGetBlobPart(bytecode_memory,bytecode_length,
+        D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart)))
+  {
+    cctracewar("extract_input_signature::error");
+    goto leave;
+  }
+
+  if(FAILED(
+      D3DReflect(bytecode_memory,bytecode_length,
+        &IID_ID3D11ShaderReflection,(void**)&Reflection)))
+  {
+    cctracewar("reflection_interface::error");
+    goto leave;
+  }
+
+  D3D11_SHADER_DESC ShaderInfo;
+  Reflection->lpVtbl->GetDesc(Reflection,&ShaderInfo);
+
+  D3D11_SIGNATURE_PARAMETER_DESC ElemSig;
+
+  // todo: what's the max size of an element array?
+  D3D11_INPUT_ELEMENT_DESC ElementArray[0x20];
+
+  for(int ElementIndex=0;ElementIndex<ShaderInfo.InputParameters;++ElementIndex)
+  {
+    Reflection->lpVtbl->GetInputParameterDesc(Reflection,ElementIndex,&ElemSig);
+
+    D3D11_INPUT_ELEMENT_DESC *Element=ElementArray+ElementIndex;
+    Element-> SemanticName=ElemSig.SemanticName;
+    Element->SemanticIndex=ElemSig.SemanticIndex;
+
+    // todo: support other formats!
+    if(ElemSig.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32)
+    {
+      switch(ElemSig.Mask)
+      { case 0b0001: Element->Format=0;                          break;
+        case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;   break;
+        case 0b0111: Element->Format=0;                          break;
+        case 0b1111: Element->Format=DXGI_FORMAT_R8G8B8A8_UNORM; break;
+        default:
+          ccassert(!"not implemented");
+      }
+    } else
+      ccassert(!"not implemented");
+
+    Element->           InputSlot=0;
+    Element->   AlignedByteOffset=D3D11_APPEND_ALIGNED_ELEMENT;
+    Element->      InputSlotClass=D3D11_INPUT_PER_VERTEX_DATA;
+    Element->InstanceDataStepRate=0;
+  }
+
+  if(FAILED(
+      ID3D11Device_CreateInputLayout(rx.Device,
+        ElementArray,ShaderInfo.InputParameters,
+          bytecode_memory,bytecode_length,&InputLayout)))
+  {
+    cctracewar("create_input_layout::error");
+    goto leave;
+  }
+
+  rxarticle_attach(
+    rxarticle_create(Shader),rxlinkage_kVERTEX_LAYOUT,InputLayout);
+
+  // ID3D11DeviceChild_SetPrivateData(Shader,&IID_ID3D11InputLayout,sizeof(InputLayout),&InputLayout);
+
+leave:
+  return (rxshader_t){(rxunknown_t)(Shader)};
+}
+
+rxshader_t
+rxload_vertex_shader(
+  const char *entry, const char *master)
+{
+  // todo!!: we should get this from the device!
+
+  char *model="vs_5_0";
+
+  ccassert(master != 0);
+  ccassert( entry != 0);
+  ccassert( model != 0);
+
+  rxshader_t r=(rxshader_t){(rxunknown_t)(ccnull)};
+
+  rxterminal_t *c=rxlinker_resolve_terminal(master);
+
+  if((c != 0) && (c->labels & rxlabel_kLOADED) && (~c->labels & rxlabel_kERRONEOUS))
+  {
+    ccassert(c->length != 0);
+    ccassert(c->memory != 0);
+
+    rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
+
+    c->labels|=rxlabel_kERRONEOUS;
+
+    if((b.memory != 0) && (b.length != 0))
+    {
+      r=rxcreate_shader(rx_kVERTEX_SHADER,b.length,b.memory);
+
+      rxdelete_blobbler(b);
+
+      c->labels^=rxlabel_kERRONEOUS;
+    }
+  }
+  return r;
+}
+
+rxshader_t
+rxload_pixel_shader(
+  const char *entry, const char *master)
+{
+  // todo!!: we should get this from the device!
+
+  char *model="ps_5_0";
+
+  ccassert(master != 0);
+  ccassert( entry != 0);
+  ccassert( model != 0);
+
+  rxshader_t r=(rxshader_t){(rxunknown_t)(ccnull)};
+
+  rxterminal_t *c=rxlinker_resolve_terminal(master);
+
+  if((c != 0) && (c->labels & rxlabel_kLOADED) && (~c->labels & rxlabel_kERRONEOUS))
+  {
+    ccassert(c->length != 0);
+    ccassert(c->memory != 0);
+
+    rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
+
+    c->labels|=rxlabel_kERRONEOUS;
+
+    if((b.memory != 0) && (b.length != 0))
+    {
+      r=rxcreate_shader(rx_kPIXEL_SHADER,b.length,b.memory);
+
+      rxdelete_blobbler(b);
+
+      c->labels^=rxlabel_kERRONEOUS;
+    }
+  }
+  return r;
+}
+
+void
+rxdevice_bind_shader(rxshader_t shader)
+{
+  int should_reload=ccfalse;
+
+  // todo!!:
+  if(rxunknown_typeof_vertex_shader(shader.unknown) &&
+      (shader.unknown != rx.vertex_shader.unknown || should_reload))
+  {
+    rx.shader=rx.vertex_shader=shader;
+
+    ID3D11DeviceContext_VSSetShader(rx.Context,(ID3D11VertexShader*)shader.unknown,0x00,0);
+
+    rxarticle_t *tangible=cctblgetP(rx.instance_table,shader.unknown);
+    ccassert(ccerrnon());
+
+    ID3D11InputLayout *Layout=(ID3D11InputLayout *)tangible->linkage[rxlinkage_kVERTEX_LAYOUT];
+
+    ID3D11DeviceContext_IASetInputLayout(rx.Context,Layout);
+    goto leave;
+  }
+
+  if(rxunknown_typeof_pixel_shader(shader.unknown) &&
+      (shader.unknown != rx.pixel_shader.unknown || should_reload))
+  {
+    rx.shader=rx.pixel_shader=shader;
+
+    ID3D11DeviceContext_PSSetShader(rx.Context,(ID3D11PixelShader*)shader.unknown,0x00,0);
+    goto leave;
+  }
+
+leave:;
+}
 
 void rxdelete_unknown(rxunknown_t unknown)
 {
@@ -460,37 +1172,6 @@ void rxdelete_unknown(rxunknown_t unknown)
     unknown->lpVtbl->Release(unknown);
 }
 
-
-
-rxtangible_t *rxlookup_instance(rxunknown_t u)
-{
-  rxtangible_t *i = 0;
-
-  if(u != 0)
-  {
-    i=cctblgetP(rx.instance_table,u);
-    ccassert(ccerrnon());
-  }
-
-  return i;
-}
-
-rxtangible_t *rxcreate_instance(rxtangible_t *i, rx_k sort, rxunknown_t unknown)
-{
-  // ccdebuglog("%i, %p", sort, unknown);
-
-  if(!i)
-  {
-    i=cctblputP(rx.instance_table,unknown);
-    ccassert(ccerrnon());
-
-  } else
-    ccassert(i->sort == sort);
-
-  i->      sort=sort;
-  i->   unknown=unknown;
-  return i;
-}
 
 void rxreturn_resource(void *resource)
 {
@@ -516,75 +1197,8 @@ void rxdelete_index_buffer(rxindex_buffer_t buffer)
 
 // todo: ensure we're doing this 'safely'!
 
-
-int rxcontents_registered(const char *name)
-{
-  cctblgetS(rx.contents_table,name);
-
-  return ccerrnon();
-}
-
-#define _RXTEXTURE_IMPLEMENTATION
-#include "rxi.cc"
-#define _RXTANGIBLE_IMPLEMENTATION
-#include "rxr.cc"
 #define _RXUNIFORM_BUFFER_IMPLEMENTATION
 #include "rxuniform_buffer.cc"
-
-
-rxcontents_t *rxreload_contents(const char *name)
-{
-  ccassert(name    != 0);
-  ccassert(name[0] != 0);
-
-  rxcontents_t *contents=cctblsetS(rx.contents_table,name);
-  ccassert(ccerrnon());
-
-  void *file=ccopenfile(name,"r");
-
-  unsigned long length=0;
-  void *memory=ccpullfile(file,0,&length);
-
-  ccclosefile(file);
-
-  if(length != 0 && memory != 0)
-  {
-    if((contents->length == 0) || (contents->memory == 0) ||
-        (contents->length != length) || memcmp(memory,contents->memory,length))
-    {
-      ccdebuglog("'%s': file contents reloaded",name);
-
-      contents->      loaded=rx.total_ticks;
-      contents->is_erroneous=ccfalse;
-    }
-
-    if(contents->memory)
-    {
-      ccfree(contents->memory);
-    }
-
-    contents->memory=memory;
-    contents->length=length;
-  } else
-    cctracewar("'%s': file contents could not be read",name);
-
-  return contents;
-}
-
-
-// note: possibly temporary
-void rxdriver_clear_render_target(rxrender_target_t target, float *color)
-{ ID3D11RenderTargetView *RenderTarget;
-  IUnknown_QueryInterface(target.unknown,&IID_ID3D11RenderTargetView,&RenderTarget);
-  ID3D11DeviceContext_ClearRenderTargetView(rx.Context,RenderTarget,color);
-}
-
-// note: possibly temporary
-void rxdriver_stage_render_target(rxrender_target_t target)
-{ ID3D11RenderTargetView *RenderTarget;
-  IUnknown_QueryInterface(target.unknown,&IID_ID3D11RenderTargetView,&RenderTarget);
-  ID3D11DeviceContext_OMSetRenderTargets(rx.Context,1,&RenderTarget,NULL);
-}
 
 // note: possibly temporary
 void rxdriver_stage_viewport(float w, float h)
@@ -596,110 +1210,6 @@ void rxdriver_stage_viewport(float w, float h)
   Viewport.MinDepth=0;
   Viewport.MaxDepth=1;
   ID3D11DeviceContext_RSSetViewports(rx.Context,1,&Viewport);
-}
-
-// todo!!: to be removed? stored separately?
-ID3D11InputLayout *rxshader_query_input_layout_d3d(rxunknown_t shader)
-{ ID3D11InputLayout *InputLayout=NULL;
-  UINT PrivateDataSize=sizeof(InputLayout);
-  ID3D11DeviceChild_GetPrivateData(shader,&IID_ID3D11InputLayout,&PrivateDataSize,&InputLayout);
-  ccassert(InputLayout != 0 && InputLayout->lpVtbl != 0);
-  return InputLayout;
-}
-
-void rxshader_store_input_layout_d3d(rxunknown_t shader, ID3D11InputLayout *InputLayout)
-{ ccassert(InputLayout != 0 && InputLayout->lpVtbl != 0);
-  UINT PrivateDataSize=sizeof(InputLayout);
-  ID3D11DeviceChild_SetPrivateData(shader,&IID_ID3D11InputLayout,PrivateDataSize,&InputLayout);
-  // rxshader_query_input_layout_d3d(shader);
-}
-
-void rxdelete_shader(rxunknown_t unknown)
-{
-  if(rxunknown_typeof_vertex_shader(unknown))
-  {
-    ID3D11InputLayout *InputLayout=rxshader_query_input_layout_d3d(unknown);
-
-    if(InputLayout != NULL)
-    {
-      rxdelete_instance((rxunknown_t)InputLayout);
-      // IUnknown_Release(InputLayout);
-    }
-
-  }
-
-  // todo!!:
-  rxdelete_unknown(unknown);
-}
-
-
-rxshader_t rxload_vertex_shader(rxtangible_t *,const char *, const char *);
-rxshader_t  rxload_pixel_shader(rxtangible_t *,const char *, const char *);
-
-rxblobber_t rxcompile_shader_file(const char *name, const char *main, const char *model);
-
-void rxdriver_stage_shader(rxshader_t shader)
-{
-  rxtangible_t *i=rxlookup_instance(shader.unknown);
-
-  int should_reload=ccfalse;
-
-  // if(rx.live_reload)
-  if(i->master != 0)
-  {
-    rxcontents_t *c=cctblgetS(rx.contents_table,i->master);
-
-    should_reload= ccerrnit() || (!c->is_erroneous && c->loaded > i->loaded);
-  }
-
-  // todo!!:
-  if(rxunknown_typeof_vertex_shader(i->unknown) &&
-      (i->unknown != rx.vertex_shader.unknown || should_reload))
-  {
-    if(should_reload)
-    {
-      rxunknown_t u=i->unknown;
-      rxshader_t n=rxload_vertex_shader(i,NULL,NULL);
-
-      if(n.unknown != NULL)
-      {
-        rxdelete_shader(u);
-
-        ccassert(i->unknown != 0);
-      }
-    }
-
-    rx.shader=rx.vertex_shader=shader;
-
-    ID3D11DeviceContext_VSSetShader(rx.Context,(ID3D11VertexShader*)i->unknown,0x00,0);
-    ID3D11DeviceContext_IASetInputLayout(rx.Context,rxshader_query_input_layout_d3d(i->unknown));
-    goto leave;
-  }
-
-  if(rxunknown_typeof_pixel_shader(i->unknown) &&
-      (i->unknown != rx.pixel_shader.unknown || should_reload))
-  {
-    if(should_reload)
-    {
-      rxunknown_t u=i->unknown;
-      rxshader_t n=rxload_pixel_shader(i,NULL,NULL);
-
-      if(n.unknown != NULL)
-      {
-        rxdelete_shader(u);
-
-        ccassert(i->unknown != 0);
-      }
-    }
-
-    rx.shader=rx.pixel_shader=shader;
-
-    ID3D11DeviceContext_PSSetShader(rx.Context,(ID3D11PixelShader*)i->unknown,0x00,0);
-    goto leave;
-  }
-
-leave:;
-
 }
 
 void rxcommand_label(const char *name)
@@ -913,6 +1423,13 @@ void rxdraw_skinned(rxtexture_t texture, float x, float y, float w, float h)
   rxdraw_skinned_unnormalized(texture,rxcolor_kWHITE,x,y,w,h,0,0,1,1);
 }
 
+void rxtexture_scaled(rxtexture_t texture, float x, float y, float scale_x, float scale_y)
+{
+  rxdraw_skinned_unnormalized(texture,rxcolor_kWHITE,x,y,
+    texture.size_x * scale_x,
+    texture.size_y * scale_y,0,0,1,1);
+}
+
 void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
 {
   rxqueue_sampler_command(rx.point_sampler);
@@ -955,12 +1472,12 @@ void rxdraw_circle(rxcolor_t color, float x, float y, float r)
 // merge: ++ 'rxdraw_line'
 void rxdraw_line(rxcolor_t color, float thickness, float x0, float y0, float x1, float y1)
 {
-  float xdirection=x1-x0;
-  float ydirection=y1-y0;
-  float length=sqrtf(xdirection*xdirection + ydirection*ydirection);
+  float xdist=x1-x0;
+  float ydist=y1-y0;
+  float length=sqrtf(xdist*xdist + ydist*ydist);
 
-  float xnormal=.5f * thickness * -ydirection/length;
-  float ynormal=.5f * thickness * +xdirection/length;
+  float xnormal=.5f * thickness * -ydist/length;
+  float ynormal=.5f * thickness * +xdist/length;
 
   rxqueue_texture_command(rx.white);
   rxvertex_mode();
@@ -973,22 +1490,22 @@ void rxdraw_line(rxcolor_t color, float thickness, float x0, float y0, float x1,
     rxsubmit_index(0); rxsubmit_index(2); rxsubmit_index(3);
   rxvertex_mode_end();
 }
-
+/* todo: this has to be re-visited for sub-pixel rendering */
 void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
 {
   const char *label=rx.command_name;
   rx.command_name=ccnull;
 
-  int b=2;
+  rxcommand_label(label);
+  rxdraw_rect(color,x-.5,y+h-.5,w+.5,1.);
+  rxcommand_label(label);
+  rxdraw_rect(color,x-.5,y+0-.5,w+.5,1.);
 
   rxcommand_label(label);
-  rxdraw_rect(color,(float)(x-b),(float)(y+h),(float)(w+b*2),(float)(b));
+  rxdraw_rect(color,x+0-.5,y-.5,1.,h-.5);
+
   rxcommand_label(label);
-  rxdraw_rect(color,(float)(x-b),(float)(y-b),(float)(w+b*2),(float)(b));
-  rxcommand_label(label);
-  rxdraw_rect(color,(float)(x-b),(float)(y+0),(float)(b),(float)(h+0));
-  rxcommand_label(label);
-  rxdraw_rect(color,(float)(x+w),(float)(y+0),(float)(b),(float)(h+0));
+  rxdraw_rect(color,x+w+.5,y-.5,1.,h-.5);
 }
 
 float rxdraw_text_length(float h, const char *string)
@@ -1026,7 +1543,7 @@ void rxdraw_text_ex(rxcolor_t color, int x, int y, int h, const char *string)
   for(int index=0; *string; ++index)
   {
     int code=*string++;
-    rxpoint16_t baked=rx.font_glyph[code-32];
+    rxvec2i16_t baked=rx.font_glyph[code-32];
 
     float sample_x0=xnormalize*baked.x;
     float sample_y0=ynormalize*baked.y;
@@ -1082,255 +1599,308 @@ rxborrowed_t rxborrow_struct_buffer(rxstruct_buffer_t buffer)
   return rxborrow_typeless_buffer((rxunknown_t)resource);
 }
 
+rxoffline_texture_t
+rxsummon_texture(
+  const char *name)
+{
+  // todo!!: support other formats
+  // todo!!: the texture memory may not necessarily come from a file
+  // todo!!: provide own memory
+  rxoffline_texture_t t;
+  t.format=rxRGBA8888;
+  t.memory=stbi_load(name,&t.size_x,&t.size_y,0,4);
+  t.stride=t.size_x*4;
+  return t;
+}
 
-// todo!: this has to be reworked and possibly removed
+rxtexture_t
+rxtexture_upload(
+  rxoffline_texture_t local)
+{
+  return rxtexture_create_ex(local.size_x,local.size_y,local.format,local.stride,local.memory);
+}
+
+rxtexture_t
+rxtexture_upload_byname(
+  const char *name)
+{
+  rxoffline_texture_t local=rxsummon_texture(name);
+
+  rxtexture_t texture=rxtexture_upload(local);
+
+  stbi_image_free(local.memory);
+
+  return texture;
+}
+
+void
+rxdelete_texture(
+  rxtexture_t texture)
+{
+  ID3D11ShaderResourceView *View;
+  ID3D11Resource           *Resource;
+
+  if(SUCCEEDED(IUnknown_QueryInterface(texture.unknown,&IID_ID3D11ShaderResourceView,&View)))
+  {
+    ID3D11View_GetResource(View,&Resource);
+
+    IUnknown_Release(Resource);
+    IUnknown_Release(View);
+  }
+}
+
+rxtexture_t
+rxtexture_create_untyped(
+          int             size_x,
+          int             size_y,
+  DXGI_FORMAT             format,
+          int             stride,
+          void           *memory,
+  D3D11_USAGE              usage,
+          int         bind_flags,
+          int  host_access_flags,
+          int       sample_count,
+          int     sample_quality )
+{
+  ccassert(size_x >= 1 || cctraceerr("invalid size x"));
+  ccassert(size_y >= 1 || cctraceerr("invalid size y"));
+
+  D3D11_TEXTURE2D_DESC TextureI;
+  TextureI.                 Width=size_x;
+  TextureI.                Height=size_y;
+  TextureI.             MipLevels=1;
+  TextureI.             ArraySize=1;
+  TextureI.                Format=format;
+  TextureI.SampleDesc.      Count=sample_count;
+  TextureI.SampleDesc.    Quality=sample_quality;
+  TextureI.                 Usage=usage;
+  TextureI.             BindFlags=bind_flags;
+  TextureI.        CPUAccessFlags=host_access_flags;
+  TextureI.             MiscFlags=0;
+
+  D3D11_SUBRESOURCE_DATA SubresourceI;
+  ZeroMemory(&SubresourceI,sizeof(SubresourceI));
+  SubresourceI.    pSysMem=memory;
+  SubresourceI.SysMemPitch=stride;
+
+  ID3D11Texture2D *Texture=NULL;
+
+  if(SUCCEEDED(
+      ID3D11Device_CreateTexture2D(rx.Device,&TextureI,memory?&SubresourceI:NULL,&Texture)))
+  {
+    rxarticle_t *article=rxarticle_create(Texture);
+
+    if(bind_flags&D3D11_BIND_SHADER_RESOURCE)
+    {
+      D3D11_SHADER_RESOURCE_VIEW_DESC ViewI;
+      ZeroMemory(&ViewI,sizeof(ViewI));
+      ViewI.       Format=DXGI_FORMAT_UNKNOWN;
+      ViewI.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
+      ViewI.    Texture2D.MostDetailedMip=0;
+      ViewI.    Texture2D.      MipLevels=1;
+
+      ID3D11ShaderResourceView *View;
+      if(SUCCEEDED(
+          ID3D11Device_CreateShaderResourceView(rx.Device,
+            (ID3D11Resource*)Texture,&ViewI,&View)))
+      {
+        rxarticle_attach(article,rxlinkage_kSHADER_RESOURCE_VIEW,View);
+      }
+    }
+
+    if(bind_flags&D3D11_BIND_RENDER_TARGET)
+    {
+      D3D11_RENDER_TARGET_VIEW_DESC ViewI;
+      ZeroMemory(&ViewI,sizeof(ViewI));
+      ViewI.Format       =DXGI_FORMAT_UNKNOWN;
+      ViewI.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
+
+      ID3D11RenderTargetView *View;
+      if(SUCCEEDED(
+          ID3D11Device_CreateRenderTargetView(rx.Device,
+            (ID3D11Resource*)Texture,&ViewI,&View)))
+      {
+        rxarticle_attach(article,rxlinkage_kRENDER_TARGET_VIEW,View);
+      }
+    }
+  }
+
+  rxtexture_t RESULT=(rxtexture_t){(rxunknown_t)(Texture)};
+  RESULT. size_x=size_x;
+  RESULT. size_y=size_y;
+  RESULT. format=format;
+  return RESULT;
+}
+
+rxtexture_t
+rxtexture_create_ex(
+  int   size_x,
+  int   size_y,
+  int   format,
+  int   stride,
+  void *memory)
+{
+  return
+    rxtexture_create_untyped(size_x,size_y,format,stride,memory,
+      D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE,1,0);
+}
+
+rxtexture_t rxtexture_create(int w, int h, int f)
+{
+  return rxtexture_create_ex(w,h,f,0,0);
+}
+
+rxborrowed_t rxtexture_borrow(rxtexture_t texture)
+{
+  rxborrowed_t result;
+  result.resource=0;
+  result.  stride=0;
+  result.  memory=0;
+
+  ID3D11Resource *Resource;
+  if(FAILED(IUnknown_QueryInterface(texture.unknown,&IID_ID3D11Resource,&Resource)))
+    goto error;
+
+  D3D11_MAPPED_SUBRESOURCE MappedAccess;
+  if(FAILED(ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess)))
+    goto error;
+
+  ID3D11DeviceChild_Release(Resource);
+
+  result.resource=Resource;
+  result.  stride=MappedAccess.RowPitch;
+  result.  memory=MappedAccess.pData;
+
+  ccassert(result.stride != 0);
+  ccassert(result.memory != 0);
+
+error:
+  return result;
+}
+
 rxrender_target_t
 rxcreate_render_target(int w, int h, int f)
 {
-  ID3D11Texture2D          *Texture;
-  ID3D11RenderTargetView   *View;
-  ID3D11ShaderResourceView *ShaderView;
+  rxrender_target_t RESULT;
 
-  rxrender_target_t result;
-  result. size_x=w;
-  result. size_y=h;
-  result. format=f;
-  result.unknown=0;
+  RESULT.texture=rxtexture_create_untyped(w,h,f,0,NULL,
+    D3D11_USAGE_DEFAULT,D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET,0,1,0);
 
-  // D3D11_TEXTURE2D_DESC I;
-  // I=rxtexture2d_legend_d3d11(w,h,f,D3D11_USAGE_DEFAULT,
-  //   // note: not sure if the we care enough about the performance
-  //   // implications of binding to two separate pipeline stages, this is
-  //   // something that I'd have to research...
-  //   D3D11_BIND_RENDER_TARGET|
-  //     D3D11_BIND_SHADER_RESOURCE,0,1,0);
+  return RESULT;
+}
 
-  // note: see ID3D11Device_CheckMultisampleQualityLevels() for safety
+void rxtexture_apply(
+  rxtexture_t texture, int slot)
+{
+  ccassert(texture.unknown != 0);
 
-  Texture=rxdevice_allocate_texture_ex(w,h,f,0,NULL,
-    D3D11_USAGE_DEFAULT,D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE,0,1,0);
+  rxarticle_t *tangible=cctblgetP(rx.instance_table,texture.unknown);
+  ccassert(ccerrnon());
 
-  // if(SUCCEEDED(ID3D11Device_CreateTexture2D(rx.Device,&I,NULL,&Texture)))
-  {
-    D3D11_RENDER_TARGET_VIEW_DESC V;
-    ZeroMemory(&V,sizeof(V));
-    V.Format       =DXGI_FORMAT_UNKNOWN;
-    V.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2DMS;
+  // todo!!:
+  //ID3D11ShaderResourceView *View;
+  //if(SUCCEEDED(ID3D11DeviceChild_QueryInterface(texture.unknown,&IID_ID3D11ShaderResourceView,&View)))
+  //{
+  //  ID3D11DeviceChild_Release(View);
 
-    if(SUCCEEDED(ID3D11Device_CreateRenderTargetView(rx.Device,
-        (ID3D11Resource*)Texture,&V,(ID3D11RenderTargetView **)&View)))
+  ID3D11ShaderResourceView *View;
+  View=(ID3D11ShaderResourceView *)tangible->linkage[rxlinkage_kSHADER_RESOURCE_VIEW];
+
+    // todo!!:
+    if(rxshader_typeof_vertex(rx.shader))
     {
-
-      if(SUCCEEDED(ID3D11Device_CreateShaderResourceView(rx.Device,
-          (ID3D11Resource*)Texture,NULL,&ShaderView)))
-      {
-        result.unknown=(rxunknown_t)View;
-        result.asinput=(rxunknown_t)ShaderView;
-      }
+      ID3D11DeviceContext_VSSetShaderResources(rx.Context,slot,1,&View);
+      goto leave;
     }
-  }
-  return result;
-}
 
-#define _RXSHADER_IMPLEMENTATION
-#include "rxs.cc"
-
-
-rxshader_t rxcreate_vertex_shader(rxtangible_t *i, rxblobber_t bytecode)
-{
-  ID3D11VertexShader     * VertexShader = NULL;
-  ID3DBlob               *     BlobPart = NULL;
-  ID3D11ShaderReflection *   Reflection = NULL;
-  ID3D11InputLayout      *  InputLayout = NULL;
-
-  if(FAILED(ID3D11Device_CreateVertexShader(rx.Device,
-      bytecode.memory,bytecode.length,NULL,&VertexShader)))
-        goto error_create_shader;
-
-  if(FAILED(D3DGetBlobPart(bytecode.memory,bytecode.length,
-      D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&BlobPart)))
-        goto error_input_signature;
-
-  if(FAILED(D3DReflect(bytecode.memory,bytecode.length,
-      &IID_ID3D11ShaderReflection,(void**)&Reflection)))
-        goto error_reflection;
-
-  D3D11_SHADER_DESC ShaderInfo;
-  Reflection->lpVtbl->GetDesc(Reflection,&ShaderInfo);
-
-  D3D11_SIGNATURE_PARAMETER_DESC ElementInfo;
-
-  // todo: what's the max size of an element array?
-  D3D11_INPUT_ELEMENT_DESC ElementArray[0x20];
-
-  for(int ElementIndex=0;ElementIndex<ShaderInfo.InputParameters;++ElementIndex)
-  {
-    Reflection->lpVtbl->GetInputParameterDesc(Reflection,ElementIndex,&ElementInfo);
-
-    D3D11_INPUT_ELEMENT_DESC *Element=ElementArray+ElementIndex;
-    Element-> SemanticName=ElementInfo.SemanticName;
-    Element->SemanticIndex=ElementInfo.SemanticIndex;
-
-    // todo: support other formats!
-    if(ElementInfo.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32)
+    if(rxshader_typeof_pixel(rx.shader))
     {
-      switch(ElementInfo.Mask)
-      { case 0b0001: Element->Format=0;                          break;
-        case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;   break;
-        case 0b0111: Element->Format=0;                          break;
-        case 0b1111: Element->Format=DXGI_FORMAT_R8G8B8A8_UNORM; break;
-        default:
-          ccassert(!"not impl");
-      }
-    } else
-      ccassert(!"not implemented");
-
-    Element->           InputSlot=0;
-    Element->   AlignedByteOffset=D3D11_APPEND_ALIGNED_ELEMENT;
-    Element->      InputSlotClass=D3D11_INPUT_PER_VERTEX_DATA;
-    Element->InstanceDataStepRate=0;
-  }
-
-  if(FAILED(ID3D11Device_CreateInputLayout(rx.Device,
-      ElementArray,ShaderInfo.InputParameters,bytecode.memory,bytecode.length,&InputLayout)))
-        goto error_input_layout;
-
-  ccassert(InputLayout != 0);
-
-  rxshader_t result=(rxshader_t){(rxunknown_t)(VertexShader)};
-
-  rxcreate_instance(i,rx_kVERTEX_SHADER,(rxunknown_t)VertexShader);
-  // todo!!!:
-  rxcreate_instance(0,rx_kINPUT_LAYOUT,(rxunknown_t)InputLayout);
-
-  rxshader_store_input_layout_d3d(result.unknown,InputLayout);
-
-goto leave;
-
-error_create_shader:
-  cctracewar("failed to create vertex shader");
-  goto error;
-error_input_signature:
-  cctracewar("there was a problem extracting the input signature");
-  goto error;
-error_reflection:
-  cctracewar("there was a problem with the reflection interface");
-  goto error;
-error_input_layout:
-  cctracewar("there was a problem creating the input layout");
-  goto error;
-error:
-
-  result=(rxshader_t){0};
-
-leave:
-  return result;
-}
-
-rxshader_t rxcreate_pixel_shader(rxtangible_t *i, rxblobber_t bytecode)
-{
-  ID3D11PixelShader *DeviceChild = NULL;
-
-  if(SUCCEEDED(ID3D11Device_CreatePixelShader(rx.Device,
-      bytecode.memory,bytecode.length,NULL,&DeviceChild)))
-  {
-    rxcreate_instance(i,rx_kPIXEL_SHADER,(rxunknown_t)DeviceChild);
-  }
-
-  rxshader_t result=(rxshader_t){(rxunknown_t)(DeviceChild)};
-  return result;
-}
-
-// note: loads or re-loads a pixel shader
-rxshader_t rxload_pixel_shader(
-  rxtangible_t *i, const char *master, const char *entry)
-{
-  // todo!!: we should get this from the device!
-  char *model="ps_5_0";
-
-  if(i != 0)
-  {
-    master=master?master:i->master;
-    entry=entry?entry:i->restore.shader_entry;
-    model=model?model:i->restore.shader_model;
-  }
-
-  ccassert(master != 0);
-  ccassert( entry != 0);
-  ccassert( model != 0);
-
-  rxcontents_t *c=rxreload_contents(master);
-  rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
-
-  rxshader_t r=(rxshader_t){0};
-
-  if((b.memory != 0) && (b.length != 0))
-  {
-    r=rxcreate_pixel_shader(i,b);
-
-    rxdelete_blobbler(b);
-
-    if(r.unknown != 0)
-    {
-      if(i == 0)
-        i=rxlookup_instance(r.unknown);
-
-      i->unknown=r.unknown;
-      i->loaded =c->loaded;
-      i->master =master;
-      i->restore.shader_model=model;
-      i->restore.shader_entry=entry;
+      ID3D11DeviceContext_PSSetShaderResources(rx.Context,slot,1,&View);
+      goto leave;
     }
-  }
-  return r;
-}
 
-// note: loads or re-loads a vertex shader
-rxshader_t rxload_vertex_shader(
-  rxtangible_t *i, const char *master, const char *entry)
-{
-  // todo!!: we should get this from the device!
-  char *model="vs_5_0";
-
-  if(i != 0)
-  {
-    master=master?master:i->master;
-    entry=entry?entry:i->restore.shader_entry;
-    model=model?model:i->restore.shader_model;
-  }
-
-  ccassert(master != 0);
-  ccassert( entry != 0);
-  ccassert( model != 0);
-
-  rxcontents_t *c=rxreload_contents(master);
-  rxblobber_t b=rxcompile_shader_bytecode(c->length,c->memory,entry,model,master);
-
-  rxshader_t r=(rxshader_t){0};
-
-  if((b.memory != 0) && (b.length != 0))
-  {
-    r=rxcreate_vertex_shader(i,b);
-
-    rxdelete_blobbler(b);
-
-    if(r.unknown != 0)
+    if(rxshader_typeof_compute(rx.shader))
     {
-      if(i == 0)
-        i=rxlookup_instance(r.unknown);
-
-      i->unknown=r.unknown;
-      i->loaded =c->loaded;
-      i->master =master;
-      i->restore.shader_model=model;
-      i->restore.shader_entry=entry;
+      ID3D11DeviceContext_CSSetShaderResources(rx.Context,slot,1,&View);
+      goto leave;
     }
-  }
+  // }
 
-  return r;
+leave:;
 }
 
-// todo: update the viewport and frame buffer!
+void
+rxsampler_apply(
+  rxsampler_t sampler, int slot)
+{
+  ccassert(sampler.unknown != 0);
+
+  // todo!!:
+  if(rxshader_typeof_vertex(rx.shader))
+  {
+    ID3D11DeviceContext_VSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
+    goto leave;
+  }
+
+  if(rxshader_typeof_pixel(rx.shader))
+  {
+    ID3D11DeviceContext_PSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
+    goto leave;
+  }
+
+  if(rxshader_typeof_compute(rx.shader))
+  {
+    ID3D11DeviceContext_CSSetSamplers(rx.Context,slot,1,(ID3D11SamplerState**)&sampler.unknown);
+    goto leave;
+  }
+
+leave:;
+}
+
+void rxrender_target_apply(rxrender_target_t target, float *ClearColor)
+{
+  rxarticle_t *article=cctblgetP(rx.instance_table,target.unknown);
+  ccassert(ccerrnon());
+
+  // todo!!: debug only
+  ID3D11RenderTargetView *View[1];
+  if(SUCCEEDED(IUnknown_QueryInterface(
+      article->linkage[rxlinkage_kRENDER_TARGET_VIEW],&IID_ID3D11RenderTargetView,&View[0])))
+  {
+    if(ClearColor != 0)
+    {
+      ID3D11DeviceContext_ClearRenderTargetView(rx.Context,View[0],ClearColor);
+    }
+
+    ID3D11DeviceContext_OMSetRenderTargets(rx.Context,ccCarrlenL(View),View,NULL);
+  } else
+    ccassert(!"error");
+}
+
+void rxrender_target_copy(rxrender_target_t l, rxrender_target_t r)
+{
+  ID3D11Resource *Resource[2];
+  Resource[0]=(ID3D11Resource*)(l.unknown);
+  Resource[1]=(ID3D11Resource*)(r.unknown);
+
+  // todo: debug only!
+  if(SUCCEEDED(
+      IUnknown_QueryInterface(l.unknown,&IID_ID3D11Resource,&Resource[0])))
+  {
+    // todo: debug only!
+    if(SUCCEEDED(
+        IUnknown_QueryInterface(r.unknown,&IID_ID3D11Resource,&Resource[1])))
+    {
+      ID3D11DeviceContext_CopyResource(rx.Context,Resource[0],Resource[1]);
+
+      IUnknown_Release(Resource[1]);
+    }
+
+    IUnknown_Release(Resource[0]);
+  }
+}
+
+// todo: update the view-port and frame buffer!
 void rxresize(int w, int h)
 {
   RECT Client;
@@ -1422,6 +1992,10 @@ void rxtime()
 
 void rxwindow()
 {
+  // todo!!:
+  rx.window_events[rx_kMVWHEEL]=0;
+  // memset(rx.window_events,0,sizeof(rx.window_events));
+
   MSG message;
   while(PeekMessage(&message,NULL,0,0,PM_REMOVE))
   { TranslateMessage(&message);
@@ -1456,15 +2030,12 @@ void rxrestore_render_stack()
   // todo:
   float clear_color[]={.2f,.2f,.2f,1.f};
 
-  rxdriver_clear_render_target(rx.  offscreen_target,clear_color);
-  rxdriver_clear_render_target(rx.effect_target,clear_color);
+  rxrender_target_apply(rx.target,clear_color);
 
-  rxdriver_stage_render_target(rx.target);
-
-  rxdriver_stage_shader(rx.default_vertex_shader);
+  rxdevice_bind_shader(rx.default_vertex_shader);
   rxdevice_bind_uniform_buffer(rx.uniform_buffer,0);
 
-  rxdriver_stage_shader(rx. default_pixel_shader);
+  rxdevice_bind_shader(rx. default_pixel_shader);
   rxdevice_bind_uniform_buffer(rx.uniform_buffer,0);
 
 
@@ -1516,10 +2087,23 @@ void rxdefault_render_pass_end()
 
   rx.shadow_array=ccnull;
   rx.candle_array=ccnull;
-
-
 }
 
+rxcommand_t *rxdraw_clip(int x0, int y0, int x1, int y1)
+{
+  ccassert(x1 >= 0);
+  ccassert(y1 >= 0);
+  ccassert(x0 >= 0);
+  ccassert(y0 >= 0);
+
+  ccassert(x0 <= x1);
+  ccassert(y0 <= y1);
+
+  rxcommand_t *c=rxdraw_command(rx_kCLIP);
+  c->x0=x0; c->y0=y0;
+  c->x1=x1; c->y1=y1;
+  return c;
+}
 
 // ccdebuglog("command - %s",draw->master?draw->master:"unnamed");
 int rxexec_command(rxcommand_t *draw, int index_offset)
@@ -1529,7 +2113,14 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
   switch(draw->kind)
   {
     case rx_kCLIP:
-    break;
+    {
+      D3D11_RECT Clip;
+      Clip.left  =draw->x0;
+      Clip.top   =draw->y0;
+      Clip.right =draw->x1;
+      Clip.bottom=draw->y1;
+      ID3D11DeviceContext_RSSetScissorRects(rx.Context,1,&Clip);
+    } break;
     case rx_kPULLTARGET:
     {
       rx.target=rx.target_stack[--rx.target_index];
@@ -1539,7 +2130,8 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
       rx.target_stack[rx.target_index++]=rx.target;
       rx.target=draw->target;
 
-      rxdriver_stage_render_target(draw->target);
+      float color[]={0,0,0,0};
+      rxrender_target_apply(draw->target,color);
 
     } break;
     case rx_kCLEAR:
@@ -1569,13 +2161,13 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
       ccassert(rx.shader_index < ccCarrlenL(rx.shader_stack));
 
       rx.shader_stack[rx.shader_index++]=rx.shader;
-      rxdriver_stage_shader(draw->shader);
+      rxdevice_bind_shader(draw->shader);
     } break;
     case rx_kPULLSHADER:
     { ccassert(rx.shader_index > 0);
 
       rxshader_t shader=rx.shader_stack[--rx.shader_index];
-      rxdriver_stage_shader(shader);
+      rxdevice_bind_shader(shader);
     } break;
     case rx_kUNIFORM:
     {
@@ -1600,17 +2192,17 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
     case rx_kSAMPLER:
     {
 
-      rxdevice_bind_sampler(draw->sampler,draw->slot);
+      rxsampler_apply(draw->sampler,draw->slot);
 
     } break;
     case rx_kTEXTURE:
     {
-      rxdevice_bind_texture(draw->texture,draw->slot);
+      rxtexture_apply(draw->texture,draw->slot);
     } break;
     case rx_kINDEXED:
     {
 
-      rxuniform_t t;
+      rxshader_builtin_uniform_t t;
       t.            e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
       t. screen_xsize=(float)(rx.size_x);
       t. screen_ysize=(float)(rx.size_y);
@@ -1632,71 +2224,13 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
   return result;
 }
 
-void rxpull_live_reload_changes()
-{
-  if(!rx.LiveReloadDirectory)
-    return;
-
-  FILE_NOTIFY_INFORMATION *Entry;
-                     char *EntryCursor;
-
-  ccglobal char   EntryBuffer[(sizeof(* Entry) + MAX_PATH) << 4];
-  ccglobal  int IsEventActive;
-
-  OVERLAPPED Overlapped;
-  ZeroMemory(&Overlapped,sizeof(Overlapped));
-  Overlapped.hEvent=rx.LiveReloadEvent;
-
-  if(!IsEventActive)
-  {
-    memset(EntryBuffer,0,sizeof(EntryBuffer));
-
-    if(ReadDirectoryChangesW(
-        rx.LiveReloadDirectory,EntryBuffer,sizeof(EntryBuffer),
-          TRUE, // note: watch the sub-tree as well!
-          FILE_NOTIFY_CHANGE_LAST_WRITE,NULL,&Overlapped,NULL))
-    {
-      IsEventActive = TRUE;
-    }
-  }
-
-  if(IsEventActive)
-  { if(WAIT_OBJECT_0 == WaitForSingleObject(rx.LiveReloadEvent,0))
-    { DWORD BytesRead=0;
-      if(GetOverlappedResult(rx.LiveReloadDirectory,&Overlapped,&BytesRead,FALSE))
-      { for(EntryCursor=EntryBuffer;EntryCursor<EntryBuffer+sizeof(EntryBuffer);)
-        { Entry=(FILE_NOTIFY_INFORMATION*)(EntryCursor);
-
-          char FileName[MAX_PATH+4];
-          memset(FileName,0,sizeof(FileName));
-
-          if(WideCharToMultiByte(CP_UTF8,0,Entry->FileName,Entry->FileNameLength,
-              FileName,sizeof(FileName),NULL,FALSE))
-          {
-            if(rxcontents_registered(FileName))
-            {
-              rxreload_contents(FileName);
-            }
-          }
-
-          if(!Entry->NextEntryOffset)
-            break;
-
-          EntryCursor += Entry->NextEntryOffset;
-        }
-
-        IsEventActive = FALSE;
-      }
-    }
-  }
-
-}
-
 int rxtick()
 {
+
+
   rx.tick_count++;
 
-  rxpull_live_reload_changes();
+  // /rxpull_live_reload_changes();
 
   rxwindow();
 
@@ -1751,16 +2285,24 @@ int rxtick()
     rxstruct_buffer_t candle_buffer=rx.candle_buffer;
 
     float clear_color[]={.3f,.3f,.4f,1};
-    rxdriver_stage_render_target(target);
+    rxrender_target_apply(target,clear_color);
 
-    rxdriver_stage_shader(vertex_shader);
-    rxdriver_stage_shader( pixel_shader);
+    rxdevice_bind_shader(vertex_shader);
+    rxdevice_bind_shader( pixel_shader);
 
     // todo!:
     ID3D11ShaderResourceView *ShaderResourceView[3];
-    IUnknown_QueryInterface( input_target.asinput,&IID_ID3D11ShaderResourceView,&ShaderResourceView[0]);
-    IUnknown_QueryInterface(shadow_buffer.unknown,&IID_ID3D11ShaderResourceView,&ShaderResourceView[1]);
-    IUnknown_QueryInterface(candle_buffer.unknown,&IID_ID3D11ShaderResourceView,&ShaderResourceView[2]);
+
+    rxarticle_t *article=cctblgetP(rx.instance_table,input_target.unknown);
+    ccassert(ccerrnon());
+
+    IUnknown_QueryInterface(
+      article->linkage[rxlinkage_kSHADER_RESOURCE_VIEW],&IID_ID3D11ShaderResourceView,&ShaderResourceView[0]);
+    IUnknown_QueryInterface(
+      shadow_buffer.unknown,&IID_ID3D11ShaderResourceView,&ShaderResourceView[1]);
+    IUnknown_QueryInterface(
+      candle_buffer.unknown,&IID_ID3D11ShaderResourceView,&ShaderResourceView[2]);
+
     ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,ccCarrlenL(ShaderResourceView),ShaderResourceView);
 
     {
@@ -1780,28 +2322,15 @@ int rxtick()
     ID3D11DeviceContext_PSSetShaderResources(rx.Context,0,ccCarrlenL(ShaderResourceView),ShaderResourceView);
   } else
   {
-    rxrender_target_t o=rx.effect_target;
-    rxrender_target_t i=rx.target;
-
-    ID3D11Resource *OutputResource;
-    ID3D11View_GetResource((ID3D11View*)o.unknown,&OutputResource);
-    ID3D11Resource *InputResource;
-    ID3D11View_GetResource((ID3D11View*)i.unknown,&InputResource);
-
-    ID3D11DeviceContext_CopyResource(rx.Context,OutputResource,InputResource);
+    rxrender_target_copy(rx.effect_target,rx.target);
   }
 
   // note: finally, move the post-process target to our screen buffer to display
   {
-    ID3D11Resource *InputResource;
-    ID3D11View_GetResource((ID3D11View*)rx.effect_target.unknown,&InputResource);
-
-    ID3D11Resource *OutputResource;
-    ID3D11View_GetResource((ID3D11View*)rx.screen_target.unknown,&OutputResource);
-
+    rxrender_target_copy(rx.screen_target,rx.effect_target);
     // todo!!: replace with CopySubresource!
-    ID3D11DeviceContext_ResolveSubresource(rx.Context,
-      OutputResource,0,InputResource,0,DXGI_FORMAT_R8G8B8A8_UNORM);
+    // ID3D11DeviceContext_ResolveSubresource(rx.Context,
+    //   OutputResource,0,InputResource,0,DXGI_FORMAT_R8G8B8A8_UNORM);
   }
 
   IDXGISwapChain_Present(rx.SwapChain,1u,0);
@@ -1824,7 +2353,10 @@ int rxtick()
 }
 
 int rxwindow_event_win32(UINT Message, WPARAM wParam, LPARAM lParam)
-{ switch(Message)
+{
+
+
+  switch(Message)
   { case WM_CLOSE:
     case WM_QUIT:
     { PostQuitMessage(0);
@@ -1838,26 +2370,44 @@ int rxwindow_event_win32(UINT Message, WPARAM wParam, LPARAM lParam)
       rx.xcursor=xcursor;
       rx.ycursor=rx.size_y-ycursor;
     } break;
-    case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
-    case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
-    case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
-    case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
-    { rx.window_events[rx_kLBUTTON]=1;
-      if(!rx.ClickFocused)
-      { rx.ClickFocused=TRUE;
-        SetCapture((HWND)rx.Window);
-      }
+    case WM_MOUSEWHEEL:
+    { rx.window_events[rx_kMVWHEEL]=GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA;
     } break;
-    case WM_LBUTTONUP: case WM_RBUTTONUP:
-    case WM_MBUTTONUP: case WM_XBUTTONUP:
-    { rx.window_events[rx_kLBUTTON]=0;
+    case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP:
+    { rx.window_events[rx_kLBUTTON]=Message!=WM_LBUTTONUP;
+    } break;
+    case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP:
+    { rx.window_events[rx_kRBUTTON]=Message!=WM_RBUTTONUP;
+    } break;
+    case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP:
+    { rx.window_events[rx_kMBUTTON]=Message!=WM_MBUTTONUP;
+    } break;
 
-      rx.ClickFocused=FALSE;
-      ReleaseCapture();
-    } break;
+    // case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
+    // case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK:
+    // case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK:
+    // case WM_XBUTTONDOWN: case WM_XBUTTONDBLCLK:
+    // { rx.window_events[rx_kLBUTTON]=1;
+    //   if(!rx.ClickFocused)
+    //   { rx.ClickFocused=TRUE;
+    //     SetCapture((HWND)rx.Window);
+    //   }
+    // } break;
+    // case WM_LBUTTONUP: case WM_RBUTTONUP:
+    // case WM_MBUTTONUP: case WM_XBUTTONUP:
+    // { rx.window_events[rx_kLBUTTON]=0;
+
+    //   rx.ClickFocused=FALSE;
+    //   ReleaseCapture();
+    // } break;
     case WM_KEYUP:
     case WM_KEYDOWN:
-    { rx.window_events[wParam]=Message==WM_KEYDOWN;
+    {
+      //todo!!!: this has to be done properly
+      if(wParam==VK_CONTROL)
+        rx.window_events[rx_kCONTROL]=Message==WM_KEYDOWN;
+      else
+        rx.window_events[wParam]=Message==WM_KEYDOWN;
     } break;
     default:
     { return FALSE;
@@ -1922,6 +2472,19 @@ void rxinit(const wchar_t *window_title)
 
   SetCursor(LoadCursorA(NULL,IDC_ARROW));
 
+  typedef BOOL WINAPI _YYY_(void);
+  typedef BOOL WINAPI _XXX_(DPI_AWARENESS_CONTEXT);
+  HMODULE User32 = LoadLibraryA("user32.dll");
+  _XXX_ *XXX = (_XXX_ *) GetProcAddress(User32, "SetProcessDPIAwarenessContext");
+  _YYY_ *YYY = (_YYY_ *) GetProcAddress(User32, "SetProcessDPIAware");
+
+  if(XXX) XXX(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+  else
+  if(YYY) YYY();
+
+  FreeLibrary(User32);
+
+
   rxwindow();
 
   // todo: maybe call this a screen_render_target_t ?
@@ -1973,12 +2536,16 @@ void rxinit(const wchar_t *window_title)
     RenderTargetViewInfo.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
     ID3D11Device_CreateRenderTargetView(rx.Device,(ID3D11Resource*)RenderBuffer,&RenderTargetViewInfo,&RenderBufferView);
 
+    rxarticle_attach(
+      rxarticle_create(RenderBuffer),
+        rxlinkage_kRENDER_TARGET_VIEW,RenderBufferView);
     // todo!:
     rx.screen_target. size_x=SwapchainInfo. Width;
     rx.screen_target. size_y=SwapchainInfo.Height;
     rx.screen_target. format=SwapchainInfo.Format;
-    rx.screen_target.unknown=(rxunknown_t)RenderBufferView;
-    rx.screen_target.asinput=0;
+    rx.screen_target.unknown=(rxunknown_t)RenderBuffer;
+
+    // rx.screen_target.asinput=0;
 
     // todo?: make separate targets for these, these are intermediate targets, i guess?
     rx.offscreen_target=rxcreate_render_target(
@@ -1988,15 +2555,15 @@ void rxinit(const wchar_t *window_title)
       rx.screen_target.size_x,rx.screen_target.size_y,rx.screen_target.format);
 
     // todo: pre-compile!
-    rx.effect_vertex_shader=rxload_vertex_shader(NULL,"light.hlsl","MainVS");
-    rx. effect_pixel_shader= rxload_pixel_shader(NULL,"light.hlsl","MainPS");
+    rx.effect_vertex_shader=rxload_vertex_shader("MainVS","light.hlsl");
+    rx. effect_pixel_shader= rxload_pixel_shader("MainPS","light.hlsl");
 
     rx.default_vertex_shader=
-      rxcreate_vertex_shader(NULL,(rxblobber_t){0,(void*)rx_vs_shader_bytecode,sizeof(rx_vs_shader_bytecode)});
+      rxcreate_shader(rx_kVERTEX_SHADER,sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
     rx.default_pixel_shader=
-      rxcreate_pixel_shader(NULL,(rxblobber_t){0,(void*)rx_ps_shader_bytecode,sizeof(rx_ps_shader_bytecode)});
+      rxcreate_shader(rx_kPIXEL_SHADER,sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
 
-    rx.uniform_buffer=rxcreate_uniform_buffer(sizeof(rxuniform_t),NULL);
+    rx.uniform_buffer=rxcreate_uniform_buffer(sizeof(rxshader_builtin_uniform_t),NULL);
     rx.  index_buffer=  rxcreate_index_buffer(sizeof(rxindex_t)  ,RX_INDEX_BUFFER_SIZE);
     rx. vertex_buffer= rxcreate_vertex_buffer(sizeof(rxvertex_t) ,RX_VERTEX_BUFFER_SIZE);
 
@@ -2061,7 +2628,7 @@ void rxinit(const wchar_t *window_title)
   RasterizerInfo.       DepthBiasClamp=D3D11_DEFAULT_DEPTH_BIAS_CLAMP;
   RasterizerInfo. SlopeScaledDepthBias=D3D11_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
   RasterizerInfo.      DepthClipEnable=FALSE;
-  RasterizerInfo.        ScissorEnable=FALSE;
+  RasterizerInfo.        ScissorEnable=TRUE;
   RasterizerInfo.    MultisampleEnable=FALSE;
   RasterizerInfo.AntialiasedLineEnable=FALSE;
   ID3D11Device_CreateRasterizerState(rx.Device,&RasterizerInfo,&rx.RasterizerState);
@@ -2108,8 +2675,6 @@ void rxinit(const wchar_t *window_title)
   SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
   ID3D11Device_CreateSamplerState(rx.Device,&SamplerInfo,&rx.point_sampler.unknown);
 
-
-
   rxdefault_render_pass();
 
   // note: configure the default state
@@ -2122,7 +2687,7 @@ void rxinit(const wchar_t *window_title)
   ID3D11DeviceContext_OMSetBlendState(rx.Context,rx.BlendState,0x00,0xFFFFFFFu);
   ID3D11DeviceContext_OMSetDepthStencilState(rx.Context,rx.DepthBufferState,1);
 
-  // rxdriver_stage_render_target(rx.offscreen_buffer);
+  // rxrender_target_apply(rx.offscreen_buffer);
 
   // ID3D11DeviceContext_IASetInputLayout(rx.Context,rx.VertexShaderInputLayout);
 
@@ -2156,9 +2721,9 @@ void rxinit(const wchar_t *window_title)
 
   rxclear(.2f,.2f,.2f,1.f);
 
-  rx.white=rxcreate_texture(16,16,rxRGBA8888);
+  rx.white=rxtexture_create(16,16,rxRGBA8888);
 
-  rxborrowed_t t=rxborrow_texture(rx.white);
+  rxborrowed_t t=rxtexture_borrow(rx.white);
   memset(t.memory,0xff,t.stride*rx.white.size_y);
   rxreturn(t);
 
@@ -2177,7 +2742,7 @@ void rxinit(const wchar_t *window_title)
     rx.LiveReloadEvent=CreateEvent(NULL,FALSE,0,NULL);
   }
 
-  rxpull_live_reload_changes();
+  // rxpull_live_reload_changes();
 }
 
 void load_bitmap8(unsigned char *memory, int stride, unsigned char *source)
@@ -2304,9 +2869,9 @@ unsigned char encoded[95][16]=
   {0,0,0,0,0,0,0,72,52,0,0,0,0,0,0,0},
 };
 
-  rxtexture_t texture=rxcreate_texture(512,256,rxRGBA8888);
+  rxtexture_t texture=rxtexture_create(512,256,rxRGBA8888);
 
-  rxborrowed_t b=rxborrow_texture(texture);
+  rxborrowed_t b=rxtexture_borrow(texture);
 
             int  stride = b.stride;
   unsigned char *memory = b.memory;
@@ -2322,7 +2887,7 @@ unsigned char encoded[95][16]=
 
     load_bitmap8(write,stride,encoded[index]);
 
-    rxpoint16_t p;
+    rxvec2i16_t p;
     p.x=(short)xcursor;
     p.y=(short)ycursor;
 
@@ -2336,199 +2901,5 @@ unsigned char encoded[95][16]=
   rx.font_xsize= 6;
 }
 
-rxvector3_t rxvector_xyz(float x, float y, float z)
-{
-  rxvector3_t r;
-  r.x = x;
-  r.y = y;
-  r.z = z;
-  return r;
-}
-
-rxvector3_t rxvector_xy(float x, float y)
-{
-  return rxvector_xyz(x,y,0);
-}
-
-rxvector3_t rxvector_x(float x)
-{
-  return rxvector_xyz(x,0,0);
-}
-
-rxvector3_t rxvector_y(float y)
-{
-  return rxvector_xyz(0,y,0);
-}
-
-rxvector3_t rxvector_z(float z)
-{
-  return rxvector_xyz(0,0,z);
-}
-
-rxvector3_t rxvector(float xyz)
-{
-  return rxvector_xyz(xyz,xyz,xyz);
-}
-
-float rxvector_dot(rxvector3_t a, rxvector3_t b)
-{
-  return a.x*b.x + a.y*b.y + a.z*b.z;
-}
-
-rxvector3_t rxvector_cross(rxvector3_t a, rxvector3_t b)
-{
-  // note: this is how I memorize the cross product formula, think of rotations around an axis.
-  return rxvector_xyz
-    ( a.y*b.z - a.z*b.y,    // x-axis -> z/y plane
-      a.z*b.x - a.x*b.z,    // y-axis -> x/z plane
-      a.x*b.y - a.y*b.x );  // z-axis -> y/x plane
-}
-
-float rxvector_length(rxvector3_t a)
-{
-  return sqrtf(rxvector_dot(a,a));
-}
-
-rxvector3_t rxvector_add(rxvector3_t a, rxvector3_t b)
-{
-  rxvector3_t r;
-  r.x = a.x+b.x;
-  r.y = a.y+b.y;
-  r.z = a.z+b.z;
-  return r;
-}
-
-rxvector3_t rxvector_sub(rxvector3_t a, rxvector3_t b)
-{
-  rxvector3_t r;
-  r.x = a.x-b.x;
-  r.y = a.y-b.y;
-  r.z = a.z-b.z;
-  return r;
-}
-
-rxvector3_t rxvector_mul(rxvector3_t a, rxvector3_t b)
-{
-  rxvector3_t r;
-  r.x = a.x*b.x;
-  r.y = a.y*b.y;
-  r.z = a.z*b.z;
-  return r;
-}
-
-rxvector3_t rxvector_downscale(rxvector3_t a, float b)
-{
-  rxvector3_t r;
-  r.x = a.x/b;
-  r.y = a.y/b;
-  r.z = a.z/b;
-  return r;
-}
-
-rxvector3_t rxvector_scale(rxvector3_t a, float b)
-{
-  rxvector3_t r;
-  r.x = a.x*b;
-  r.y = a.y*b;
-  r.z = a.z*b;
-  return r;
-}
-
-rxvector3_t rxvector_negate(rxvector3_t a)
-{
-  rxvector3_t r;
-  r.x = - a.x;
-  r.y = - a.y;
-  r.z = - a.z;
-  return r;
-}
-
-rxvector3_t rxvector_min(rxvector3_t a, float min)
-{
-  rxvector3_t r;
-  r.x = a.x > min ? min : a.x;
-  r.y = a.y > min ? min : a.y;
-  r.z = a.z > min ? min : a.z;
-  return r;
-}
-
-rxvector3_t rxvector_max(rxvector3_t a, float max)
-{
-  rxvector3_t r;
-  r.x = a.x < max ? max : a.x;
-  r.y = a.y < max ? max : a.y;
-  r.z = a.z < max ? max : a.z;
-  return r;
-}
-
-rxvector3_t rxvector_abs(rxvector3_t a)
-{
-  rxvector3_t r;
-  r.x = a.x < 0 ? - a.x : a.x;
-  r.y = a.y < 0 ? - a.y : a.y;
-  r.z = a.z < 0 ? - a.z : a.z;
-  return r;
-}
-
-
-rxvector3_t rxvector_normalize(rxvector3_t a)
-{
-  float length=rxvector_length(a);
-
-  if(length != 0)
-    a=rxvector_scale(a,1/length);
-
-  return a;
-}
-
-rxmatrix_t rxmatrix_identity()
-{
-  rxmatrix_t r;
-  r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
-  r.m[0][1]=0.f;r.m[1][1]=1.f;r.m[2][1]=0.f;r.m[3][1]=0.f;
-  r.m[0][2]=0.f;r.m[1][2]=0.f;r.m[2][2]=1.f;r.m[3][2]=0.f;
-  r.m[0][3]=0.f;r.m[1][3]=0.f;r.m[2][3]=0.f;r.m[3][3]=1.f;
-  return r;
-}
-
-// todo!!: remove loop
-rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
-{ rxmatrix_t result;
-  for(int r=0; r<4; ++r)
-  { for(int c=0; c<4; ++c)
-    {  result.m[r][c] =
-        (a.m[r][0]*b.m[0][c]) +
-        (a.m[r][1]*b.m[1][c]) +
-        (a.m[r][2]*b.m[2][c]) +
-        (a.m[r][3]*b.m[3][c]);
-    }
-  }
-  return result;
-}
-
-// todo!!: this could be made faster, just usind perp!
-rxmatrix_t rxmatrix_rotZ(float angle)
-{ rxmatrix_t result=rxmatrix_identity();
-  float cosres=cosf(angle);
-  float sinres=sinf(angle);
-  result.m[0][0]=+cosres;
-  result.m[0][1]=+sinres;
-  result.m[1][0]=-sinres;
-  result.m[1][1]=+cosres;
-  return result;
-}
-
-rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
-{ rxmatrix_t result=rxmatrix_identity();
-  result.m[3][0]=x;
-  result.m[3][1]=y;
-  result.m[3][2]=z;
-  return result;
-}
-
-rxmatrix_t rxmatrix_flip_vertically()
-{ rxmatrix_t result=rxmatrix_identity();
-  result.m[1][1]=-1.f;
-  return result;
-}
+#pragma warning(pop)
 #endif

@@ -1,18 +1,7 @@
 #ifndef _RXUNIFORM_BUFFER_HEADER
 #define _RXUNIFORM_BUFFER_HEADER
 
-typedef struct rxuniform_buffer_t rxuniform_buffer_t;
-typedef struct rxuniform_buffer_t
-{
-  rxunknown_t unknown;
-} rxuniform_buffer_t;
 
-void
-rxdelete_uniform_buffer(
-  rxuniform_buffer_t buffer);
-
-void rxupdate_uniform_buffer(
-  rxuniform_buffer_t uniform, void *memory, size_t length);
 #endif
 
 #ifdef _RXUNIFORM_BUFFER_IMPLEMENTATION
