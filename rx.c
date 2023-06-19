@@ -101,50 +101,95 @@
 #include  "rxps.hlsl"
 #include  "rxvs.hlsl"
 
+/* This is used to add support for both CPP and C, though support for CPP
+ is not online yet.. XXX */
+#ifndef RX_TLIT
+#ifndef __cplusplus
+#define RX_TLIT(T) (T)
+#  else
+#define RX_TLIT(T)
+# endif//__cplusplus
+# endif//RX_TLIT
+
 #pragma warning(push)
 
-/* suppress some warnings, normally I like to be explicit with casting, but since I use hlsl
-   so often, I've gotten used to using '.' syntax and I've developed an aesthetic for it */
+/* Suppress some warnings, normally I like to be explicit with casting, but since I use hlsl
+ so often, I've gotten used to using '.' syntax and I've developed an aesthetic for it and
+ honestly, for most code, I could care less. */
 #pragma warning(disable:4244)
 #pragma warning(disable:4305)
 
-
-// todo: this is provisional
+/* The following are rather crude setup macros, not the long-term approach that one would like
+ to use but for what this API does it seems to be the next simplest step you'd take towards
+ providing slightly more flexibility.
+   Normally, in my use cases when I write a graphics app I just want to see something on
+ screen first and then figure out where to go from there, this usually means the last thing I want
+ to bother with is the graphics API or windows stuff, so in the end, I usually end up either
+ modifying this file directly or extracting the bits I want from it or a combination of both, so for
+ now this seems sufficient, not sure why I wrote this comment. */
+#ifndef _RX_DEFAULT_WINDOW_SIZE_X
+#define _RX_DEFAULT_WINDOW_SIZE_X CW_USEDEFAULT
+# endif//_RX_DEFAULT_WINDOW_SIZE_X
+#ifndef _RX_DEFAULT_WINDOW_SIZE_Y
+#define _RX_DEFAULT_WINDOW_SIZE_Y CW_USEDEFAULT
+# endif//_RX_DEFAULT_WINDOW_SIZE_Y
 #ifndef RX_COMMAND_BUFFER_SIZE
 #define RX_COMMAND_BUFFER_SIZE 0x10000
-# endif
-// note: use these as your pre-init parameters, you can always change later!
+# endif//RX_COMMAND_BUFFER_SIZE
 #ifndef RX_INDEX_BUFFER_SIZE
 #define RX_INDEX_BUFFER_SIZE 0x10000*8
-# endif
+# endif//RX_INDEX_BUFFER_SIZE
 #ifndef RX_VERTEX_BUFFER_SIZE
 #define RX_VERTEX_BUFFER_SIZE 0x10000*8
-#endif
+# endif//RX_VERTEX_BUFFER_SIZE
+
 // note: off by default!
 // #ifndef RX_ENABLE_DEPTH_BUFFER
 // # define RX_ENABLE_DEPTH_BUFFER
 // #endif
 
-
-// todo?: there should be a macro for row-vs-col matrices!
+/* XX Would one want to support row/col matrices? */
+#ifndef RX_SHADER_COMPILATION_FLAGS
 #ifdef _CCDEBUG
 #define RX_SHADER_COMPILATION_FLAGS\
   D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|\
                      D3DCOMPILE_DEBUG|\
          D3DCOMPILE_SKIP_OPTIMIZATION|\
        D3DCOMPILE_WARNINGS_ARE_ERRORS
+
 #else
 #define RX_SHADER_COMPILATION_FLAGS\
   D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|\
          D3DCOMPILE_ENABLE_STRICTNESS|\
        D3DCOMPILE_OPTIMIZATION_LEVEL3
-#endif
+# endif//_CCDEBUG
+# endif//RX_SHADER_COMPILATION_FLAGS
+
+
+/* XX these have to be extended */
+#define RXCOLOR_WHITE  RX_TLIT(rxcolor_t){0xff,0xff,0xff,0xff}
+#define RXCOLOR_BLACK  RX_TLIT(rxcolor_t){0x00,0x00,0x00,0xff}
+#define RXCOLOR_RED    RX_TLIT(rxcolor_t){0xff,0x00,0x00,0xff}
+#define RXCOLOR_GREEN  RX_TLIT(rxcolor_t){0x00,0xff,0x00,0xff}
+#define RXCOLOR_BLUE   RX_TLIT(rxcolor_t){0x00,0x00,0xff,0xff}
+#define RXCOLOR_GRAY   RX_TLIT(rxcolor_t){0x80,0x80,0x80,0xff}
+#define RXCOLOR_YELLOW RX_TLIT(rxcolor_t){0xff,0xff,0x00,0xff}
+
+typedef struct rxcolor_t rxcolor_t;
+typedef struct rxcolor_t
+{
+  unsigned char r;
+  unsigned char g;
+  unsigned char b;
+  unsigned char a;
+} rxcolor_t;
 
 #include "rxm.cc"
 
-// todo: to be removed!
-#define     rxRGB8 DXGI_FORMAT_R8_UNORM
-#define rxRGBA8888 DXGI_FORMAT_R8G8B8A8_UNORM
+/* XX these have to be renamed */
+enum {
+     rxRGB8 = DXGI_FORMAT_R8_UNORM,
+ rxRGBA8888 = DXGI_FORMAT_R8G8B8A8_UNORM };
 
 typedef enum rx_k
 {
@@ -197,29 +242,13 @@ typedef enum rx_k
   rx_kMVWHEEL,
 } rx_k;
 
-typedef struct rxcolor_t rxcolor_t;
-typedef struct rxcolor_t
-{
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-  unsigned char a;
-} rxcolor_t;
-
-const rxcolor_t  rxcolor_kWHITE={0xff,0xff,0xff,0xff};
-const rxcolor_t   rxcolor_kGRAY={0x80,0x80,0x80,0xff};
-const rxcolor_t  rxcolor_kBLACK={0x00,0x00,0x00,0xff};
-const rxcolor_t    rxcolor_kRED={0xff,0x00,0x00,0xff};
-const rxcolor_t  rxcolor_kGREEN={0x00,0xff,0x00,0xff};
-const rxcolor_t rxcolor_kYELLOW={0xff,0xff,0x00,0xff};
-const rxcolor_t   rxcolor_kBLUE={0x00,0x00,0xff,0xff};
-
 typedef ID3D11DeviceChild   *rxunknown_t;
 
 #define rxlabel_kLOADED      1
 #define rxlabel_kERRONEOUS   2
 #define rxlabel_kINVALIDATED 4
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 typedef struct rxterminal_t rxterminal_t;
 typedef struct rxterminal_t
 { unsigned  int  length;
@@ -237,22 +266,27 @@ rxterminal_t *
 rxlinker_onlyquery_terminal(
   const char *master);
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 int
 rxlinker_labelshas_terminal(
   const char *master, int labels);
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 int
 rxlinker_labelsadd_terminal(
   const char *master, int labels);
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 int
 rxlinker_labelsrem_terminal(
   const char *master, int labels);
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 rxterminal_t *
 rxlinker_resolve_terminal(
   const char *master);
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 typedef enum rxlinkage_k
 {
   rxlinkage_kSHADER_RESOURCE_VIEW,
@@ -261,6 +295,7 @@ typedef enum rxlinkage_k
   rxlinkage_kCOUNT,
 } rxlinkage_k;
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 typedef struct rxrestore_t rxrestore_t;
 typedef struct rxrestore_t
 {
@@ -268,6 +303,7 @@ typedef struct rxrestore_t
   const    char *shader_entry;
 } rxrestore_t;
 
+/* If you know what's good for you, you'd get rid of this immediatly - XXX */
 typedef struct rxarticle_t rxarticle_t;
 typedef struct rxarticle_t
 { rx_k                sorting;
@@ -309,7 +345,7 @@ typedef struct rxoffline_texture_t
 } rxoffline_texture_t;
 
 rxoffline_texture_t
-rxsummon_texture(
+rxtexture_load(
   const char *name);
 
 typedef struct rxtexture_t rxtexture_t;
@@ -539,6 +575,8 @@ typedef struct rxcommand_t
 typedef struct rx_t rx_t;
 typedef struct rx_t
 {
+  HANDLE DefaultCursor;
+
   // note:
   HANDLE LiveReloadDirectory;
   HANDLE LiveReloadEvent;
@@ -1173,16 +1211,6 @@ void rxdelete_unknown(rxunknown_t unknown)
 }
 
 
-void rxreturn_resource(void *resource)
-{
-  ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)resource,0);
-}
-
-void rxreturn(rxborrowed_t borrowed)
-{
-  rxreturn_resource(borrowed.resource);
-}
-
 // todo: ensure we're doing this 'safely'!
 void rxdelete_vertex_buffer(rxvertex_buffer_t buffer)
 {
@@ -1277,7 +1305,7 @@ void rxqueue_sampler_command_ex(rxsampler_t sampler, int slot)
   draw->slot=slot;
 }
 
-void rxqueue_sampler_command(rxsampler_t sampler)
+void rxsampler_bind(rxsampler_t sampler)
 {
   rxqueue_sampler_command_ex(sampler,0);
 }
@@ -1289,7 +1317,7 @@ void rxqueue_texture_command_ex(rxtexture_t texture, int slot)
   draw->slot=slot;
 }
 
-void rxqueue_texture_command(rxtexture_t texture)
+void rxtexture_bind(rxtexture_t texture)
 {
   rxqueue_texture_command_ex(texture,0);
 }
@@ -1319,7 +1347,7 @@ void rxvertex_mode()
 
   rx.vertex_ytexel=0;
   rx.vertex_xtexel=0;
-  rx.vertex_color=rxcolor_kBLACK;
+  rx.vertex_color=RXCOLOR_BLACK;
   rx.command=rxdraw_command(rx_kINDEXED);
   rx.command->offset=rx.vertex_tally;
   rx.command->length=0;
@@ -1404,7 +1432,7 @@ void rxdraw_skinned_unnormalized(
   rx.command_name=0;
 
   rxcommand_label(label);
-  rxqueue_texture_command(texture);
+  rxtexture_bind(texture);
 
   rxcommand_label(label);
   rxdraw_skinned_preset_unnormalized(color,x,y,w,h,tx,ty,tw,th);
@@ -1420,19 +1448,19 @@ void rxdraw_skinned_ex(
 
 void rxdraw_skinned(rxtexture_t texture, float x, float y, float w, float h)
 {
-  rxdraw_skinned_unnormalized(texture,rxcolor_kWHITE,x,y,w,h,0,0,1,1);
+  rxdraw_skinned_unnormalized(texture,RXCOLOR_WHITE,x,y,w,h,0,0,1,1);
 }
 
 void rxtexture_scaled(rxtexture_t texture, float x, float y, float scale_x, float scale_y)
 {
-  rxdraw_skinned_unnormalized(texture,rxcolor_kWHITE,x,y,
+  rxdraw_skinned_unnormalized(texture,RXCOLOR_WHITE,x,y,
     texture.size_x * scale_x,
     texture.size_y * scale_y,0,0,1,1);
 }
 
 void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
 {
-  rxqueue_sampler_command(rx.point_sampler);
+  rxsampler_bind(rx.point_sampler);
   rxdraw_skinned_unnormalized(rx.white,color,x,y,w,h,0,0,1,1);
 }
 
@@ -1440,7 +1468,7 @@ void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
 // todo!!: this is disgusting!
 void rxdraw_circle(rxcolor_t color, float x, float y, float r)
 {
-  rxqueue_texture_command(rx.white);
+  rxtexture_bind(rx.white);
 
   rxvertex_mode();
   { rxvertex_color(color);
@@ -1479,7 +1507,7 @@ void rxdraw_line(rxcolor_t color, float thickness, float x0, float y0, float x1,
   float xnormal=.5f * thickness * -ydist/length;
   float ynormal=.5f * thickness * +xdist/length;
 
-  rxqueue_texture_command(rx.white);
+  rxtexture_bind(rx.white);
   rxvertex_mode();
     rxvertex_color(color);
     rxsubmit_vertex_tex(x0-xnormal,y0-ynormal,0,1);
@@ -1498,14 +1526,15 @@ void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
 
   rxcommand_label(label);
   rxdraw_rect(color,x-.5,y+h-.5,w+.5,1.);
+
   rxcommand_label(label);
   rxdraw_rect(color,x-.5,y+0-.5,w+.5,1.);
 
   rxcommand_label(label);
-  rxdraw_rect(color,x+0-.5,y-.5,1.,h-.5);
+  rxdraw_rect(color,x+0-.5,y-.5,1.,h+.5);
 
   rxcommand_label(label);
-  rxdraw_rect(color,x+w+.5,y-.5,1.,h-.5);
+  rxdraw_rect(color,x+w-.5,y-.5,1.,h+.5);
 }
 
 float rxdraw_text_length(float h, const char *string)
@@ -1524,14 +1553,14 @@ void rxdraw_text_ex(rxcolor_t color, int x, int y, int h, const char *string)
   float ox=(float)x;
   float oy=(float)y;
 
-  // todo: this should restore the state!
-  rxqueue_texture_command(rx.font_atlas);
-  rxqueue_sampler_command(rx.point_sampler);
+  /* XXX this should restore the state */
+  rxtexture_bind(rx.font_atlas);
+  rxsampler_bind(rx.point_sampler);
 
   rxvertex_mode();
   rxvertex_color(color);
 
-  // todo!!: this actually something we have to get back to
+  /* XXX we have to get back to this */
   float sample_xsize=rx.font_ysize*xnormalize;
   float sample_ysize=rx.font_ysize*ynormalize;
 
@@ -1571,7 +1600,7 @@ void rxdraw_text_ex(rxcolor_t color, int x, int y, int h, const char *string)
 
 void rxdraw_text(int x, int y, int h, const char *string)
 {
-  rxdraw_text_ex(rxcolor_kWHITE,x,y,h,string);
+  rxdraw_text_ex(RXCOLOR_WHITE,x,y,h,string);
 }
 
 
@@ -1599,18 +1628,28 @@ rxborrowed_t rxborrow_struct_buffer(rxstruct_buffer_t buffer)
   return rxborrow_typeless_buffer((rxunknown_t)resource);
 }
 
+/* XXX this could use a better name */
 rxoffline_texture_t
-rxsummon_texture(
+rxtexture_load(
   const char *name)
 {
-  // todo!!: support other formats
-  // todo!!: the texture memory may not necessarily come from a file
-  // todo!!: provide own memory
-  rxoffline_texture_t t;
-  t.format=rxRGBA8888;
-  t.memory=stbi_load(name,&t.size_x,&t.size_y,0,4);
-  t.stride=t.size_x*4;
-  return t;
+  const char *ext = ccfileext(name);
+
+  rxoffline_texture_t result;
+  memset(&result,0,sizeof(result));
+
+  /* XXX this is google type stuff */
+  if(strcmp(ext,"png")&&
+     strcmp(ext,"jpg")&&
+     strcmp(ext,"bmp")) return result;
+
+  /* XXX support other formats, use own memory */
+  void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
+
+  result.format=rxRGBA8888;
+  result.memory=memory;
+  result.stride=result.size_x*4;
+  return result;
 }
 
 rxtexture_t
@@ -1624,11 +1663,17 @@ rxtexture_t
 rxtexture_upload_byname(
   const char *name)
 {
-  rxoffline_texture_t local=rxsummon_texture(name);
+  rxoffline_texture_t local=rxtexture_load(name);
 
-  rxtexture_t texture=rxtexture_upload(local);
+  rxtexture_t texture;
+  memset(&texture,0,sizeof(texture));
 
-  stbi_image_free(local.memory);
+  if(local.memory != ccnull)
+  {
+    texture=rxtexture_upload(local);
+
+    stbi_image_free(local.memory);
+  }
 
   return texture;
 }
@@ -1648,22 +1693,21 @@ rxdelete_texture(
     IUnknown_Release(View);
   }
 }
-
 rxtexture_t
 rxtexture_create_untyped(
-          int             size_x,
-          int             size_y,
-  DXGI_FORMAT             format,
-          int             stride,
-          void           *memory,
-  D3D11_USAGE              usage,
-          int         bind_flags,
-          int  host_access_flags,
-          int       sample_count,
-          int     sample_quality )
+          int              size_x,
+          int              size_y,
+  DXGI_FORMAT              format,
+          int              stride,
+          void           * memory,
+  D3D11_USAGE               usage,
+          int          bind_flags,
+          int   host_access_flags,
+          int        sample_count,
+          int      sample_quality )
 {
-  ccassert(size_x >= 1 || cctraceerr("invalid size x"));
-  ccassert(size_y >= 1 || cctraceerr("invalid size y"));
+  ccassert((size_x >= 1 && size_x <= 16384) || cctraceerr("invalid size x %i", size_x));
+  ccassert((size_y >= 1 && size_y <= 16384) || cctraceerr("invalid size y %i", size_y));
 
   D3D11_TEXTURE2D_DESC TextureI;
   TextureI.                 Width=size_x;
@@ -1990,6 +2034,13 @@ void rxtime()
   rx.frame_ticks=ticks;
 }
 
+
+void rxwindow_xy(int x, int y)
+{
+  /* XXX do this properly */
+  SetWindowPos(rx.Window,HWND_TOP,x,y,0,0,SWP_NOSIZE);
+}
+
 void rxwindow()
 {
   // todo!!:
@@ -2091,13 +2142,19 @@ void rxdefault_render_pass_end()
 
 rxcommand_t *rxdraw_clip(int x0, int y0, int x1, int y1)
 {
-  ccassert(x1 >= 0);
-  ccassert(y1 >= 0);
-  ccassert(x0 >= 0);
-  ccassert(y0 >= 0);
-
   ccassert(x0 <= x1);
   ccassert(y0 <= y1);
+
+  /* this could be improved */
+  x0 = rxclampi(x0, 0,rx.size_x);
+  y0 = rxclampi(y0, 0,rx.size_y);
+  x1 = rxclampi(x1, 0,rx.size_x);
+  y1 = rxclampi(y1, 0,rx.size_y);
+
+  // ccassert(x1 >= 0);
+  // ccassert(y1 >= 0);
+  // ccassert(x0 >= 0);
+  // ccassert(y0 >= 0);
 
   rxcommand_t *c=rxdraw_command(rx_kCLIP);
   c->x0=x0; c->y0=y0;
@@ -2114,11 +2171,12 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
   {
     case rx_kCLIP:
     {
+      /* XXX we have to make this clearer */
       D3D11_RECT Clip;
       Clip.left  =draw->x0;
-      Clip.top   =draw->y0;
+      Clip.top   =rx.size_y - draw->y1;
       Clip.right =draw->x1;
-      Clip.bottom=draw->y1;
+      Clip.bottom=rx.size_y - draw->y0;
       ID3D11DeviceContext_RSSetScissorRects(rx.Context,1,&Clip);
     } break;
     case rx_kPULLTARGET:
@@ -2227,13 +2285,13 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
 int rxtick()
 {
 
-
   rx.tick_count++;
 
   // /rxpull_live_reload_changes();
 
   rxwindow();
 
+  SetCursor(rx.DefaultCursor);
 
   // todo: clear_color
 #if 0
@@ -2247,7 +2305,7 @@ int rxtick()
   rxdraw_end();
 
   rxdraw_skinned_preset_unnormalized(
-    rxcolor_kWHITE,0,0,(float)(rx.size_x),(float)(rx.size_y),0,0,1,1);
+    RXCOLOR_WHITE,0,0,(float)(rx.size_x),(float)(rx.size_y),0,0,1,1);
 
   // todo: this is extremely unsafe and unpredictable, get something more robust!
   rxdraw_end();
@@ -2459,6 +2517,7 @@ void rxinit(const wchar_t *window_title)
     }
   }
 
+
   WNDCLASSW WindowClass;
   ZeroMemory(&WindowClass,sizeof(WindowClass));
   WindowClass.lpfnWndProc=rxwindow_callback_win32;
@@ -2467,10 +2526,15 @@ void rxinit(const wchar_t *window_title)
   RegisterClassW(&WindowClass);
 
   rx.Window=CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,WindowClass.lpszClassName,window_title,
-    WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,CW_USEDEFAULT,
+    WS_OVERLAPPEDWINDOW,
+      CW_USEDEFAULT,
+      CW_USEDEFAULT,
+      _RX_DEFAULT_WINDOW_SIZE_X,
+      _RX_DEFAULT_WINDOW_SIZE_Y,
       NULL,NULL,WindowClass.hInstance,NULL);
 
-  SetCursor(LoadCursorA(NULL,IDC_ARROW));
+  rx.DefaultCursor=LoadCursorA(NULL,IDC_ARROW);
+  SetCursor(rx.DefaultCursor);
 
   typedef BOOL WINAPI _YYY_(void);
   typedef BOOL WINAPI _XXX_(DPI_AWARENESS_CONTEXT);

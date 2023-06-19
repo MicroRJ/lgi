@@ -6,6 +6,7 @@
 #define rxMIN(x,y) ((x)<(y)? (x):(y))
 #define rxMAX(x,y) ((x)>(y)? (x):(y))
 
+
 typedef struct rxvec2i16_t rxvec2i16_t;
 typedef struct rxvec2i16_t
 {

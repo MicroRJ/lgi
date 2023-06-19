@@ -1,24 +1,24 @@
 #ifndef _RXUNIFORM_BUFFER_HEADER
 #define _RXUNIFORM_BUFFER_HEADER
-
-
 #endif
 
 #ifdef _RXUNIFORM_BUFFER_IMPLEMENTATION
 
+void rxreturn(rxborrowed_t borrowed)
+{
+  ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)borrowed.resource,0);
+}
 
 rxborrowed_t
 rxborrow_typeless_buffer(rxunknown_t buffer)
-{
-  rxborrowed_t result;
+{ rxborrowed_t result;
   result.resource=0;
   result.  length=0;
   result.  memory=0;
 
   // note: ensures this is a valid buffer!
   ID3D11Resource *Resource;
-  if(SUCCEEDED(
-      IUnknown_QueryInterface(buffer,&IID_ID3D11Buffer,&Resource)))
+  if(SUCCEEDED(IUnknown_QueryInterface(buffer,&IID_ID3D11Buffer,&Resource)))
   {
     D3D11_MAPPED_SUBRESOURCE MappedAccess;
     ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
