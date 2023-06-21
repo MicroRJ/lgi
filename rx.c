@@ -1,15 +1,27 @@
 /*
 **
-** -+- rx -+-
+**                      -+- rx -+-
 **
-** Copyright(C) Dayan Rodriguez, 2022, All rights reserved.
+**                 Mundane Graphics API.
 **
-** Simple render API for when you just want to see something.
+**  *--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*
+**  Copyright(C) Dayan Rodriguez, 2022, All Rights Reserved
+**  *--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*--*
 **
-** 'rx' is not production ready nor production quality.
+**        NOT PRODUCTION READY/NOT PRODUCTION QUALITY
 **
-** libraries that you should use instead:
-** erkkah/tigr or raysan5/raylib
+**
+**               HONI SOIT QUI MAL Y PENSE
+**
+**
+**                 github.com/MicroRJ/rx
+**
+*/
+
+/*
+** Libraries that you should use instead:
+** erkkah/tigr or raysan5/raylib or virtually any other library that isn't
+** this one.
 **
 ** ** panic notes **
 ** - I DON'T SEE ANYTHING:
@@ -165,8 +177,9 @@
 # endif//_CCDEBUG
 # endif//RX_SHADER_COMPILATION_FLAGS
 
+/*        NOLI SE TANGERE
 
-/* XX these have to be extended */
+  XX these have to be extended */
 #define RXCOLOR_WHITE  RX_TLIT(rxcolor_t){0xff,0xff,0xff,0xff}
 #define RXCOLOR_BLACK  RX_TLIT(rxcolor_t){0x00,0x00,0x00,0xff}
 #define RXCOLOR_RED    RX_TLIT(rxcolor_t){0xff,0x00,0x00,0xff}
@@ -242,79 +255,9 @@ typedef enum rx_k
   rx_kMVWHEEL,
 } rx_k;
 
-typedef ID3D11DeviceChild   *rxunknown_t;
+typedef ID3D11DeviceChild *rxunknown_t;
 
-#define rxlabel_kLOADED      1
-#define rxlabel_kERRONEOUS   2
-#define rxlabel_kINVALIDATED 4
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-typedef struct rxterminal_t rxterminal_t;
-typedef struct rxterminal_t
-{ unsigned  int  length;
-  void         * memory;
-  ccclocktick_t  loaded;
-            int  labels;
-    const char * master;
-} rxterminal_t;
-
-rxterminal_t *
-rxlinker_register_terminal(
-  const char *master);
-
-rxterminal_t *
-rxlinker_onlyquery_terminal(
-  const char *master);
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-int
-rxlinker_labelshas_terminal(
-  const char *master, int labels);
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-int
-rxlinker_labelsadd_terminal(
-  const char *master, int labels);
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-int
-rxlinker_labelsrem_terminal(
-  const char *master, int labels);
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-rxterminal_t *
-rxlinker_resolve_terminal(
-  const char *master);
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-typedef enum rxlinkage_k
-{
-  rxlinkage_kSHADER_RESOURCE_VIEW,
-  rxlinkage_kRENDER_TARGET_VIEW,
-  rxlinkage_kVERTEX_LAYOUT,
-  rxlinkage_kCOUNT,
-} rxlinkage_k;
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-typedef struct rxrestore_t rxrestore_t;
-typedef struct rxrestore_t
-{
-  const    char *shader_model;
-  const    char *shader_entry;
-} rxrestore_t;
-
-/* If you know what's good for you, you'd get rid of this immediatly - XXX */
-typedef struct rxarticle_t rxarticle_t;
-typedef struct rxarticle_t
-{ rx_k                sorting;
-  rxunknown_t         unknown;
-  rxunknown_t         linkage[rxlinkage_kCOUNT];
-  // rxunknown_t         varying[0x10];
-  // rxunknown_t         sampler[0x10];
-  rxrestore_t         restore;
-  const char      *    master;
-  ccclocktick_t        loaded;
-} rxarticle_t;
+#include "rxobject.h"
 
 typedef struct rxblobber_t rxblobber_t;
 typedef struct rxblobber_t
@@ -717,140 +660,7 @@ typedef struct rx_t
 
 ccglobal rx_t rx;
 
-rxarticle_t *
-rxarticle_create(void *unknown)
-{
-  rxarticle_t *tan=cctblputP(rx.instance_table,unknown);
-  ccassert(ccerrnon());
-
-  tan->unknown=(rxunknown_t)(unknown);
-
-  return tan;
-}
-
-rxarticle_t *
-rxarticle_attach(rxarticle_t *tan, rxlinkage_k lin, void *unknown)
-{
-  tan->linkage[lin]=(rxunknown_t)(unknown);
-
-  return tan;
-}
-
-rxterminal_t *
-rxlinker_register_terminal(
-  const char *master)
-{
-  rxterminal_t *contents=cctblsetS(rx.contents_table,master);
-  ccassert(ccerrnon());
-
-  return contents;
-}
-
-rxterminal_t *
-rxlinker_onlyquery_terminal(
-  const char *master)
-{
-  rxterminal_t *contents=cctblgetS(rx.contents_table,master);
-
-  if(ccerrnit())
-  {
-    contents=ccnull;
-  }
-
-  return contents;
-}
-
-int
-rxlinker_labelshas_terminal(
-  const char *master, int labels)
-{
-  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
-
-  if(contents != 0)
-  {
-    return contents->labels & labels;
-  }
-
-  return 0;
-}
-
-int
-rxlinker_labelsadd_terminal(
-  const char *master, int labels)
-{
-  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
-
-  if(contents != 0)
-  {
-    contents->labels |= labels;
-  }
-
-  return contents != 0;
-}
-
-int
-rxlinker_labelsrem_terminal(
-  const char *master, int labels)
-{
-  rxterminal_t *contents=rxlinker_onlyquery_terminal(master);
-
-  if(contents != 0)
-  {
-    contents->labels |= labels;
-  }
-
-  return contents != 0;
-}
-
-rxterminal_t *
-rxlinker_resolve_terminal(
-  const char *master)
-{
-  ccassert(master    != 0);
-  ccassert(master[0] != 0);
-
-  rxterminal_t *contents=rxlinker_register_terminal(master);
-
-  if((~contents->labels&rxlabel_kLOADED)||(contents->labels&rxlabel_kINVALIDATED))
-  {
-    unsigned long length;
-    void *        memory;
-    void *        handle;
-
-    length=0;
-    handle=ccopenfile(master,"r");
-    memory=ccpullfile(handle,0,&length);
-
-
-    ccclosefile(handle);
-
-    if(length != 0 && memory != 0)
-    {
-      if((contents->length!=length)||memcmp(memory,contents->memory,length))
-      {
-        ccdebuglog("'%s': file contents re/loaded",master);
-
-        contents->loaded=rx.total_ticks;
-        contents->labels&=~rxlabel_kERRONEOUS;
-        contents->labels&=~rxlabel_kINVALIDATED;
-        contents->labels|=rxlabel_kLOADED;
-      }
-
-      if(contents->memory)
-      {
-        ccfree(contents->memory);
-      }
-
-      contents->memory=memory;
-      contents->length=length;
-      contents->master=master;
-
-    } else
-      cctracewar("'%s': file contents could not be read",master);
-  }
-
-  return contents;
-}
+#include "rxobject.cc"
 
 void rxinvalidate_contents(void)
 {

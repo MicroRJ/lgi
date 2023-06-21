@@ -2,6 +2,7 @@
 #define _RXM_HEADER
 
 #define rxPI_F 3.14159265358979323846f
+#define rxPI   3.14159265358979323846
 #define rxABS(v)   ((v)<(0)?-(v):(v))
 #define rxMIN(x,y) ((x)<(y)? (x):(y))
 #define rxMAX(x,y) ((x)>(y)? (x):(y))
@@ -81,8 +82,9 @@ typedef struct rxmatrix_t
 rxmatrix_t rxmatrix_identity();
 rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
 
-// merge: added 'rxclamp'
-float rxclamp(float val, float min, float max)
+/* ++ added 'rxclamp'
+	 ++ switched to 64-bit floats instead */
+double rxclamp(double val, double min, double max)
 {
   return val < min ? min : val > max ? max : val;
 }
