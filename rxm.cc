@@ -173,6 +173,32 @@ float rxvector_length(rxvec3_t a)
   return sqrtf(rxvector_dot(a,a));
 }
 
+float rxvec2_dot(rxvec2_t a, rxvec2_t b)
+{
+  return a.x*b.x + a.y*b.y;
+}
+
+float rxvec2_len(rxvec2_t a)
+{
+  return sqrtf(rxvec2_dot(a,a));
+}
+
+rxvec2_t rxvec2_add(rxvec2_t a, rxvec2_t b)
+{
+  rxvec2_t r;
+  r.x = a.x+b.x;
+  r.y = a.y+b.y;
+  return r;
+}
+
+rxvec2_t rxvec2_sub(rxvec2_t a, rxvec2_t b)
+{
+  rxvec2_t r;
+  r.x = a.x-b.x;
+  r.y = a.y-b.y;
+  return r;
+}
+
 rxvec3_t rxvector_add(rxvec3_t a, rxvec3_t b)
 {
   rxvec3_t r;

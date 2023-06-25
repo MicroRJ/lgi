@@ -1844,7 +1844,6 @@ void rxtime()
   rx.frame_ticks=ticks;
 }
 
-
 void rxwindow_xy(int x, int y)
 {
   /* XXX do this properly */
@@ -1865,8 +1864,8 @@ void rxwindow()
 
   RECT client;
   GetClientRect(rx.Window,&client);
-  rx.size_x=client.right-client.left;
-  rx.size_y=client.bottom-client.top;
+  rx.size_x=client. right - client.left;
+  rx.size_y=client.bottom - client. top;
   rx.center_x=rx.size_x>>1;
   rx.center_y=rx.size_y>>1;
 }
@@ -2335,13 +2334,36 @@ void rxinit(const wchar_t *window_title)
   WindowClass.lpszClassName=window_title;
   RegisterClassW(&WindowClass);
 
-  rx.Window=CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,WindowClass.lpszClassName,window_title,
-    WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT,
-      CW_USEDEFAULT,
-      _RX_DEFAULT_WINDOW_SIZE_X,
-      _RX_DEFAULT_WINDOW_SIZE_Y,
-      NULL,NULL,WindowClass.hInstance,NULL);
+
+  int WindowSizeX=_RX_DEFAULT_WINDOW_SIZE_X;
+  int WindowSizeY=_RX_DEFAULT_WINDOW_SIZE_Y;
+
+  if((WindowSizeX != CW_USEDEFAULT) ||
+  	 (WindowSizeY != CW_USEDEFAULT) )
+  {
+  	if(WindowSizeX == CW_USEDEFAULT) WindowSizeX = 720;
+  	if(WindowSizeY == CW_USEDEFAULT) WindowSizeY = 720;
+	}
+
+  if((WindowSizeX != CW_USEDEFAULT) &&
+  	 (WindowSizeY != CW_USEDEFAULT) )
+  {
+	  RECT WindowRect;
+	  WindowRect.  left=0;
+	  WindowRect.   top=0;
+	  WindowRect. right=_RX_DEFAULT_WINDOW_SIZE_X;
+	  WindowRect.bottom=_RX_DEFAULT_WINDOW_SIZE_Y;
+	  AdjustWindowRect(&WindowRect,WS_OVERLAPPEDWINDOW,FALSE);
+
+  	WindowSizeX = WindowRect. right - WindowRect.left;
+  	WindowSizeY = WindowRect.bottom - WindowRect. top;
+  }
+
+  rx.Window = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,
+  	WindowClass.lpszClassName,window_title,
+    	WS_OVERLAPPEDWINDOW & ~WS_THICKFRAME,
+    		CW_USEDEFAULT,CW_USEDEFAULT,
+      		WindowSizeX,WindowSizeY,NULL,NULL,WindowClass.hInstance,NULL);
 
   rx.DefaultCursor=LoadCursorA(NULL,IDC_ARROW);
   SetCursor(rx.DefaultCursor);
