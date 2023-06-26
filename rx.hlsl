@@ -4,19 +4,19 @@ cbuffer _ : register(b0)
 	float2    mouse_xycursor;
 };
 struct VS_INPUT
-{ float2   xyz:POSITION;
+{ float4  xyzw:POSITION;
   float2    uv:TEXCOORD0;
   float4 color:COLOR0;
 };
 struct PS_INPUT
-{ float4      xyz:SV_POSITION;
+{ float4     xyzw:SV_POSITION;
   float4    color:COLOR0;
   float2       uv:TEXCOORD0;
 };
 PS_INPUT MainVS(VS_INPUT i)
 {
 	PS_INPUT o;
-  o.     xyz=mul(_xyzworldtoclip,float4(i.xyz, 0.f, 1.f));
+  o.    xyzw=mul(_xyzworldtoclip,i.xyzw);
   o.   color=i.color;
   o.      uv=i.uv;
   return o;

@@ -177,27 +177,45 @@
 # endif//_CCDEBUG
 # endif//RX_SHADER_COMPILATION_FLAGS
 
-/*        NOLI SE TANGERE
+#include "rxm.cc"
 
-  XX these have to be extended */
-#define RXCOLOR_WHITE  RX_TLIT(rxcolor_t){0xff,0xff,0xff,0xff}
-#define RXCOLOR_BLACK  RX_TLIT(rxcolor_t){0x00,0x00,0x00,0xff}
-#define RXCOLOR_RED    RX_TLIT(rxcolor_t){0xff,0x00,0x00,0xff}
-#define RXCOLOR_GREEN  RX_TLIT(rxcolor_t){0x00,0xff,0x00,0xff}
-#define RXCOLOR_BLUE   RX_TLIT(rxcolor_t){0x00,0x00,0xff,0xff}
-#define RXCOLOR_GRAY   RX_TLIT(rxcolor_t){0x80,0x80,0x80,0xff}
-#define RXCOLOR_YELLOW RX_TLIT(rxcolor_t){0xff,0xff,0x00,0xff}
+/* We have to formalize this - XXX - */
+typedef struct rxcolor8_t rxcolor8_t;
+typedef struct rxcolor8_t
+{ unsigned char r,g,b,a;
+} rxcolor8_t;
 
+/* We have to formalize this - XXX - */
 typedef struct rxcolor_t rxcolor_t;
 typedef struct rxcolor_t
-{
-  unsigned char r;
-  unsigned char g;
-  unsigned char b;
-  unsigned char a;
+{ float r,g,b,a;
 } rxcolor_t;
 
-#include "rxm.cc"
+#ifndef RX_RGBA
+#define RX_RGBA(R,G,B,A) RX_TLIT(rxcolor_t){R,G,B,A}
+# endif
+/* Never seen anyone do this sort of stuff, probably due to my room temperature iq
+	- XXX - the one called rj */
+#ifndef RX_RGBA_UNORM
+#define RX_RGBA_UNORM(R,G,B,A) RX_RGBA(R/255.,G/255.,B/255.,A/255.)
+# endif
+
+#define RX_COLOR_CHECK(color)\
+	do\
+	{ assert(CCWITHIN(color.r,0,1));\
+		assert(CCWITHIN(color.g,0,1));\
+		assert(CCWITHIN(color.b,0,1));\
+		assert(CCWITHIN(color.a,0,1)); } while(0)
+/*
+		NOLI SE TANGERE
+*/
+#define RXCOLOR_WHITE  RX_RGBA_UNORM(0xff,0xff,0xff,0xff)
+#define RXCOLOR_BLACK  RX_RGBA_UNORM(0x00,0x00,0x00,0xff)
+#define RXCOLOR_RED    RX_RGBA_UNORM(0xff,0x00,0x00,0xff)
+#define RXCOLOR_GREEN  RX_RGBA_UNORM(0x00,0xff,0x00,0xff)
+#define RXCOLOR_BLUE   RX_RGBA_UNORM(0x00,0x00,0xff,0xff)
+#define RXCOLOR_GRAY   RX_RGBA_UNORM(0x80,0x80,0x80,0xff)
+#define RXCOLOR_YELLOW RX_RGBA_UNORM(0xff,0xff,0x00,0xff)
 
 /* XX these have to be renamed */
 enum {
@@ -242,8 +260,8 @@ typedef enum rx_k
 
   rx_kUNIFORM,
 
+  /* Breaking changes */
   rx_kMATRIX,
-  rx_kMATRIX_MULTIPLY,
 
   rx_kINDEXED,
 
@@ -391,8 +409,7 @@ typedef struct rxshader_t
 typedef struct rxshader_builtin_uniform_t rxshader_builtin_uniform_t;
 typedef struct rxshader_builtin_uniform_t
 {
-  // todo!!!: rename
-  rxmatrix_t e;
+  rxmatrix_t matrix;
 
   float    screen_xsize;
   float    screen_ysize;
@@ -405,14 +422,24 @@ typedef struct rxshader_builtin_uniform_t
   int           padding[2];
 } rxshader_builtin_uniform_t;
 
+
+/* This is just to support what one would normally use */
 typedef int rxindex_t;
 
-// todo: migrate to xyz
 typedef struct rxvertex_t rxvertex_t;
 typedef struct rxvertex_t
-{ float x, y;
-  float u, v;
-  unsigned char r,g,b,a;
+{ union
+	{ struct
+		{ rxvec4_t      xyzw;
+			rxvec2_t      uv;
+			rxcolor_t     rgba;
+		};
+		struct
+		{ float x,y,z,w;
+		  float u,v;
+  		float r,g,b,a;
+		};
+	};
 } rxvertex_t;
 
 rxblobber_t
@@ -542,11 +569,16 @@ typedef struct rx_t
 
   // note: these are cc-hash-tables
   rxarticle_t       *instance_table;
-  rxterminal_t       *contents_table;
+  rxterminal_t      *contents_table;
 
+  /* These are only used for the matrix stack and not accessible through the
+  	command interface directly nor affect the matrix used for rendering however,
+  	the actual matrix that is at render time is accessible through the command interface
+  	directly - XXX - the one called rj */
+  rxmatrix_t   view_matrix;
+  rxmatrix_t  world_matrix;
 
-  rxmatrix_t                        view_matrix;
-  rxmatrix_t                       world_matrix;
+  // rxmatrix_t  matrix;
 
   rxuniform_buffer_t             uniform_buffer;
    rxvertex_buffer_t              vertex_buffer;
@@ -868,14 +900,18 @@ rxcreate_shader(
     Element-> SemanticName=ElemSig.SemanticName;
     Element->SemanticIndex=ElemSig.SemanticIndex;
 
-    // todo: support other formats!
+    /* This is something that we have to revisit, for instance, say I wanted to
+     support RGBA color as 4 chars instead of four floats for greater memory efficiency,
+     there's not a straight forward way to know the mapping of the vertex layout we're
+     using and map it to the layout of the input signature
+     - XXX - the one called rj */
     if(ElemSig.ComponentType == D3D_REGISTER_COMPONENT_FLOAT32)
     {
       switch(ElemSig.Mask)
-      { case 0b0001: Element->Format=0;                          break;
-        case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;   break;
-        case 0b0111: Element->Format=0;                          break;
-        case 0b1111: Element->Format=DXGI_FORMAT_R8G8B8A8_UNORM; break;
+      { case 0b0001: Element->Format=0;                              break;
+        case 0b0011: Element->Format=DXGI_FORMAT_R32G32_FLOAT;       break;
+        case 0b0111: Element->Format=0;                              break;
+        case 0b1111: Element->Format=DXGI_FORMAT_R32G32B32A32_FLOAT; break;
         default:
           ccassert(!"not implemented");
       }
@@ -1092,13 +1128,6 @@ void rxdraw_matrix(rxmatrix_t matrix)
   draw->matrix=matrix;
 }
 
-// todo: properly integrate this!
-void rxdraw_matrix_multiply(rxmatrix_t matrix)
-{
-  rxcommand_t *draw=rxdraw_command(rx_kMATRIX_MULTIPLY);
-  draw->matrix=matrix;
-}
-
 // todo: this should be a command instead, and it should use 'rxcolor_t'
 void rxclear(float r, float g, float b, float a)
 {
@@ -1185,6 +1214,8 @@ void rxvertex_color_rgba(int color_r, int color_g, int color_b, int color_a)
 
 void rxvertex_color(rxcolor_t color)
 {
+	RX_COLOR_CHECK(color);
+
   rx.vertex_color=color;
 }
 
@@ -1194,9 +1225,15 @@ void rxsubmit_vertex_ex(
   ccassert(rx.vertex_modeon != 0);
   ccassert(rx.command != 0);
 
+
+  RX_COLOR_CHECK(color);
+
   rxvertex_t vertex;
   vertex.x=x;
   vertex.y=y;
+  vertex.z=.5;
+  vertex.w=1.;
+
   vertex.u=xcoord;
   vertex.v=ycoord;
   vertex.r=color.r;
@@ -1223,6 +1260,8 @@ void rxsubmit_vertex_tex(float x, float y, float xcoord, float ycoord)
 void rxdraw_skinned_preset_unnormalized(
   rxcolor_t color, float x, float y, float w, float h, float tx, float ty, float tw, float th)
 {
+	RX_COLOR_CHECK(color);
+
   rxvertex_mode();
     rxvertex_color(color);
     rxsubmit_vertex_tex(x+0,y+0,tx   ,ty+th);
@@ -1273,7 +1312,6 @@ void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
   rxsampler_bind(rx.point_sampler);
   rxdraw_skinned_unnormalized(rx.white,color,x,y,w,h,0,0,1,1);
 }
-
 
 // todo!!: this is disgusting!
 void rxdraw_circle(rxcolor_t color, float x, float y, float r)
@@ -1898,14 +1936,16 @@ void rxrestore_render_stack()
   rxdevice_bind_shader(rx. default_pixel_shader);
   rxdevice_bind_uniform_buffer(rx.uniform_buffer,0);
 
+  rx.world_matrix = rxmatrix_identity();
+  rx. view_matrix = rxmatrix_identity();
+  rx.view_matrix.m[0][0]=  2. / rx.size_x;
+  rx.view_matrix.m[1][1]=  2. / rx.size_y;
+  rx.view_matrix.m[2][2]= .5;
+  rx.view_matrix.m[3][0]=- 1.;
+  rx.view_matrix.m[3][1]=- 1.;
 
-  rx.world_matrix=rxmatrix_identity();
-  rx. view_matrix=rxmatrix_identity();
-  rx.view_matrix.m[0][0]=+ 2.0f/(rx.size_x);
-  rx.view_matrix.m[1][1]=+ 2.0f/(rx.size_y);
-  rx.view_matrix.m[2][2]=+ 0.5f;
-  rx.view_matrix.m[3][0]=- 1.0f;
-  rx.view_matrix.m[3][1]=- 1.0f;
+
+  //rx. matrix = rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
 }
 
 // todo!!: this is possibly the slowest thing ever, don't write games like this!
@@ -2014,12 +2054,7 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
     // todo: this is to be revised!
     case rx_kMATRIX:
     {
-      rx.world_matrix=draw->matrix;
-    } break;
-    // todo: this is to be revised!
-    case rx_kMATRIX_MULTIPLY:
-    {
-      rx.world_matrix=rxmatrix_multiply(rx.world_matrix,draw->matrix);
+      rx.world_matrix = draw->matrix;
     } break;
     case rx_kPUSHSHADER:
     {
@@ -2068,9 +2103,10 @@ int rxexec_command(rxcommand_t *draw, int index_offset)
     } break;
     case rx_kINDEXED:
     {
+    	rxmatrix_t matrix = rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
 
       rxshader_builtin_uniform_t t;
-      t.            e=rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
+      t.       matrix=matrix;
       t. screen_xsize=(float)(rx.size_x);
       t. screen_ysize=(float)(rx.size_y);
       t.mouse_xcursor=(float)(rx.xcursor) / rx.size_x; // todo!!:
@@ -2646,13 +2682,15 @@ void load_bitmap8(unsigned char *memory, int stride, unsigned char *source)
   for(int y=0; y<16; ++y)
   { unsigned short bitrow=*source++;
 
-    rxcolor_t *color=(rxcolor_t*)memory;
+    rxcolor8_t *color = (rxcolor8_t*) memory;
+
     for(int x=0; x<8; ++x)
-    { unsigned char bitpixel=255 * (bitrow & 0x1);
-      color->r = bitpixel;
-      color->g = bitpixel;
-      color->b = bitpixel;
-      color->a = bitpixel;
+    {
+    	unsigned char bp;
+    	bp=(bitrow & 0x1)*0xff;
+
+    	color[0]=RX_TLIT(rxcolor8_t){bp,bp,bp,bp};
+
       ++color;
       bitrow >>= 1;
     }
@@ -2779,7 +2817,7 @@ unsigned char encoded[95][16]=
 
     unsigned char *write;
 
-    write=memory+stride*ycursor+xcursor*sizeof(rxcolor_t);
+    write=memory+stride*ycursor+xcursor*sizeof(rxcolor8_t);
 
     load_bitmap8(write,stride,encoded[index]);
 

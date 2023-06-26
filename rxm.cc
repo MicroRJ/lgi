@@ -60,21 +60,19 @@ rxvec3_t   rxvec3_xy (float x, float y);
 rxvec3_t   rxvec3_x  (float x);
 rxvec3_t   rxvec3_y  (float y);
 rxvec3_t   rxvec3_z  (float z);
+/* this will have to be renamed to float4 instead, usually vec3 has the w component implicitly, oops,
+	 - XXX - the one called rj */
 typedef struct rxvec4_t rxvec4_t;
 typedef struct rxvec4_t
 { union
-  { struct
-    {
-      float x,y,z,w;
-    };
-    struct
-    {
-      float r,g,b,a;
-    };
+  { struct { float x,y,z,w; };
+    struct { float r,g,b,a; };
     rxvec3_t xyz;
     rxvec3_t rgb;
+    rxvec2_t xy;
   };
 } rxvec4_t;
+
 typedef struct rxmatrix_t rxmatrix_t;
 typedef struct rxmatrix_t
 { float m[4][4];
@@ -291,6 +289,20 @@ rxvec3_t rxvector_normalize(rxvec3_t a)
   return a;
 }
 
+rxmatrix_t rxmatrix_projection(double r, double v, double zmin, double zmax)
+{
+  rxmatrix_t m = rxmatrix_identity();
+  v = 1. / tan(v / 180 * rxPI_F * .5);
+
+  m.m[0][0] = r * v;
+  m.m[1][1] = v;
+  m.m[2][2] = zmax / (zmax - zmin);
+  m.m[3][2] = - (zmax * zmin) / (zmax - zmin);
+  m.m[3][3] = 0.;
+  m.m[2][3] = 1.;
+  return m;
+}
+
 rxmatrix_t rxmatrix_identity()
 {
   rxmatrix_t r;
@@ -300,6 +312,8 @@ rxmatrix_t rxmatrix_identity()
   r.m[0][3]=0.f;r.m[1][3]=0.f;r.m[2][3]=0.f;r.m[3][3]=1.f;
   return r;
 }
+
+
 
 // todo!!: remove loop
 rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
@@ -316,7 +330,6 @@ rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
   return result;
 }
 
-// todo!!: this could be made faster, just usind perp!
 rxmatrix_t rxmatrix_rotZ(float angle)
 { rxmatrix_t result=rxmatrix_identity();
   float cosres=cosf(angle);
