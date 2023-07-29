@@ -60,8 +60,9 @@ rxvec3_t   rxvec3_xy (float x, float y);
 rxvec3_t   rxvec3_x  (float x);
 rxvec3_t   rxvec3_y  (float y);
 rxvec3_t   rxvec3_z  (float z);
+
 /* this will have to be renamed to float4 instead, usually vec3 has the w component implicitly, oops,
-	 - XXX - the one called rj */
+   - XXX - the one called rj */
 typedef struct rxvec4_t rxvec4_t;
 typedef struct rxvec4_t
 { union
@@ -73,6 +74,17 @@ typedef struct rxvec4_t
   };
 } rxvec4_t;
 
+typedef struct rxvec4i_t rxvec4i_t;
+typedef struct rxvec4i_t
+{ union
+  { struct { int x,y,z,w; };
+    struct { int r,g,b,a; };
+    rxvec3i_t xyz;
+    rxvec3i_t rgb;
+    rxvec2i_t xy;
+  };
+} rxvec4i_t;
+
 typedef struct rxmatrix_t rxmatrix_t;
 typedef struct rxmatrix_t
 { float m[4][4];
@@ -80,8 +92,26 @@ typedef struct rxmatrix_t
 rxmatrix_t rxmatrix_identity();
 rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
 
+// From a value between 0 and 1, it returns a value between min and max
+double rxmix(double val, double min, double max)
+{
+  return min + (max - min) * val;
+}
+
+// From a value between min and max, it returns a value between 0 and 1
+double rxunmix(double val, double min, double max)
+{
+  return (val - min) / (max - min);
+}
+
+// From a value between val_min and val_max, it returns a value between min and max
+double rxremix(double val, double val_min, double val_max, double min, double max)
+{
+  return rxmix(rxunmix(val,val_min,val_max),min,max);
+}
+
 /* ++ added 'rxclamp'
-	 ++ switched to 64-bit floats instead */
+   ++ switched to 64-bit floats instead */
 double rxclamp(double val, double min, double max)
 {
   return val < min ? min : val > max ? max : val;
@@ -292,9 +322,10 @@ rxvec3_t rxvector_normalize(rxvec3_t a)
 rxmatrix_t rxmatrix_projection(double r, double v, double zmin, double zmax)
 {
   rxmatrix_t m = rxmatrix_identity();
+
   v = 1. / tan(v / 180 * rxPI_F * .5);
 
-  m.m[0][0] = r * v;
+  m.m[0][0] = v * r;
   m.m[1][1] = v;
   m.m[2][2] = zmax / (zmax - zmin);
   m.m[3][2] = - (zmax * zmin) / (zmax - zmin);
@@ -330,16 +361,43 @@ rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
   return result;
 }
 
-rxmatrix_t rxmatrix_rotZ(float angle)
-{ rxmatrix_t result=rxmatrix_identity();
-  float cosres=cosf(angle);
-  float sinres=sinf(angle);
-  result.m[0][0]=+cosres;
-  result.m[0][1]=+sinres;
-  result.m[1][0]=-sinres;
-  result.m[1][1]=+cosres;
+rxmatrix_t rxmatrix_rotZ(double angle)
+{
+  rxmatrix_t r = rxmatrix_identity();
+  double cosres = cos(angle);
+  double sinres = sin(angle);
+  r.m[0][0]= + cosres;
+  r.m[0][1]= + sinres;
+  r.m[1][0]= - sinres;
+  r.m[1][1]= + cosres;
+  return r;
+}
+
+rxmatrix_t rxmatrix_rotY(double angle)
+{
+  rxmatrix_t r = rxmatrix_identity();
+  double cosres = cos(angle);
+  double sinres = sin(angle);
+  r.m[0][0] =   cosres;
+  r.m[0][2] = - sinres;
+  r.m[2][0] =   sinres;
+  r.m[2][2] =   cosres;
+  return r;
+}
+
+rxmatrix_t rxmatrix_rotX(float angle)
+{
+  rxmatrix_t result = rxmatrix_identity();
+  float cosres = cosf(angle);
+  float sinres = sinf(angle);
+  result.m[1][1] =   cosres;
+  result.m[1][2] =   sinres;
+  result.m[2][1] = - sinres;
+  result.m[2][2] =   cosres;
   return result;
 }
+
+
 
 rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
 { rxmatrix_t result=rxmatrix_identity();
@@ -354,5 +412,52 @@ rxmatrix_t rxmatrix_flip_vertically()
   result.m[1][1]=-1.f;
   return result;
 }
+
+
+/* All this has to be worked out */
+rxvec4_t rxmul_matvec(rxmatrix_t m, rxvec4_t v)
+{
+  rxvec4_t r;
+  r.x = m.m[0][0] * v.x + m.m[1][0] * v.y + m.m[2][0] * v.z + m.m[3][0];
+  r.y = m.m[0][1] * v.x + m.m[1][1] * v.y + m.m[2][1] * v.z + m.m[3][1];
+  r.z = m.m[0][2] * v.x + m.m[1][2] * v.y + m.m[2][2] * v.z + m.m[3][2];
+  r.w = m.m[0][3] * v.x + m.m[1][3] * v.y + m.m[2][3] * v.z + m.m[3][3];
+  return r;
+}
+
+rxvec2_t rxadd_vec2(rxvec2_t v0, rxvec2_t v1)
+{
+  rxvec2_t r;
+  r.x = v0.x + v1.x;
+  r.y = v0.y + v1.y;
+  return r;
+}
+
+rxvec2_t rxmul_vec2(rxvec2_t v0, rxvec2_t v1)
+{
+  rxvec2_t r;
+  r.x = v0.x * v1.x;
+  r.y = v0.y * v1.y;
+  return r;
+}
+
+rxvec2_t rxvec2_xy(int x, int y)
+{
+
+  rxvec2_t r;
+  r.x = x;
+  r.y = y;
+
+  return r;
+}
+
+rxvec2_t rxvec2i_vec2(rxvec2i_t v)
+{
+  rxvec2_t r;
+  r.x = v.x;
+  r.y = v.y;
+  return r;
+}
+
 
 #endif

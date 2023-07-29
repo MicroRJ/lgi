@@ -95,9 +95,9 @@ rxlinker_resolve_terminal(
 
   if((~contents->labels&rxlabel_kLOADED)||(contents->labels&rxlabel_kINVALIDATED))
   {
-    unsigned long length;
-    void *        memory;
-    void *        handle;
+    ccu32_t length;
+    void *  memory;
+    void *  handle;
 
     length=0;
     handle=ccopenfile(master,"r");
