@@ -42,6 +42,7 @@ typedef struct rxvec2_t
 {
   float x,y;
 } rxvec2_t;
+
 typedef struct rxvec3_t rxvec3_t;
 typedef struct rxvec3_t
 { union
@@ -71,8 +72,12 @@ typedef struct rxvec4_t
     rxvec3_t xyz;
     rxvec3_t rgb;
     rxvec2_t xy;
+
+    float e[4];
   };
 } rxvec4_t;
+
+rxvec4_t rxvec4_xyzw(float x, float y, float z, float w);
 
 typedef struct rxvec4i_t rxvec4i_t;
 typedef struct rxvec4i_t
@@ -148,12 +153,26 @@ int rxmini(int x, int y)
   return x<y?x:y;
 }
 
-rxvec3_t rxvec3_xyz(float x, float y, float z)
+rxvec3_t
+rxvec3_xyz(
+	float x, float y, float z)
 {
   rxvec3_t r;
   r.x = x;
   r.y = y;
   r.z = z;
+  return r;
+}
+
+rxvec4_t
+rxvec4_xyzw(
+	float x, float y, float z, float w)
+{
+  rxvec4_t r;
+  r.x = x;
+  r.y = y;
+  r.z = z;
+  r.w = w;
   return r;
 }
 

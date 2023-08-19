@@ -18,14 +18,150 @@
 **
 */
 
-/* XXX this could use a better name */
-rxoffline_texture_t
+ccfunc ccinle rxtexture_config_t
+rxtexture_config_init(
+          int     size_x,
+          int     size_y,
+  DXGI_FORMAT     format,
+
+          int     stride,
+          void  * memory,
+
+  				int    samples,
+  				int    quality,
+
+  D3D11_USAGE    memtype,
+          int    useflag,
+          int    memflag )
+{
+  rxtexture_config_t config;
+  config.size_x     = size_x;
+  config.size_y     = size_y;
+  config.format     = format;
+  config.stride     = stride;
+  config.memory     = memory;
+  config.samples    = samples;
+  config.quality    = quality;
+  config.memtype    = memtype;
+  config.useflag    = useflag;
+  config.memflag    = memflag;
+
+  config.d3d11.view     = NULL;
+  config.d3d11.resource = NULL;
+  return config;
+}
+
+ccfunc int
+rxtexture_init(
+  rxtexture_t         *texture,
+  rxtexture_config_t  *config )
+{
+  ZeroMemory(texture,sizeof(*texture));
+
+  /* todo: check this properly based on d3d11's version spec */
+  ccassert((config->size_x >= 1 &&
+            config->size_x <= 16384)
+    || cctraceerr("invalid size x %i", config->size_x));
+  ccassert((config->size_y >= 1 &&
+            config->size_y <= 16384)
+    || cctraceerr("invalid size y %i", config->size_y));
+
+  D3D11_TEXTURE2D_DESC texture_config_d3d;
+  texture_config_d3d.                 Width=config->size_x;
+  texture_config_d3d.                Height=config->size_y;
+  texture_config_d3d.             MipLevels=1;
+  texture_config_d3d.             ArraySize=1;
+  texture_config_d3d.                Format=config->format;
+  texture_config_d3d.SampleDesc.      Count=1;
+  texture_config_d3d.SampleDesc.    Quality=0;
+  texture_config_d3d.                 Usage=config->memtype;
+  texture_config_d3d.             BindFlags=config->useflag;
+  texture_config_d3d.        CPUAccessFlags=config->memflag;
+  texture_config_d3d.             MiscFlags=0;
+
+  D3D11_SUBRESOURCE_DATA texture_upload_config_d3d;
+  ZeroMemory(&texture_upload_config_d3d,sizeof(texture_upload_config_d3d));
+  texture_upload_config_d3d.    pSysMem=config->memory;
+  texture_upload_config_d3d.SysMemPitch=config->stride;
+
+  ID3D11Device_CreateTexture2D(rx.d3d11.dev,
+    &texture_config_d3d,
+    config->memory ? &texture_upload_config_d3d : NULL,
+    &config->d3d11.texture_2d);
+
+  ccassert(config->d3d11.texture_2d != NULL);
+
+  if(config->d3d11.view == NULL)
+  {
+    if((config->useflag & D3D11_BIND_SHADER_RESOURCE) != 0)
+    {
+      D3D11_SHADER_RESOURCE_VIEW_DESC texture_view_config_d3d;
+      ZeroMemory(&texture_view_config_d3d,sizeof(texture_view_config_d3d));
+      texture_view_config_d3d.       Format=DXGI_FORMAT_UNKNOWN;
+      texture_view_config_d3d.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
+      texture_view_config_d3d.    Texture2D.MostDetailedMip=0;
+      texture_view_config_d3d.    Texture2D.      MipLevels=1;
+
+      ID3D11Device_CreateShaderResourceView(rx.d3d11.dev,
+        config->d3d11.resource,&texture_view_config_d3d,&config->d3d11.view);
+
+      ccassert(config->d3d11.view != NULL);
+    }
+  }
+
+  texture->size_x         = config->size_x;
+  texture->size_y         = config->size_y;
+  texture->format         = config->format;
+  texture->samples        = config->samples;
+  texture->quality        = config->quality;
+  texture->d3d11.view     = config->d3d11.view;
+  texture->d3d11.resource = config->d3d11.resource;
+  return cctrue;
+}
+
+ccfunc ccinle rxtexture_t
+rxtexture_create_exex(
+          int    size_x,
+          int    size_y,
+  DXGI_FORMAT    format,
+          int    stride,
+          void * memory,
+  /* todo: these could all be merged into a single flag */
+  D3D11_USAGE    memtype,
+          int    useflag,
+          int    memflag )
+{
+
+  rxtexture_config_t config =
+    rxtexture_config_init(
+      size_x,size_y,format,stride,memory,1,0,memtype,useflag,memflag);
+
+  rxtexture_t texture;
+  rxtexture_init(&texture,&config);
+
+  return texture;
+}
+
+ccfunc ccinle rxtexture_t
+rxtexture_create_ex(
+    int   size_x,
+    int   size_y,
+    int   format,
+    int   stride,
+    void *memory )
+{
+  return
+    rxtexture_create_exex(size_x,size_y,format,stride,memory,
+      D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE);
+}
+
+rxtexture_memory_t
 rxtexture_load(
   const char *name)
 {
   const char *ext = ccfileext(name);
 
-  rxoffline_texture_t result;
+  rxtexture_memory_t result;
   memset(&result,0,sizeof(result));
 
   /* XXX this is google type stuff */
@@ -43,24 +179,24 @@ rxtexture_load(
 }
 
 rxtexture_t
-rxtexture_upload(
-  rxoffline_texture_t local)
+rxtexture_memory_upload(
+  rxtexture_memory_t local)
 {
   return rxtexture_create_ex(local.size_x,local.size_y,local.format,local.stride,local.memory);
 }
 
 rxtexture_t
-rxtexture_upload_byname(
+rxtexture_upload(
   const char *name)
 {
-  rxoffline_texture_t local=rxtexture_load(name);
+  rxtexture_memory_t local=rxtexture_load(name);
 
   rxtexture_t texture;
   memset(&texture,0,sizeof(texture));
 
   if(local.memory != ccnull)
   {
-    texture = rxtexture_upload(local);
+    texture = rxtexture_memory_upload(local);
 
     stbi_image_free(local.memory);
   }
@@ -72,113 +208,8 @@ void
 rxtexture_delete(
   rxtexture_t texture)
 {
-  ID3D11ShaderResourceView *View;
-  ID3D11Resource           *Resource;
-
-  if(SUCCEEDED(
-  		IUnknown_QueryInterface(texture.unknown,&IID_ID3D11ShaderResourceView,&View)))
-  {
-    ID3D11View_GetResource(View,&Resource);
-
-    IUnknown_Release(Resource);
-    IUnknown_Release(View);
-  }
-}
-
-rxtexture_t
-rxtexture_create_untyped(
-          int              size_x,
-          int              size_y,
-  DXGI_FORMAT              format,
-          int              stride,
-          void           * memory,
-  D3D11_USAGE               usage,
-          int          bind_flags,
-          int   host_access_flags,
-          int        sample_count,
-          int      sample_quality )
-{
-  ccassert((size_x >= 1 && size_x <= 16384) || cctraceerr("invalid size x %i", size_x));
-  ccassert((size_y >= 1 && size_y <= 16384) || cctraceerr("invalid size y %i", size_y));
-
-  D3D11_TEXTURE2D_DESC TextureI;
-  TextureI.                 Width=size_x;
-  TextureI.                Height=size_y;
-  TextureI.             MipLevels=1;
-  TextureI.             ArraySize=1;
-  TextureI.                Format=format;
-  TextureI.SampleDesc.      Count=sample_count;
-  TextureI.SampleDesc.    Quality=sample_quality;
-  TextureI.                 Usage=usage;
-  TextureI.             BindFlags=bind_flags;
-  TextureI.        CPUAccessFlags=host_access_flags;
-  TextureI.             MiscFlags=0;
-
-  D3D11_SUBRESOURCE_DATA SubresourceI;
-  ZeroMemory(&SubresourceI,sizeof(SubresourceI));
-  SubresourceI.    pSysMem=memory;
-  SubresourceI.SysMemPitch=stride;
-
-  ID3D11Texture2D *Texture=NULL;
-
-  if(SUCCEEDED(
-      ID3D11Device_CreateTexture2D(rx.Device,&TextureI,memory?&SubresourceI:NULL,&Texture)))
-  {
-    rxarticle_t *article=rxarticle_create(Texture);
-
-    if(bind_flags&D3D11_BIND_SHADER_RESOURCE)
-    {
-      D3D11_SHADER_RESOURCE_VIEW_DESC ViewI;
-      ZeroMemory(&ViewI,sizeof(ViewI));
-      ViewI.       Format=DXGI_FORMAT_UNKNOWN;
-      ViewI.ViewDimension=D3D11_SRV_DIMENSION_TEXTURE2D;
-      ViewI.    Texture2D.MostDetailedMip=0;
-      ViewI.    Texture2D.      MipLevels=1;
-
-      ID3D11ShaderResourceView *View;
-      if(SUCCEEDED(
-          ID3D11Device_CreateShaderResourceView(rx.Device,
-            (ID3D11Resource*)Texture,&ViewI,&View)))
-      {
-        rxarticle_attach(article,rxlinkage_kSHADER_RESOURCE_VIEW,View);
-      }
-    }
-
-    if(bind_flags&D3D11_BIND_RENDER_TARGET)
-    {
-      D3D11_RENDER_TARGET_VIEW_DESC ViewI;
-      ZeroMemory(&ViewI,sizeof(ViewI));
-      ViewI.Format       =DXGI_FORMAT_UNKNOWN;
-      ViewI.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
-
-      ID3D11RenderTargetView *View;
-      if(SUCCEEDED(
-          ID3D11Device_CreateRenderTargetView(rx.Device,
-            (ID3D11Resource*)Texture,&ViewI,&View)))
-      {
-        rxarticle_attach(article,rxlinkage_kRENDER_TARGET_VIEW,View);
-      }
-    }
-  }
-
-  rxtexture_t the_result=RX_TLIT(rxtexture_t){(rxunknown_t)(Texture)};
-  the_result. size_x=size_x;
-  the_result. size_y=size_y;
-  the_result. format=format;
-  return the_result;
-}
-
-rxtexture_t
-rxtexture_create_ex(
-  int   size_x,
-  int   size_y,
-  int   format,
-  int   stride,
-  void *memory)
-{
-  return
-    rxtexture_create_untyped(size_x,size_y,format,stride,memory,
-      D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE,1,0);
+  rxunknown_delete(texture.d3d11.view);
+  rxunknown_delete(texture.d3d11.resource);
 }
 
 rxtexture_t
@@ -187,25 +218,29 @@ rxtexture_create(int size_x, int size_y, int format)
   return rxtexture_create_ex(size_x,size_y,format,0,0);
 }
 
+/* todo: perhaps we should have a specific type for this */
 rxborrowed_t
 rxtexture_borrow(rxtexture_t texture)
 {
   rxborrowed_t result;
   memset(&result,0,sizeof(result));
 
-  ID3D11Resource *Resource;
-  if(FAILED(IUnknown_QueryInterface(texture.unknown,&IID_ID3D11Resource,&Resource)))
+  D3D11_MAPPED_SUBRESOURCE memory_d3d;
+  if(FAILED(
+      ID3D11DeviceContext_Map(
+        rx.d3d11.ctx,
+        texture.d3d11.resource,
+        0,
+        D3D11_MAP_WRITE_DISCARD,
+        0,
+        &memory_d3d)))
+  {
     goto error;
+  }
 
-  D3D11_MAPPED_SUBRESOURCE MappedAccess;
-  if(FAILED(ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess)))
-    goto error;
-
-  ID3D11DeviceChild_Release(Resource);
-
-  result.resource=Resource;
-  result.  stride=MappedAccess.RowPitch;
-  result.  memory=MappedAccess.pData;
+  result.        stride = memory_d3d.RowPitch;
+  result.        memory = memory_d3d.pData;
+  result.d3d11.resource = texture.d3d11.resource;
 
   ccassert(result.stride != 0);
   ccassert(result.memory != 0);
@@ -214,27 +249,57 @@ error:
   return result;
 }
 
-void
-rxtexture_apply(
-  rxtexture_t texture, int slot)
+
+rxdrawing_texture_t
+rxdrawing_texture_create(
+  int size_x, int size_y, int format, int samples, int quality)
 {
-  /* Please remove this - XXXX - the one called rj  */
-  rxarticle_t *tangible=cctblgetP(rx.instance_table,texture.unknown);
-  ccassert(ccerrnon());
+  rxdrawing_texture_t surface;
+  ZeroMemory(&surface,sizeof(surface));
 
-  ID3D11ShaderResourceView *View;
-  View = (ID3D11ShaderResourceView *)tangible->linkage[rxlinkage_kSHADER_RESOURCE_VIEW];
+  rxtexture_config_t texture_config =
+    rxtexture_config_init(size_x,size_y,format,0,NULL,samples,quality,
+      D3D11_USAGE_DEFAULT,D3D11_BIND_SHADER_RESOURCE|D3D11_BIND_RENDER_TARGET,0);
 
-	if(rxshader_typeof_vertex(rx.shader))
-	{
-	  ID3D11DeviceContext_VSSetShaderResources(rx.Context,slot,1,&View);
-	} else
-	if(rxshader_typeof_pixel(rx.shader))
-	{
-	  ID3D11DeviceContext_PSSetShaderResources(rx.Context,slot,1,&View);
-	} else
-	if(rxshader_typeof_compute(rx.shader))
-	{
-	  ID3D11DeviceContext_CSSetShaderResources(rx.Context,slot,1,&View);
-	}
+  rxtexture_t texture;
+  if(rxtexture_init(&texture,&texture_config))
+  {
+    D3D11_RENDER_TARGET_VIEW_DESC render_target_config_d3d;
+    ZeroMemory(&render_target_config_d3d,sizeof(render_target_config_d3d));
+    render_target_config_d3d.Format       =DXGI_FORMAT_UNKNOWN;
+    render_target_config_d3d.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
+
+    ID3D11RenderTargetView *render_target_view_d3d;
+    if(SUCCEEDED(
+        ID3D11Device_CreateRenderTargetView(rx.d3d11.dev,
+          texture_config.d3d11.resource,&render_target_config_d3d,&render_target_view_d3d)))
+    {
+      surface.texture    = texture;
+      surface.d3d11.view = render_target_view_d3d;
+    }
+  }
+
+  return surface;
+}
+
+ccfunc ccinle void
+rxtexture_copy(
+  rxtexture_t *dst,
+  rxtexture_t *src )
+{
+  if( dst->d3d11.resource !=
+      src->d3d11.resource )
+  {
+  	if(src->samples <= 1)
+  	{
+	    ID3D11DeviceContext_CopyResource(rx.d3d11.ctx,
+	      dst->d3d11.resource,
+	      src->d3d11.resource);
+  	} else
+  	{
+		  ID3D11DeviceContext_ResolveSubresource(rx.d3d11.ctx,
+		  	dst->d3d11.resource, 0,
+		  	src->d3d11.resource, 0, dst->format);
+  	}
+  }
 }

@@ -22,28 +22,26 @@ void
 rxreturn(
 	rxborrowed_t borrowed )
 {
-  ID3D11DeviceContext_Unmap(rx.Context,(ID3D11Resource*)borrowed.resource,0);
+  ID3D11DeviceContext_Unmap(rx.d3d11.ctx,borrowed.d3d11.resource,0);
 }
 
 rxborrowed_t
-rxbuffer_borrow(
+rxunknown_borrow(
 	rxunknown_t buffer )
 {
 	rxborrowed_t result;
-  result.resource = 0;
-  result.  length = 0;
-  result.  memory = 0;
+	ZeroMemory(&result,sizeof(result));
 
   // note: ensures this is a valid buffer!
   ID3D11Resource *Resource;
   if(SUCCEEDED(IUnknown_QueryInterface(buffer,&IID_ID3D11Buffer,&Resource)))
   {
     D3D11_MAPPED_SUBRESOURCE MappedAccess;
-    ID3D11DeviceContext_Map(rx.Context,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
+    ID3D11DeviceContext_Map(rx.d3d11.ctx,Resource,0,D3D11_MAP_WRITE_DISCARD,0,&MappedAccess);
 
-    result.resource = Resource;
-    result.  length = MappedAccess.RowPitch;
-    result.  memory = MappedAccess.pData;
+    result.d3d11.resource = Resource;
+    result.        length = MappedAccess.RowPitch;
+    result.        memory = MappedAccess.pData;
 
     ccassert(result.length != 0);
     ccassert(result.memory != 0);
@@ -57,32 +55,7 @@ rxuniform_buffer_borrow(
 	rxuniform_buffer_t buffer )
 {
 	/* do the type checking thing here - XXX - the one called rj */
-  return rxbuffer_borrow(buffer.unknown);
-}
-
-/* Should we just have a function that checks what type of buffer it is and binds it using the appropriate
-	function - XXX - the one called rj */
-void
-rxuniform_buffer_bind_ex(
-  rxuniform_buffer_t buffer, int offset)
-{
-  ccassert(buffer.unknown != 0);
-
-  /* maybe just for safety we should have a function that checks whether the interface
-  	is the right type - XXX - the one called rj */
-  ID3D11Buffer *the_buffer;
-  if(SUCCEEDED(ID3D11DeviceChild_QueryInterface(buffer.unknown,&IID_ID3D11Buffer,&the_buffer)))
-  { ID3D11DeviceChild_Release(the_buffer);
-
-    if(rxshader_typeof_vertex(rx.shader))
-      ID3D11DeviceContext_VSSetConstantBuffers(rx.Context,offset,1,&the_buffer);
-    else
-    if(rxshader_typeof_pixel(rx.shader))
-      ID3D11DeviceContext_PSSetConstantBuffers(rx.Context,offset,1,&the_buffer);
-    else
-    if(rxshader_typeof_compute(rx.shader))
-      ID3D11DeviceContext_CSSetConstantBuffers(rx.Context,offset,1,&the_buffer);
-  }
+  return rxunknown_borrow(buffer.unknown);
 }
 
 void
@@ -115,7 +88,7 @@ rxuniform_buffer_create(
   the_buffer_info.          ByteWidth = (UINT)((length+15)/16*16);
 
   ID3D11Buffer *the_buffer;
-  ID3D11Device_CreateBuffer(rx.Device,&the_buffer_info,NULL,&the_buffer);
+  ID3D11Device_CreateBuffer(rx.d3d11.dev,&the_buffer_info,NULL,&the_buffer);
 
   return RX_TLIT(rxuniform_buffer_t){(rxunknown_t)(the_buffer)};
 }
@@ -133,7 +106,7 @@ rxcreate_index_buffer(
   the_buffer_info.          ByteWidth = (UINT)(index_size * index_count);
 
   ID3D11Buffer *the_buffer;
-  ID3D11Device_CreateBuffer(rx.Device,&the_buffer_info,NULL,&the_buffer);
+  ID3D11Device_CreateBuffer(rx.d3d11.dev,&the_buffer_info,NULL,&the_buffer);
 
   return RX_TLIT(rxindex_buffer_t){(rxunknown_t)(the_buffer)};
 }
@@ -151,7 +124,7 @@ rxcreate_vertex_buffer(
   the_buffer_info.          ByteWidth = (UINT)(vertex_size * vertex_count);
 
   ID3D11Buffer *the_buffer;
-  ID3D11Device_CreateBuffer(rx.Device,&the_buffer_info,NULL,&the_buffer);
+  ID3D11Device_CreateBuffer(rx.d3d11.dev,&the_buffer_info,NULL,&the_buffer);
 
   return RX_TLIT(rxvertex_buffer_t){(rxunknown_t)(the_buffer)};
 }
@@ -169,7 +142,7 @@ rxcreate_struct_buffer(
   the_buffer_info.          ByteWidth=(UINT)(struct_size * struct_count);
 
   ID3D11Buffer *the_buffer;
-  ID3D11Device_CreateBuffer(rx.Device,&the_buffer_info,NULL,&the_buffer);
+  ID3D11Device_CreateBuffer(rx.d3d11.dev,&the_buffer_info,NULL,&the_buffer);
 
   D3D11_SHADER_RESOURCE_VIEW_DESC D;
   D.             Format=DXGI_FORMAT_UNKNOWN;
@@ -178,7 +151,7 @@ rxcreate_struct_buffer(
   D.Buffer. NumElements=(UINT)(struct_count);
 
   ID3D11ShaderResourceView *View;
-  ID3D11Device_CreateShaderResourceView(rx.Device,(ID3D11Resource*)the_buffer,&D,&View);
+  ID3D11Device_CreateShaderResourceView(rx.d3d11.dev,(ID3D11Resource*)the_buffer,&D,&View);
 
   rxstruct_buffer_t result;
   result.unknown=(rxunknown_t)View;
@@ -199,14 +172,14 @@ rxborrowed_t
 rxborrow_vertex_buffer(
 	rxvertex_buffer_t buffer)
 {
-  return rxbuffer_borrow(buffer.unknown);
+  return rxunknown_borrow(buffer.unknown);
 }
 
 rxborrowed_t
 rxborrow_index_buffer(
 	rxindex_buffer_t buffer)
 {
-  return rxbuffer_borrow(buffer.unknown);
+  return rxunknown_borrow(buffer.unknown);
 }
 
 rxborrowed_t
@@ -217,5 +190,5 @@ rxborrow_struct_buffer(
   ID3D11Resource *the_resource;
   ID3D11View_GetResource((ID3D11View*)buffer.unknown,&the_resource);
 
-  return rxbuffer_borrow((rxunknown_t)the_resource);
+  return rxunknown_borrow((rxunknown_t)the_resource);
 }
