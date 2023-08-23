@@ -18,9 +18,70 @@
 **
 */
 
+void rxsystem_init()
+{
+  rx.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
+
+  typedef enum
+	{
+    MDT_EFFECTIVE_DPI = 0,
+    MDT_ANGULAR_DPI 	= 1,
+    MDT_RAW_DPI 			= 2,
+    MDT_DEFAULT 			= MDT_EFFECTIVE_DPI
+	} MONITOR_DPI_TYPE;
+
+  typedef enum
+	{
+    PROCESS_DPI_UNAWARE = 0,
+    PROCESS_SYSTEM_DPI_AWARE = 1,
+    PROCESS_PER_MONITOR_DPI_AWARE = 2
+	} PROCESS_DPI_AWARENESS;
+
+	typedef HRESULT (WINAPI * PFN_SetProcessDpiAwareness)(PROCESS_DPI_AWARENESS);
+	typedef HRESULT (WINAPI * PFN_GetDpiForMonitor)(HMONITOR,MONITOR_DPI_TYPE,UINT*,UINT*);
+	typedef BOOL (WINAPI * PFN_SetProcessDPIAware)(void);
+	typedef BOOL (WINAPI * PFN_ChangeWindowMessageFilterEx)(HWND,UINT,DWORD,CHANGEFILTERSTRUCT*);
+	typedef BOOL (WINAPI * PFN_EnableNonClientDpiScaling)(HWND);
+	typedef BOOL (WINAPI * PFN_SetProcessDpiAwarenessContext)(HANDLE);
+	typedef UINT (WINAPI * PFN_GetDpiForWindow)(HWND);
+	typedef BOOL (WINAPI * PFN_AdjustWindowRectExForDpi)(LPRECT,DWORD,BOOL,DWORD,UINT);
+	typedef int  (WINAPI * PFN_GetSystemMetricsForDpi)(int,UINT);
+
+	rx.win32.shcore_dll = LoadLibraryA("shcore.dll");
+  rx.win32.user32_dll = LoadLibraryA("user32.dll");
+
+  PFN_SetProcessDpiAwareness SetProcessDpiAwareness = (PFN_SetProcessDpiAwareness)
+        GetProcAddress(rx.win32.shcore_dll, "SetProcessDpiAwareness");
+  PFN_GetDpiForMonitor GetDpiForMonitor = (PFN_GetDpiForMonitor)
+        GetProcAddress(rx.win32.shcore_dll, "GetDpiForMonitor");
+  // SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
+
+  PFN_SetProcessDPIAware SetProcessDPIAware = (PFN_SetProcessDPIAware)
+      GetProcAddress(rx.win32.user32_dll, "SetProcessDPIAware");
+  PFN_ChangeWindowMessageFilterEx ChangeWindowMessageFilterEx = (PFN_ChangeWindowMessageFilterEx)
+      GetProcAddress(rx.win32.user32_dll, "ChangeWindowMessageFilterEx");
+  PFN_EnableNonClientDpiScaling EnableNonClientDpiScaling = (PFN_EnableNonClientDpiScaling)
+      GetProcAddress(rx.win32.user32_dll, "EnableNonClientDpiScaling");
+  PFN_SetProcessDpiAwarenessContext SetProcessDpiAwarenessContext = (PFN_SetProcessDpiAwarenessContext)
+      GetProcAddress(rx.win32.user32_dll, "SetProcessDpiAwarenessContext");
+  PFN_GetDpiForWindow GetDpiForWindow = (PFN_GetDpiForWindow)
+      GetProcAddress(rx.win32.user32_dll, "GetDpiForWindow");
+  PFN_AdjustWindowRectExForDpi AdjustWindowRectExForDpi = (PFN_AdjustWindowRectExForDpi)
+      GetProcAddress(rx.win32.user32_dll, "AdjustWindowRectExForDpi");
+  PFN_GetSystemMetricsForDpi GetSystemMetricsForDpi = (PFN_GetSystemMetricsForDpi)
+      GetProcAddress(rx.win32.user32_dll, "GetSystemMetricsForDpi");
+
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+  //SetProcessDPIAware();
+
+}
+
 /* todo: */
 void rxwindow_init(LPCWSTR window_title)
 {
+
+
+
   WNDCLASSW WindowClass;
   ZeroMemory(&WindowClass,sizeof(WindowClass));
   WindowClass.lpfnWndProc=rxwndmsg_callback_win32;
@@ -93,7 +154,7 @@ void rxwindow_xy(int x, int y)
 }
 
 /* XXXX */
-void rxwnd_poll()
+void rxwindow_poll()
 {
   /* todo: */
   memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));

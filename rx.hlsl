@@ -25,13 +25,12 @@ cbuffer _ : register(b0)
   float2    xysample;
   float2    xycursor;
 
-  double total_seconds;
-  double delta_seconds;
+  double    total_seconds;
+  double    delta_seconds;
 };
 
 SamplerState      sampler0: register(s0);
 Texture2D<float4> texture0: register(t0);
-
 
 /* this is the basic vertex shader */
 struct VS_INPUT
@@ -58,16 +57,32 @@ float4 MainPS(PS_INPUT i) : SV_Target
   return i.color * texture0.Sample(sampler0, i.uv);
 }
 
-
-float4 MainPS_Text(PS_INPUT i) : SV_Target
+struct PS_OUTPUT
 {
-  float3 sample =
+  float4 color:      SV_TARGET0;
+  float4 color_mask: SV_TARGET1;
+};
+PS_OUTPUT MainPS_Text(PS_INPUT i)
+{
+  const float samplingBias = 1.;
+  float3 triSample =
     float3(
-      texture0.Sample(sampler0, i.uv + float2(-1., 0) / xysample).r,
+      texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
       texture0.Sample(sampler0, i.uv).r,
-      texture0.Sample(sampler0, i.uv + float2(+1., 0) / xysample).r );
+      texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
 
-  return i.color * sample.rgbg;
+  PS_OUTPUT o;
+  o.color_mask = float4(triSample*i.color.aaa,1.);
+  o.color      = i.color;
+
+  return o; // float4(colorMask * i.color.rgb, i.color.a * triSample.r);
+
+  // /* ensure there's atleast this amount of pixel for padding, otherwise you're
+  //  gonna sample from unwanted places #important */
+  // float onEdge = -.5 + texture0.Sample(sampler0,i.uv).r;
+  // float range = length(float2( ddx(onEdge), ddy(onEdge) ));
+  // float alpha = smoothstep(-range, range, onEdge);
+  // return float4(lerp(i.color.rgb,i.color.rgb,.05), i.color.a*alpha);
 }
 
 /* these are the extended versions for SDF shape rendering */
@@ -122,3 +137,59 @@ float4 MainPS_BoxSDF(PS_INPUT_SDF i) : SV_Target
   return float4(i.shape_rgba.rgb,
     i.shape_rgba.a * smoothstep(0.,i.shape_flag.w,(1-box_sdf(xy-i.shape_xyxy.xy,i.shape_xyxy.zw,i.shape_flag.x))));
 }
+
+
+
+
+
+#if 0
+float4 MainPS_Text(PS_INPUT i) : SV_Target
+{
+  const float smoothing = 1./8.;
+  const float samplingBias = 1.;
+  const float contrasting  = 1.;
+  const float delineation  = .45;
+
+  float3 trilinearSample =
+    float3(
+      texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
+      texture0.Sample(sampler0, i.uv).r,
+      texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
+
+  float strength = contrasting -
+     saturate( length(ddx(trilinearSample.g)) +
+               length(ddy(trilinearSample.g)) );
+
+  float3 strengthened = strength * smoothstep(.5-smoothing,.5+smoothing,trilinearSample);
+
+  float3 delineated = lerp(strengthened, strengthened * trilinearSample, delineation);
+
+  return i.color * delineated.rgbg;
+}
+
+  const float smoothing    = 1./16.;
+  const float contrasting  = 1.5;
+  /* #important should be smaller for smaller fonts, otherwise they'll look chewed up */
+  const float delineation  = .95;
+
+  /* #todo this probably overkill, the point of this is to sort of bevel or enunciate the
+   edges of the font in subtle yet elegant border-like effect, it looks almost shadowy,
+   this would work in favor of fonts with fine details, sharp curves, thin edges, etc ..
+   promote contrast and help blending */
+  trilinearSample =
+    float3(
+      texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
+      texture0.Sample(sampler0, i.uv).r,
+      texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
+
+  float contrastFactor = contrasting;
+    // saturate( length(ddx(trilinearSample.g)) +
+    //           length(ddy(trilinearSample.g)) );
+
+  float4 color = i.color;
+
+  float smoothFactor = smoothstep(.5-smoothing,.5+smoothing,trilinearSample.g);
+  color.rgb = lerp(color.rgb, color.rgb * trilinearSample, delineation);
+  color.a *= (contrastFactor * smoothFactor);
+  return color;
+#endif

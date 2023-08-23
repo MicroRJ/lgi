@@ -18,6 +18,26 @@
 **
 */
 
+#if 0
+enum
+{ EMU_HOST_READ_BIT         = 1 << 0,
+	EMU_HOST_WRITE_BIT        = 1 << 1,
+	EMU_GPU_READ_BIT          = 1 << 2,
+	EMU_GPU_WRITE_BIT         = 1 << 3,
+
+	EMU_CPU_READ_BIT          = EMU_HOST_READ_BIT,
+	EMU_CPU_WRITE_BIT         = EMU_HOST_WRITE_BIT,
+
+	EMU_COLOR_ATTACHMENT_BIT  = 1 << 4,
+	EMU_DEPTH_ATTACHMENT_BIT  = 1 << 5,
+
+	EMU_USAGE_DEFAULT_BIT     = EMU_GPU_READ_BIT|EMU_GPU_WRITE_BIT,
+	EMU_USAGE_DYNAMIC_BIT     = EMU_CPU_WRITE_BIT|EMU_GPU_READ_BIT,
+	EMU_USAGE_IMMUTABLE_BIT   = EMU_GPU_READ_BIT,
+	EMU_USAGE_STAGING_BIT     = EMU_GPU_WRITE_BIT|EMU_CPU_READ_BIT,
+};
+#endif
+
 ccfunc ccinle rxtexture_config_t
 rxtexture_config_init(
           int     size_x,
@@ -155,6 +175,21 @@ rxtexture_create_ex(
       D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE);
 }
 
+ccfunc ccinle rxtexture_t
+rxtexture_create_empty()
+{
+	rxtexture_t texture;
+	memset(&texture,0,sizeof(texture));
+	return texture;
+}
+
+rxtexture_t
+rxtexture_create(int size_x, int size_y, int format)
+{
+  return rxtexture_create_ex(size_x,size_y,format,0,0);
+}
+
+
 rxtexture_memory_t
 rxtexture_load(
   const char *name)
@@ -212,11 +247,6 @@ rxtexture_delete(
   rxunknown_delete(texture.d3d11.resource);
 }
 
-rxtexture_t
-rxtexture_create(int size_x, int size_y, int format)
-{
-  return rxtexture_create_ex(size_x,size_y,format,0,0);
-}
 
 /* todo: perhaps we should have a specific type for this */
 rxborrowed_t

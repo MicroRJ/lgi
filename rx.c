@@ -146,7 +146,7 @@
 #define _RX_DEFAULT_WINDOW_SIZE_Y CW_USEDEFAULT
 # endif//_RX_DEFAULT_WINDOW_SIZE_Y
 #ifndef     _RX_MSAA
-#define     _RX_MSAA 4
+#define     _RX_MSAA 1
 # endif//_RX_MSAA
 #ifndef     _RX_REFRESH_RATE
 #define     _RX_REFRESH_RATE 60
@@ -284,11 +284,12 @@ enum
 typedef struct rxborrowed_t rxborrowed_t;
 typedef struct rxborrowed_t
 {
-            void * memory;
+  int length;
+  int stride;
+
   union
-  {          int   stride;
-             int   length;
-  };
+  { unsigned char *cursor;
+    				 void *memory; };
 
   /* this will be removed possibly if we ever switch to a handle based system */
   struct
@@ -368,6 +369,8 @@ rxsampler_apply(
   rxsampler_t sampler);
 
 /* section: textures */
+
+
 
 typedef struct
 {
@@ -540,7 +543,9 @@ typedef struct
     } source;
     struct
     { size_t length;
-      void * memory;
+      union
+      { void *memory;
+        char *string; };
     } bytecode;
   } hlsl;
 
@@ -668,7 +673,7 @@ typedef struct
     ID3D11BlendState      *blend_state;
   } d3d11;
 
-  rxshader_t sha;
+
   pipout_t   out[0x10];
   regenv_t   reg[0x20];
   char       opt[0x10];/* find better way to store this, possibly just using flags */
@@ -772,8 +777,12 @@ typedef struct rx_t
     rxuniform_buffer_t  varying;
 
     struct
-    { rxdrawing_texture_t surface;
-      rxstencil_texture_t stencil; };
+    {
+                      int count;
+      rxdrawing_texture_t array[2];
+
+      rxstencil_texture_t depth;    } out;
+
 
     struct
     {
@@ -871,17 +880,15 @@ typedef struct rx_t
   /* basic platform specific stuff */
   struct
   {
+    HMODULE shcore_dll;
+    HMODULE user32_dll;
+
     struct
     {
       HCURSOR arrow;
     } cursor;
   } win32;
 
-  /* this is for the built-in font */
-  rxtexture_t     font_atlas;
-  rxvec2i16_t     font_glyph[95];
-  float           font_ysize;
-  float           font_xsize;
 } rx_t;
 
 
@@ -896,12 +903,6 @@ rxsys_setcur(/*todo*/HCURSOR cursor)
   SetCursor(cursor);
 }
 
-void
-rxsys_ini()
-{
-  /* todo: */
-  rx.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
-}
 
 /* section: windowing functions */
 int
@@ -911,7 +912,7 @@ LRESULT CALLBACK
 rxwndmsg_callback_win32(HWND,UINT,WPARAM,LPARAM);
 
 ccfunc void
-rxwnd_poll();
+rxwindow_poll();
 
 
 /* todo: rename */
@@ -1071,12 +1072,9 @@ pipupl()
   /* todo: only update if necessary */
   rxuniform_buffer_update(rx.imp.varying,&rx.imp.var,sizeof(rx.imp.var));
 
-  /* todo */
+  /* #todo */
   ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,
-    rx.imp.stencil.d3d11.state,1);
-
-  // ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,
-  //   rx.pip.opt[OPT_ZTST] ? rx.imp.stencil.d3d11.state : NULL,1);
+    rx.imp.out.depth.d3d11.state,1);
 
   ID3D11DeviceContext_VSSetShader(rx.d3d11.ctx,rx.pip.d3d11.vs,0x00,0);
   ID3D11DeviceContext_PSSetShader(rx.d3d11.ctx,rx.pip.d3d11.ps,0x00,0);
@@ -1100,8 +1098,12 @@ pipupl()
   ID3D11DeviceContext_IASetInputLayout(rx.d3d11.ctx,rx.pip.d3d11.in);
 
   /* ensure the proper render target is set */
+  ID3D11RenderTargetView *render_targets[2] =
+  { rx.imp.out.array[0].d3d11.view,
+    rx.imp.out.array[1].d3d11.view };
+
   ID3D11DeviceContext_OMSetRenderTargets(rx.d3d11.ctx,
-    1,&rx.imp.surface.d3d11.view,rx.imp.stencil.d3d11.view);
+    rx.imp.out.count,render_targets,rx.imp.out.depth.d3d11.view);
 
   unsigned int Stride=sizeof(rxvertex_imp_t);
   unsigned int Offset=0;
@@ -1175,28 +1177,31 @@ void rximp_clip(int x0, int y0, int x1, int y1)
   ID3D11DeviceContext_RSSetScissorRects(rx.d3d11.ctx,1,&rect_d3d);
 }
 
+/* YOU MUST CALL THIS FUNCTION, CAN'T YOU SEE
+ IT IS FUNDAMENTAL */
 ccfunc ccinle void
-rxend()
+rximp_end()
 {
 }
 
 ccfunc void
-rxbgn()
+rximp_begin()
 {
-  rx.imp.attr.xyzw.x =  0;
-  rx.imp.attr.xyzw.y =  0;
+  /* #pending is this something that we want to do? */
+  rx.imp.attr.xyzw.x = .0;
+  rx.imp.attr.xyzw.y = .0;
   rx.imp.attr.xyzw.z = .5;
   rx.imp.attr.xyzw.w =  1;
-  rx.imp.attr.rgba.r =  0;
-  rx.imp.attr.rgba.g =  0;
-  rx.imp.attr.rgba.b = .5;
-  rx.imp.attr.rgba.a =  1;
-  rx.imp.attr.  uv.x =  0;
-  rx.imp.attr.  uv.y =  0;
+  rx.imp.attr.rgba.r = .0;
+  rx.imp.attr.rgba.g = .0;
+  rx.imp.attr.rgba.b = .0;
+  rx.imp.attr.rgba.a = .0;
+  rx.imp.attr.  uv.x = .0;
+  rx.imp.attr.  uv.y = .0;
 
   rx.imp.index_offset = rx.imp.vertex_tally;
 
-  if(rx.imp.vertex_array == 0)
+  if(rx.imp.vertex_array == NULL)
   {
     rx.imp.vertex_buffer_writeonly = rxborrow_vertex_buffer(rx.imp.asm_vtx);
     rx.imp. index_buffer_writeonly =  rxborrow_index_buffer(rx.imp.asm_idx);
@@ -1300,26 +1305,27 @@ rxvtx_xyuv_col(float x, float y, float u, float v, rxcolor_t rgba)
 #include "rx.texture.cc"
 
 
-/* todo: temporary */
 ccfunc ccinle void
 rximp_clear()
 {
+  /* #todo temporary */
   float clear_color[]={.0f,.0f,.0f,1.f};
 
-#ifdef _RX_ENABLE_DEPTH_STENCIL
   ID3D11DeviceContext_ClearDepthStencilView(
-    rx.d3d11.ctx,rx.imp.stencil.d3d11.view,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
-#endif
+    rx.d3d11.ctx,rx.imp.out.depth.d3d11.view,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
 
-  ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,
-    rx.imp.surface.d3d11.view,clear_color);
+  for(int i=0; i<rx.imp.out.count; i+=1)
+  {
+    ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,
+      rx.imp.out.array[i].d3d11.view,clear_color);
+  }
 }
 
 ccfunc ccinle void
 rximp_apply()
 {
   rxpipset_program(
-  	rx.imp.sha_vtx,
+    rx.imp.sha_vtx,
     rx.imp.sha_pxl );
 
   rx2d();
@@ -1369,21 +1375,21 @@ int rxtick()
 {
   rx.tick_count += 1;
 
-  rxwnd_poll();
+  rxwindow_poll();
 
-  /* todo: */
+  /* todo */
   rxsys_setcur(rx.win32.cursor.arrow);
 
   rximp_flush();
 
-  /* this has to be formalized */
+  /* this has to be formalized #todo */
   rxtexture_copy(
-    &rx.wnd.out.tar.texture ,
-    &rx.imp.surface.texture );
+    &rx.wnd.out.     tar.texture ,
+    &rx.imp.out.array[0].texture );
 
   IDXGISwapChain_Present(rx.wnd.out.d3d11.swap_chain,1u,0);
 
-  // todo!:
+  /* this does not serve any purpose in full screen mode */
   WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
 
   rxwnd_show();
@@ -1397,7 +1403,7 @@ int rxtick()
 
 /* todo: revise */
 rxstencil_texture_t
-rxcreate_stencil_texture(
+rxstencil_texture_create(
   int size_x, int size_y, int depth_enabled, int stencil_enabled)
 {
   rxtexture_config_t texture_config =
@@ -1506,6 +1512,8 @@ rxcreate_window_surface()
 
 void rxinit(const wchar_t *window_title)
 {
+  rxsystem_init();
+
   UINT DriverModeFlags=
 #ifdef _CCDEBUG
     D3D11_CREATE_DEVICE_DEBUG| // -- Note: COMMENT THIS OUT TO USE INTEL'S GRAPHIC ANALYZER
@@ -1532,58 +1540,48 @@ void rxinit(const wchar_t *window_title)
     }
   }
 
-  rxsys_ini();
+
   rxwindow_init(window_title);
+  rxwindow_poll();
 
-  typedef BOOL WINAPI _YYY_(void);
-  typedef BOOL WINAPI _XXX_(DPI_AWARENESS_CONTEXT);
-  HMODULE user32_dll = LoadLibraryA("user32.dll");
-  _XXX_ *XXX = (_XXX_ *) GetProcAddress(user32_dll, "SetProcessDPIAwarenessContext");
-  _YYY_ *YYY = (_YYY_ *) GetProcAddress(user32_dll, "SetProcessDPIAware");
+  // note: we can use the adapter to enumerate display devices,
+  // this might come useful to the user!
 
-  if(XXX) XXX(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE); else
-  if(YYY) YYY();
+  rx.wnd.out.tar = rxcreate_window_surface();
 
-  FreeLibrary(user32_dll);
+  /* determine the proper size for this */
+  rx.white = rxtexture_create(512,512,rxRGBA8888);
+  rxborrowed_t t = rxtexture_borrow(rx.white);
+  memset(t.memory,0xff,t.stride*rx.white.size_y);
+  rxreturn(t);
 
-  rxwnd_poll();
+  /* create immediate mode renderer */
+  rx.imp.varying = rxuniform_buffer_create(sizeof(rx.imp.var),NULL);
 
-  {
-    // note: we can use the adapter to enumerate display devices,
-    // this might come useful to the user!
-
-    rx.wnd.out.tar = rxcreate_window_surface();
-
-    /* determine the proper size for this */
-    rx.white = rxtexture_create(512,512,rxRGBA8888);
-    rxborrowed_t t = rxtexture_borrow(rx.white);
-    memset(t.memory,0xff,t.stride*rx.white.size_y);
-    rxreturn(t);
-
-    /* create default raster stage */
-    rx.imp.varying = rxuniform_buffer_create(sizeof(rx.imp.var),NULL);
-    rx.imp.surface = rxdrawing_texture_create(
-        rx.wnd.out.tar.texture.size_x,
-        rx.wnd.out.tar.texture.size_y,
-        rx.wnd.out.tar.texture.format,_RX_MSAA,0);
-
-    rx.imp.sha_vtx         = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
-    rx.imp.sha_pxl         = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
-    rx.imp.sha_pxl_txt     = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
-    rx.imp.sha_vtx_sdf     = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
-    rx.imp.sha_pxl_sdf_cir = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
-    rx.imp.sha_pxl_sdf_box = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
-
-
-#ifdef _RX_ENABLE_DEPTH_STENCIL
-    rx.imp.stencil = rxcreate_stencil_texture(
+  rx.imp.out.count = 1;
+  rx.imp.out.array[0] = rxdrawing_texture_create(
       rx.wnd.out.tar.texture.size_x,
-      rx.wnd.out.tar.texture.size_y,FALSE,FALSE);
-#endif
+      rx.wnd.out.tar.texture.size_y,
+      rx.wnd.out.tar.texture.format,_RX_MSAA,0);
+  // rx.imp.out.array[1] = rxdrawing_texture_create(
+  //     rx.wnd.out.tar.texture.size_x,
+  //     rx.wnd.out.tar.texture.size_y,
+  //     rx.wnd.out.tar.texture.format,_RX_MSAA,0);
+  rx.imp.out.depth    = rxstencil_texture_create(
+    rx.wnd.out.tar.texture.size_x,
+    rx.wnd.out.tar.texture.size_y,FALSE,FALSE);
 
-    rx.imp.asm_idx =  rxcreate_index_buffer(sizeof(rxvindex_imp_t),  RX_INDEX_BUFFER_SIZE);
-    rx.imp.asm_vtx = rxcreate_vertex_buffer(sizeof(rxvertex_imp_t), RX_VERTEX_BUFFER_SIZE);
-  }
+  rx.imp.sha_vtx         = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
+  rx.imp.sha_pxl         = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
+  rx.imp.sha_pxl_txt     = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
+  rx.imp.sha_vtx_sdf     = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
+  rx.imp.sha_pxl_sdf_cir = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
+  rx.imp.sha_pxl_sdf_box = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
+
+
+
+  rx.imp.asm_idx =  rxcreate_index_buffer(sizeof(rxvindex_imp_t),  RX_INDEX_BUFFER_SIZE);
+  rx.imp.asm_vtx = rxcreate_vertex_buffer(sizeof(rxvertex_imp_t), RX_VERTEX_BUFFER_SIZE);
 
   /* todo */
   D3D11_RASTERIZER_DESC raster_config_d3d;
@@ -1600,9 +1598,11 @@ void rxinit(const wchar_t *window_title)
   raster_config_d3d.AntialiasedLineEnable= FALSE;
   ID3D11Device_CreateRasterizerState(rx.d3d11.dev,&raster_config_d3d,&rx.pip.d3d11.rastr_state);
 
+  // 132 glBlendFunc(GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR)
+
   D3D11_BLEND_DESC blender_config_d3d;
   ZeroMemory(&blender_config_d3d,sizeof(blender_config_d3d));
-  for(int I=0; I<1; ++I)
+  for(int I=0; I<1; I +=1)
   { blender_config_d3d.RenderTarget[I].          BlendEnable=TRUE;
     blender_config_d3d.RenderTarget[I].             SrcBlend=D3D11_BLEND_SRC_ALPHA;
     blender_config_d3d.RenderTarget[I].            DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
@@ -1612,6 +1612,16 @@ void rxinit(const wchar_t *window_title)
     blender_config_d3d.RenderTarget[I].       DestBlendAlpha=D3D11_BLEND_ZERO;
     blender_config_d3d.RenderTarget[I].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
     blender_config_d3d.RenderTarget[I].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+
+    blender_config_d3d.RenderTarget[0].BlendEnable = TRUE;
+    blender_config_d3d.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
+    blender_config_d3d.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
+    blender_config_d3d.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    blender_config_d3d.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    blender_config_d3d.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    blender_config_d3d.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    blender_config_d3d.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
   }
   ID3D11Device_CreateBlendState(rx.d3d11.dev,&blender_config_d3d,&rx.pip.d3d11.blend_state);
 
@@ -1620,6 +1630,10 @@ void rxinit(const wchar_t *window_title)
   SamplerInfo.AddressU=D3D11_TEXTURE_ADDRESS_WRAP;
   SamplerInfo.AddressV=D3D11_TEXTURE_ADDRESS_WRAP;
   SamplerInfo.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+  SamplerInfo.MaxAnisotropy  = 1;
+  SamplerInfo.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+  SamplerInfo.MinLOD         = 0;
+  SamplerInfo.MaxLOD         = D3D11_FLOAT32_MAX;
 
   SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
   ID3D11Device_CreateSamplerState(rx.d3d11.dev,&SamplerInfo,&rx.linear_sampler.d3d11.state);
@@ -1637,171 +1651,10 @@ void rxinit(const wchar_t *window_title)
   ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.pip.d3d11.rastr_state);
   ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,rx.pip.d3d11.blend_state,0x00,0xFFFFFFFu);
 
-  rxinit_default_font();
-
   rx.start_ticks=ccclocktick();
   rx.frame_ticks=rx.start_ticks;
   rxtime();
 }
-
-void load_bitmap8(unsigned char *memory, int stride, unsigned char *source)
-{
-  for(int y=0; y<16; ++y)
-  { unsigned short bitrow=*source++;
-
-    rxcolor8_t *color = (rxcolor8_t*) memory;
-
-    for(int x=0; x<8; ++x)
-    {
-      unsigned char bp;
-      bp=(bitrow & 0x1)*0xff;
-
-      color[0]=RX_TLIT(rxcolor8_t){bp,bp,bp,bp};
-
-      ++color;
-      bitrow >>= 1;
-    }
-    memory += stride;
-  }
-}
-
-void rxinit_default_font()
-{
-//
-// please forgive me
-//
-// credits: https://datagoblin.itch.io/monogram
-//
-unsigned char encoded[95][16]=
-{ {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,16,16,16,16,16,0,16,0,0,0,0},
-  {0,0,0,0,0,40,40,40,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,40,124,40,40,124,40,0,0,0,0},
-  {0,0,0,0,0,16,120,20,56,80,60,16,0,0,0,0},
-  {0,0,0,0,0,68,68,32,16,8,68,68,0,0,0,0},
-  {0,0,0,0,0,24,36,36,120,36,36,88,0,0,0,0},
-  {0,0,0,0,0,16,16,16,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,32,16,16,16,16,16,32,0,0,0,0},
-  {0,0,0,0,0,8,16,16,16,16,16,8,0,0,0,0},
-  {0,0,0,0,0,0,16,84,56,84,16,0,0,0,0,0},
-  {0,0,0,0,0,0,16,16,124,16,16,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0,0,16,16,8,0,0,0},
-  {0,0,0,0,0,0,0,0,124,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0,0,16,16,0,0,0,0},
-  {0,0,0,0,0,64,64,32,16,8,4,4,0,0,0,0},
-  {0,0,0,0,0,56,68,100,84,76,68,56,0,0,0,0},
-  {0,0,0,0,0,16,24,16,16,16,16,124,0,0,0,0},
-  {0,0,0,0,0,56,68,64,32,16,8,124,0,0,0,0},
-  {0,0,0,0,0,56,68,64,48,64,68,56,0,0,0,0},
-  {0,0,0,0,0,72,72,68,124,64,64,64,0,0,0,0},
-  {0,0,0,0,0,124,4,60,64,64,68,56,0,0,0,0},
-  {0,0,0,0,0,56,4,4,60,68,68,56,0,0,0,0},
-  {0,0,0,0,0,124,64,64,32,16,16,16,0,0,0,0},
-  {0,0,0,0,0,56,68,68,56,68,68,56,0,0,0,0},
-  {0,0,0,0,0,56,68,68,120,64,68,56,0,0,0,0},
-  {0,0,0,0,0,0,16,16,0,0,16,16,0,0,0,0},
-  {0,0,0,0,0,0,16,16,0,0,16,16,8,0,0,0},
-  {0,0,0,0,0,0,96,24,4,24,96,0,0,0,0,0},
-  {0,0,0,0,0,0,0,124,0,124,0,0,0,0,0,0},
-  {0,0,0,0,0,0,12,48,64,48,12,0,0,0,0,0},
-  {0,0,0,0,0,56,68,64,32,16,0,16,0,0,0,0},
-  {0,0,0,0,0,56,100,84,84,100,4,56,0,0,0,0},
-  {0,0,0,0,0,56,68,68,68,124,68,68,0,0,0,0},
-  {0,0,0,0,0,60,68,68,60,68,68,60,0,0,0,0},
-  {0,0,0,0,0,56,68,4,4,4,68,56,0,0,0,0},
-  {0,0,0,0,0,60,68,68,68,68,68,60,0,0,0,0},
-  {0,0,0,0,0,124,4,4,60,4,4,124,0,0,0,0},
-  {0,0,0,0,0,124,4,4,60,4,4,4,0,0,0,0},
-  {0,0,0,0,0,56,68,4,116,68,68,56,0,0,0,0},
-  {0,0,0,0,0,68,68,68,124,68,68,68,0,0,0,0},
-  {0,0,0,0,0,124,16,16,16,16,16,124,0,0,0,0},
-  {0,0,0,0,0,64,64,64,64,68,68,56,0,0,0,0},
-  {0,0,0,0,0,68,36,20,12,20,36,68,0,0,0,0},
-  {0,0,0,0,0,4,4,4,4,4,4,124,0,0,0,0},
-  {0,0,0,0,0,68,108,84,68,68,68,68,0,0,0,0},
-  {0,0,0,0,0,68,68,76,84,100,68,68,0,0,0,0},
-  {0,0,0,0,0,56,68,68,68,68,68,56,0,0,0,0},
-  {0,0,0,0,0,60,68,68,60,4,4,4,0,0,0,0},
-  {0,0,0,0,0,56,68,68,68,68,68,56,96,0,0,0},
-  {0,0,0,0,0,60,68,68,60,68,68,68,0,0,0,0},
-  {0,0,0,0,0,56,68,4,56,64,68,56,0,0,0,0},
-  {0,0,0,0,0,124,16,16,16,16,16,16,0,0,0,0},
-  {0,0,0,0,0,68,68,68,68,68,68,56,0,0,0,0},
-  {0,0,0,0,0,68,68,68,68,40,40,16,0,0,0,0},
-  {0,0,0,0,0,68,68,68,68,84,108,68,0,0,0,0},
-  {0,0,0,0,0,68,68,40,16,40,68,68,0,0,0,0},
-  {0,0,0,0,0,68,68,40,16,16,16,16,0,0,0,0},
-  {0,0,0,0,0,124,64,32,16,8,4,124,0,0,0,0},
-  {0,0,0,0,0,48,16,16,16,16,16,48,0,0,0,0},
-  {0,0,0,0,0,4,4,8,16,32,64,64,0,0,0,0},
-  {0,0,0,0,0,24,16,16,16,16,16,24,0,0,0,0},
-  {0,0,0,0,0,16,40,68,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,0,0,0,0,124,0,0,0,0},
-  {0,0,0,0,0,8,16,0,0,0,0,0,0,0,0,0},
-  {0,0,0,0,0,0,0,120,68,68,68,120,0,0,0,0},
-  {0,0,0,0,0,4,4,60,68,68,68,60,0,0,0,0},
-  {0,0,0,0,0,0,0,56,68,4,68,56,0,0,0,0},
-  {0,0,0,0,0,64,64,120,68,68,68,120,0,0,0,0},
-  {0,0,0,0,0,0,0,56,68,124,4,56,0,0,0,0},
-  {0,0,0,0,0,48,72,8,60,8,8,8,0,0,0,0},
-  {0,0,0,0,0,0,0,120,68,68,68,120,64,56,0,0},
-  {0,0,0,0,0,4,4,60,68,68,68,68,0,0,0,0},
-  {0,0,0,0,0,16,0,24,16,16,16,124,0,0,0,0},
-  {0,0,0,0,0,64,0,96,64,64,64,64,68,56,0,0},
-  {0,0,0,0,0,4,4,68,36,28,36,68,0,0,0,0},
-  {0,0,0,0,0,12,8,8,8,8,8,112,0,0,0,0},
-  {0,0,0,0,0,0,0,60,84,84,84,84,0,0,0,0},
-  {0,0,0,0,0,0,0,60,68,68,68,68,0,0,0,0},
-  {0,0,0,0,0,0,0,56,68,68,68,56,0,0,0,0},
-  {0,0,0,0,0,0,0,60,68,68,68,60,4,4,0,0},
-  {0,0,0,0,0,0,0,120,68,68,68,120,64,64,0,0},
-  {0,0,0,0,0,0,0,52,76,4,4,4,0,0,0,0},
-  {0,0,0,0,0,0,0,120,4,56,64,60,0,0,0,0},
-  {0,0,0,0,0,8,8,60,8,8,8,112,0,0,0,0},
-  {0,0,0,0,0,0,0,68,68,68,68,120,0,0,0,0},
-  {0,0,0,0,0,0,0,68,68,68,40,16,0,0,0,0},
-  {0,0,0,0,0,0,0,68,68,84,84,40,0,0,0,0},
-  {0,0,0,0,0,0,0,68,40,16,40,68,0,0,0,0},
-  {0,0,0,0,0,0,0,68,68,68,68,120,64,56,0,0},
-  {0,0,0,0,0,0,0,124,32,16,8,124,0,0,0,0},
-  {0,0,0,0,0,32,16,16,8,16,16,32,0,0,0,0},
-  {0,0,0,0,0,16,16,16,16,16,16,16,0,0,0,0},
-  {0,0,0,0,0,8,16,16,32,16,16,8,0,0,0,0},
-  {0,0,0,0,0,0,0,72,52,0,0,0,0,0,0,0},
-};
-
-  rxtexture_t texture=rxtexture_create(512,256,rxRGBA8888);
-
-  rxborrowed_t b=rxtexture_borrow(texture);
-
-            int  stride = b.stride;
-  unsigned char *memory = b.memory;
-
-  int index;
-  for(index=0; index<ccCarrlenL(encoded); ++index)
-  { int xcursor=index % 32 * 16;
-    int ycursor=index / 32 * 16;
-
-    unsigned char *write;
-
-    write=memory+stride*ycursor+xcursor*sizeof(rxcolor8_t);
-
-    load_bitmap8(write,stride,encoded[index]);
-
-    rxvec2i16_t p;
-    p.x=(short)xcursor;
-    p.y=(short)ycursor;
-
-    rx.font_glyph[index]=p;
-  }
-
-  rxreturn(b);
-
-  rx.font_atlas=texture;
-  rx.font_ysize=16;
-  rx.font_xsize= 6;
-}
-
 
 /* section: basic drawing functions */
 /* todo: instead of center based we should take corner based arguments, makes everything easier */
@@ -1817,7 +1670,7 @@ draw_box_sdf(
 
   rxpipset_program(rx.imp.sha_vtx_sdf,
          rx.imp.sha_pxl_sdf_box);
-  rxbgn();
+  rximp_begin();
     rx.imp.attr.rect.xy     = rxvec2_xy(x0,y0);
     rx.imp.attr.rect.xyxy   = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
     rx.imp.attr.rect.rgba   = color;
@@ -1847,7 +1700,7 @@ draw_box_sdf(
     rxaddvtx(rx.imp.attr);
 
     rxaddnidx(6, 0,1,2, 0,2,3);
-  rxend();
+  rximp_end();
 }
 
 
@@ -1859,14 +1712,14 @@ rxadd_colatex4(
   rxvec2_t uv0, rxvec2_t uv1,
   rxcolor_t c0,rxcolor_t c1,rxcolor_t c2,rxcolor_t c3)
 {
-  rxbgn();
+  rximp_begin();
     rxaddnvtx(4,
       rxvtx_xyuv_col(xy0.x,xy0.y, uv0.x,uv1.y, c0),
       rxvtx_xyuv_col(xy0.x,xy1.y, uv0.x,uv0.y, c1),
       rxvtx_xyuv_col(xy1.x,xy1.y, uv1.x,uv0.y, c2),
       rxvtx_xyuv_col(xy1.x,xy0.y, uv1.x,uv1.y, c3));
     rxaddnidx(6, 0,1,2, 0,2,3);
-  rxend();
+  rximp_end();
 }
 
 ccfunc ccinle void
@@ -1874,14 +1727,14 @@ rxadd_latex4(
   rxvec2_t xy0, rxvec2_t xy1,
   rxvec2_t uv0, rxvec2_t uv1 )
 {
-  rxbgn();
+  rximp_begin();
     rxaddnvtx(4,
       rxvtx_xyuv(xy0.x,xy0.y, uv0.x,uv1.y),
       rxvtx_xyuv(xy0.x,xy1.y, uv0.x,uv0.y),
       rxvtx_xyuv(xy1.x,xy1.y, uv1.x,uv0.y),
       rxvtx_xyuv(xy1.x,xy0.y, uv1.x,uv1.y));
     rxaddnidx(6, 0,1,2, 0,2,3);
-  rxend();
+  rximp_end();
 }
 
 ccfunc ccinle void
@@ -1917,7 +1770,7 @@ void rxdraw_circle(rxcolor_t color, float x, float y, float r)
 
   rxpipset_texture(REG_PS_TEX_0,rx.white);
 
-  rxbgn();
+  rximp_begin();
   rx.imp.attr.rgba = color;
   for(int i=0; i<360; ++i)
   {
@@ -1939,7 +1792,7 @@ void rxdraw_circle(rxcolor_t color, float x, float y, float r)
 
     rxaddidx(i*3+0); rxaddidx(i*3+1); rxaddidx(i*3+2);
   }
-  rxend();
+  rximp_end();
 }
 
 ccfunc void
@@ -1956,7 +1809,7 @@ rxdraw_line(
   rximp_apply();
 
   rxpipset_texture(REG_PS_TEX_0,rx.white);
-  rxbgn();
+  rximp_begin();
     rx.imp.attr.rgba = color;
     rxaddnvtx(4,
       rxvtx_xyuv(x0-xnormal,y0-ynormal,0,1),
@@ -1964,8 +1817,9 @@ rxdraw_line(
       rxvtx_xyuv(x1+xnormal,y1+ynormal,1,0),
       rxvtx_xyuv(x1-xnormal,y1-ynormal,1,1));
     rxaddnidx(6, 0,1,2, 0,2,3);
-  rxend();
+  rximp_end();
 }
+
 /* todo: this has to be re-visited for sub-pixel rendering */
 void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
 {
@@ -1974,154 +1828,6 @@ void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
   rxdraw_rect(color,x+0-.5,y-.5,1.,h+.5);
   rxdraw_rect(color,x+w-.5,y-.5,1.,h+.5);
 }
-
-float rxdraw_text_length(float h, const char *string)
-{
-  float result = ccCstrlenS(string) * rx.font_xsize;
-  result *= h/rx.font_ysize;
-  return result;
-}
-
-// /* remove */
-// float rxchrxsz(int ysize)
-// {
-//   return rx.font_xsize * (ysize / rx.font_ysize);
-// }
-
-void
-rxdraw_text_run(
-  int x/*starting position x*/,
-  int y/*starting position y*/,
-  int h/* the raster height of the font in pixels*/,
-  void *user,
-  int (*callback)(/*return whether to continue the run */
-    void */*user pointer (could be a plain string)*/,
-    int/*the string index*/,
-    int */*[out] character to rasterize*/,
-    rxcolor_t */*[out] the color*/))
-{
-  ccassert(h != 0);
-
-  float xnormalize=1.f/rx.font_atlas.size_x;
-  float ynormalize=1.f/rx.font_atlas.size_y;
-  float render_scale=h/rx.font_ysize;
-
-  float render_x0 = x;
-  float render_y0 = y;
-
-  /* XXX this should restore the state */
-
-
-  /* XXX we have to get back to this */
-  float sample_xsize=rx.font_ysize*xnormalize;
-  float sample_ysize=rx.font_ysize*ynormalize;
-  float render_xsize=rx.font_ysize*render_scale;
-  float render_ysize=rx.font_ysize*render_scale;
-
-  float xadvance=rx.font_xsize*render_scale;
-
-  rximp_apply();
-
-  rxpipset_texture(REG_PS_TEX_0,rx.font_atlas   );
-  rxpipset_sampler(REG_PS_SAM_0,rx.point_sampler);
-
-  rxcolor_t color;
-  int  code;
-  int index;
-  for( index =0; callback(user,index,&code,&color/* pass in the vertex color directly */);
-       index+=1 )
-  {
-    rxvec2i16_t baked = rx.font_glyph[code-32];
-
-    float sample_x0=baked.x*xnormalize;
-    float sample_y0=baked.y*ynormalize;
-    float sample_x1=sample_x0+sample_xsize;
-    float sample_y1=sample_y0+sample_ysize;
-    float render_x1=render_x0+render_xsize;
-    float render_y1=render_y0+render_ysize;
-
-    rxbgn();
-      rx.imp.attr.rgba = color;
-      rxaddvtx(rxvtx_xyuv(render_x0,render_y0,sample_x0,sample_y1));
-      rxaddvtx(rxvtx_xyuv(render_x0,render_y1,sample_x0,sample_y0));
-      rxaddvtx(rxvtx_xyuv(render_x1,render_y1,sample_x1,sample_y0));
-      rxaddvtx(rxvtx_xyuv(render_x1,render_y0,sample_x1,sample_y1));
-      rxaddnidx(6, 0,1,2, 0,2,3);
-    rxend();
-
-    render_x0 += xadvance;
-  }
-
-}
-
-/* todo: re-use draw-text-run instead */
-void
-rxdraw_text_ex(rxcolor_t color, int x, int y, int h, int length, const char *string)
-{
-  ccassert(h != 0);
-
-  if(length <= 0)
-  {
-    return;
-  }
-
-  float xnormalize=1.f/rx.font_atlas.size_x;
-  float ynormalize=1.f/rx.font_atlas.size_y;
-  float render_scale=h/rx.font_ysize;
-
-  float render_x0 = x;
-  float render_y0 = y;
-
-  rxpipset_texture(REG_PS_TEX_0,rx.font_atlas);
-  rxpipset_sampler(REG_PS_SAM_0,rx.point_sampler);
-
-  rxbgn();
-
-  rx.imp.attr.rgba = color;
-
-  /* XXX we have to get back to this */
-  float sample_xsize=rx.font_ysize*xnormalize;
-  float sample_ysize=rx.font_ysize*ynormalize;
-  float render_xsize=rx.font_ysize*render_scale;
-  float render_ysize=rx.font_ysize*render_scale;
-
-  float xadvance=rx.font_xsize*render_scale;
-
-  int index;
-  for(index=0; index < length; index += 1)
-  {
-    int code = *string ++;
-
-    rxvec2i16_t baked=rx.font_glyph[code-32];
-
-    float sample_x0=baked.x*xnormalize;
-    float sample_y0=baked.y*ynormalize;
-    float sample_x1=sample_x0+sample_xsize;
-    float sample_y1=sample_y0+sample_ysize;
-    float render_x1=render_x0+render_xsize;
-    float render_y1=render_y0+render_ysize;
-    rxaddvtx(rxvtx_xyuv(render_x0,render_y0,sample_x0,sample_y1));
-    rxaddvtx(rxvtx_xyuv(render_x0,render_y1,sample_x0,sample_y0));
-    rxaddvtx(rxvtx_xyuv(render_x1,render_y1,sample_x1,sample_y0));
-    rxaddvtx(rxvtx_xyuv(render_x1,render_y0,sample_x1,sample_y1));
-    rxaddidx(index*4+0); rxaddidx(index*4+1); rxaddidx(index*4+2);
-    rxaddidx(index*4+0); rxaddidx(index*4+2); rxaddidx(index*4+3);
-
-    render_x0+=xadvance;
-  }
-
-  rxend();
-}
-
-void rxdraw_text(int x, int y, int h, const char *string)
-{
-  if(string != 0)
-  {
-    rxdraw_text_ex(RX_COLOR_WHITE,x,y,h,strlen(string),string);
-  }
-}
-
-
 
 #pragma warning(pop)
 #endif
