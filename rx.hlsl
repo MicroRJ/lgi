@@ -72,17 +72,17 @@ PS_OUTPUT MainPS_Text(PS_INPUT i)
       texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
 
   PS_OUTPUT o;
-  o.color_mask = float4(triSample*i.color.aaa,1.);
   o.color      = i.color;
+  o.color_mask = float4(triSample*i.color.aaa,1.);
+  return o;
+}
 
-  return o; // float4(colorMask * i.color.rgb, i.color.a * triSample.r);
-
-  // /* ensure there's atleast this amount of pixel for padding, otherwise you're
-  //  gonna sample from unwanted places #important */
-  // float onEdge = -.5 + texture0.Sample(sampler0,i.uv).r;
-  // float range = length(float2( ddx(onEdge), ddy(onEdge) ));
-  // float alpha = smoothstep(-range, range, onEdge);
-  // return float4(lerp(i.color.rgb,i.color.rgb,.05), i.color.a*alpha);
+float4 MainPS_TextSDF(PS_INPUT i): SV_TARGET0
+{
+  float onEdge = -.5 + texture0.Sample(sampler0,i.uv).r;
+  float range = length(float2( ddx(onEdge), ddy(onEdge) ));
+  float alpha = smoothstep(-range, range, onEdge);
+  return float4(lerp(i.color.rgb,i.color.rgb,.05), i.color.a*alpha);
 }
 
 /* these are the extended versions for SDF shape rendering */

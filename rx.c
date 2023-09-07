@@ -86,23 +86,33 @@
 #pragma warning(disable:4305)
 # endif
 
+#  ifndef EMU_MALLOC
+#  define EMU_MALLOC(size,user) ((void)(user),ccmalloc(size))
+#   endif
+#  ifndef EMU_REALLOC
+#  define EMU_REALLOC(size,memory,user) ((void)(user),ccrealloc(size,memory))
+#   endif
+#  ifndef EMU_FREE
+#  define EMU_FREE(memory,user) ((void)(user),ccfree(memory))
+#   endif
+
 #   ifdef _RX_STANDALONE
 # include "cc\cc.c"
 #  define STB_IMAGE_IMPLEMENTATION
-#  define STBI_MALLOC(size)          ccmalloc(size)
-#  define STBI_REALLOC(size,memory)  ccrealloc(size,memory)
-#  define STBI_FREE(memory)          ccfree(memory)
+#  define STBI_MALLOC(size)          EMU_MALLOC(size,NULL)
+#  define STBI_REALLOC(size,memory)  EMU_REALLOC(size,memory,NULL)
+#  define STBI_FREE(memory)          EMU_FREE(memory,NULL)
 # include "stb_image.h"
 
 #  define STB_IMAGE_WRITE_IMPLEMENTATION
-#  define STBIW_MALLOC(size)         ccmalloc(size)
-#  define STBIW_REALLOC(size,memory) ccrealloc(size,memory)
-#  define STBIW_FREE(memory)         ccfree(memory)
+#  define STBIW_MALLOC(size)         EMU_MALLOC(size,NULL)
+#  define STBIW_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
+#  define STBIW_FREE(memory)         EMU_FREE(memory,NULL)
 # include "stb_image_write.h"
 
 # define  STB_TRUETYPE_IMPLEMENTATION
-# define  STBTT_malloc(size,u) ccmalloc(size)
-# define  STBTT_free(memory,u) ccfree(memory)
+# define  STBTT_malloc(size,u) EMU_MALLOC(size,NULL)
+# define  STBTT_free(memory,u) EMU_FREE(memory,NULL)
 # include "stb_truetype.h"
 #endif//_RX_STANDALONE
 
@@ -111,6 +121,7 @@
 #include  "rxvs.hlsl"
 #include  "rxsdf.vs.hlsl"
 #include  "rxtxt.ps.hlsl"
+#include  "rxtxt_sdf.ps.hlsl"
 #include  "rxsdf_cir.ps.hlsl"
 #include  "rxsdf_box.ps.hlsl"
 
@@ -145,22 +156,12 @@
 #ifndef _RX_DEFAULT_WINDOW_SIZE_Y
 #define _RX_DEFAULT_WINDOW_SIZE_Y CW_USEDEFAULT
 # endif//_RX_DEFAULT_WINDOW_SIZE_Y
-#ifndef     _RX_MSAA
-#define     _RX_MSAA 1
+#ifndef _RX_MSAA
+#define _RX_MSAA 1
 # endif//_RX_MSAA
-#ifndef     _RX_REFRESH_RATE
-#define     _RX_REFRESH_RATE 60
+#ifndef _RX_REFRESH_RATE
+#define _RX_REFRESH_RATE 60
 # endif//_RX_REFRESH_RATE
-#ifndef RX_INDEX_BUFFER_SIZE
-#define RX_INDEX_BUFFER_SIZE 0x4000
-# endif//RX_INDEX_BUFFER_SIZE
-#ifndef RX_VERTEX_BUFFER_SIZE
-#define RX_VERTEX_BUFFER_SIZE 0x4000
-# endif//RX_VERTEX_BUFFER_SIZE
-/* This is only if 3d mode is enabled - XXX - the one called rj */
-#ifndef _RX_ENABLE_DEPTH_STENCIL
-#define _RX_ENABLE_DEPTH_STENCIL
-# endif//_RX_ENABLE_DEPTH_STENCIL
 
 /* XX Would one want to support row/col matrices? */
 #ifndef RX_SHADER_COMPILATION_FLAGS
@@ -229,10 +230,18 @@ typedef rxvec4_t rxcolor_t;
 #define RX_COLOR_SALMON        RX_RGBA_UNORM(0xFA, 0x80, 0x72, 0xFF)
 #define RX_COLOR_AQUAMARINE    RX_RGBA_UNORM(0x7F, 0xFF, 0xD4, 0xFF)
 
-/* XX these have to be renamed */
-enum {
-     rxRGB8 = DXGI_FORMAT_R8_UNORM,
- rxRGBA8888 = DXGI_FORMAT_R8G8B8A8_UNORM };
+
+
+typedef enum
+{
+  EMU_ERROR_NONE = 0,
+  EMU_ERROR_CREATE_TEXTURE,
+  EMU_ERROR } emu_error;
+
+enum
+{
+       EMU_FORMAT_R8_UNORM = DXGI_FORMAT_R8_UNORM,
+ EMU_FORMAT_R8G8B8A8_UNORM = DXGI_FORMAT_R8G8B8A8_UNORM };
 
 enum
 { rx_kNONE   = 0,
@@ -289,7 +298,7 @@ typedef struct rxborrowed_t
 
   union
   { unsigned char *cursor;
-    				 void *memory; };
+             void *memory; };
 
   /* this will be removed possibly if we ever switch to a handle based system */
   struct
@@ -369,363 +378,10 @@ rxsampler_apply(
   rxsampler_t sampler);
 
 /* section: textures */
-
-
-
-typedef struct
-{
-  int    format;
-  int    size_x;
-  int    size_y;
-  /* memory and stride are optional, if memory provided stride may not be 0 */
-  int    stride;
-  void  *memory;
-
-  /* multisampling, default should be 1,0 */
-  int    samples;
-  int    quality;
-
-  /* todo: replace this with a single flag field instead */
-  struct
-  { /* GPU allocation flags */
-    D3D11_USAGE memtype;
-            int useflag;
-    /* CPU access flags */
-            int memflag; };
-
-  /* optional in/out */
-  struct
-  { union
-    { ID3D11Resource         *resource;
-      ID3D11Texture2D        *texture_2d; };
-
-    ID3D11ShaderResourceView *view;
-  } d3d11;
-} rxtexture_config_t;
-
-ccfunc ccinle rxtexture_config_t
-rxtexture_config_init(
-          int     size_x,
-          int     size_y,
-  DXGI_FORMAT     format,
-
-          int     stride,
-          void  * memory,
-
-          int    samples,
-          int    quality,
-
-  D3D11_USAGE    memtype,
-          int    useflag,
-          int    memflag );
-
-/* base texture object for all other textures */
-typedef struct
-{
-  int format;
-  int size_x;
-  int size_y;
-  int samples;
-  int quality;
-
-  struct
-  { union
-    { ID3D11Resource  *resource;
-      ID3D11Texture2D *texture_2d; };
-    /* the view is optional */
-    ID3D11ShaderResourceView *view;
-  } d3d11;
-} rxtexture_t;
-
-ccfunc int
-rxtexture_init(
-  rxtexture_t *texture, rxtexture_config_t *config);
-
-ccfunc ccinle rxtexture_t
-rxtexture_create_exex(
-          int             size_x,
-          int             size_y,
-  DXGI_FORMAT             format,
-          int             stride,
-          void           *memory,
-  D3D11_USAGE            memtype,
-          int            useflag,
-          int            memflag );
-
-ccfunc ccinle rxtexture_t
-rxtexture_create_ex(
-          int  size_x,
-          int  size_y,
-  DXGI_FORMAT  format,
-          int  stride,
-        void  *memory);
-
-ccfunc ccinle rxtexture_t
-rxtexture_create(
-  int  size_x,
-  int  size_y,
-  int  format);
-
-ccfunc rxborrowed_t
-rxtexture_borrow(
-  rxtexture_t texture);
-
-typedef struct
-{  int   size_x, size_y;
-   int   format;
-   int   stride;
-  void * memory;
-} rxtexture_memory_t;
-
-ccfunc rxtexture_memory_t
-rxtexture_load(
-  const char *name);
-
-ccfunc rxtexture_t
-rxtexture_memory_upload(
-  rxtexture_memory_t texture);
-
-ccfunc rxtexture_t
-rxtexture_upload(
-  const char *);
-
-/* render target, not sure why I chose to make this a separate type but we're going for it */
-typedef struct
-{
-  rxtexture_t texture;/* must be first field */
-
-  struct
-  { ID3D11RenderTargetView  *view;
-  } d3d11;
-} rxdrawing_texture_t;
-
-typedef struct rxstencil_texture_t
-{
-  rxtexture_t texture;/* must be first field */
-
-  struct
-  { ID3D11DepthStencilState *state;
-    ID3D11DepthStencilView  *view;
-  } d3d11;
-} rxstencil_texture_t;
-
-void
-rxdrawing_texture_apply(
-  rxdrawing_texture_t target, float *clear_color);
-
-/* section: GPU shader */
-enum
-{ RX_OBJECT_TYPE_kINVALID        = 0,
-  RX_OBJECT_TYPE_kPIXEL_SHADER   = 1,
-  RX_OBJECT_TYPE_kVERTEX_SHADER  = 2,
-  RX_OBJECT_TYPE_kCOMPUTE_SHADER = 3,
-};
-
-
-typedef struct
-{
-  int type;
-
-  struct
-  { struct
-    {
-      struct
-      { size_t      length;
-        void       *memory; };
-
-      /* load from file if memory not given */
-      char const  *fpath;
-
-      char const  *label;/* optional */
-      char const  *model;/* optional */
-      char const  *entry;
-
-    } source;
-    struct
-    { size_t length;
-      union
-      { void *memory;
-        char *string; };
-    } bytecode;
-  } hlsl;
-
-  struct
-  { /* pending: who cares? */
-    D3D11_INPUT_ELEMENT_DESC layout_config[0x20];
-                         int layout_length;
-
-    ID3D11InputLayout *layout;
-  } d3d11;
-} shader_config_t;
-
-typedef struct
-{ int type;
-  struct
-  { union
-    { ID3D11DeviceChild    *unknown;
-      ID3D11VertexShader   *vertex_shader;
-      ID3D11PixelShader    *pixel_shader;
-      ID3D11ComputeShader  *compute_shader; };
-
-    ID3D11InputLayout *layout;
-  } d3d11;
-} rxshader_t;
-
-/* beware that this function may not handle padding very well should
- you choose to let the API create the input layout for you automatically,
-  ideally you should stick to aligned units, try to pack things into float4's
- if necessary. */
-void
-rxshader_init(
-  rxshader_t *shader, shader_config_t *config);
-
-rxshader_t
-rxshader_create(/* this function takes the bytecode itself */
-  int type, size_t length, void *memory);
-
-rxshader_t
-rxshader_load(
-  int type, char const *entry, char const *fpath);
-
-
-/* todo: implement this */
-typedef struct
-{
-  rxshader_t ps;
-  rxshader_t vs;
-} rxprogram_t;
-
-/* section: immediate mode */
-ccfunc void rximp_flush();
-ccfunc void rximp_apply();
-ccfunc void rximp_clear();
-
-/* We're going for simplicity here, this should be enough for most simple
- things */
-typedef int rxvindex_imp_t;
-
-typedef union
-{ struct
-  { rxvec4_t  xyzw;
-    rxvec4_t  rgba;
-    rxvec2_t  uv; };
-  struct
-  { float x,y,z,w;
-    float r,g,b,a;
-    float u,v; };
-
-  /* specialized shaders */
-  struct
-  { rxvec2_t xy;
-    rxvec4_t xyxy;
-    rxvec4_t rgba;
-    rxvec4_t flag;
-  } rect;
-} rxvertex_imp_t;
-
-/* todo */
-typedef union
-{
-  void *val;
-
-  union
-  { ID3D11ShaderResourceView   *texture_2d;
-    ID3D11Buffer               *buffer;
-    ID3D11SamplerState         *sampler;
-  } d3d11;
-} regenv_t;
-
-/* stores information about a render target for the pipeline */
-typedef struct
-{
-  rxdrawing_texture_t surface;
-
-  struct
-  { int x0,y0,x1,y1;
-  } vport;
-  struct
-  { unsigned       enable: 1;
-    int            mask;
-    struct
-    { D3D11_BLEND    src;
-      D3D11_BLEND    dest;
-      D3D11_BLEND_OP op; };
-    struct
-    { D3D11_BLEND    src;
-      D3D11_BLEND    dest;
-      D3D11_BLEND_OP op; } alpha;
-  } blend;
-} pipout_t;
-
-typedef struct
-{
-  struct
-  {
-    ID3D11InputLayout     *in;
-
-    ID3D11VertexShader    *vs;/* these have to be more intricate */
-    ID3D11PixelShader     *ps;/* these have to be more intricate */
-
-    ID3D11ComputeShader   *cs;
-
-    /* (recommended) do not modify these directly */
-    ID3D11RasterizerState *rastr_state;
-    ID3D11BlendState      *blend_state;
-  } d3d11;
-
-
-  pipout_t   out[0x10];
-  regenv_t   reg[0x20];
-  char       opt[0x10];/* find better way to store this, possibly just using flags */
-} pipenv_t;
-
-enum
-{
-  OPT_ZTST,
-};
-
-enum
-{ REG_PS_TEX_0,
-  REG_PS_TEX_1,
-  REG_PS_SAM_0,
-  REG_PS_SAM_1,
-  REG_PS_BLC_0,
-  REG_PS_BLC_1,
-
-  REG_VS_TEX_0,
-  REG_VS_TEX_1,
-  REG_VS_SAM_0,
-  REG_VS_SAM_1,
-  REG_VS_BLC_0,
-  REG_VS_BLC_1,
-
-  REG_CS_TEX_0,
-  REG_CS_TEX_1,
-  REG_CS_SAM_0,
-  REG_CS_SAM_1,
-  REG_CS_BLC_0,
-  REG_CS_BLC_1,
-};
-
-void
-regset(
-  int reg, void *res);
-
-/* todo: these are temporary */
-void
-rxpipset_program(
-  rxshader_t vs,
-  rxshader_t ps);
-
-void
-rxpipset_sampler(
-  int reg, rxsampler_t sampler );
-void
-rxpipset_texture(
-  int reg, rxtexture_t texture );
-void
-rxpipset_varying(
-  int reg, rxuniform_buffer_t buffer );
+#include "emu_texture.h"
+#include "emu_shader.h"
+#include "rx.program.c"
+#include "emu_imp.h"
 
 /* this struct is typedef'd should you want to avoid allocating it globally,
  for instance say you had your own global state and within that state you'd
@@ -748,7 +404,6 @@ typedef struct rx_t
   rxsampler_t          linear_sampler;
   rxsampler_t          point_sampler;
   rxsampler_t          anisotropic_sampler;
-  rxtexture_t          white;
 
   /* main stuff */
   struct
@@ -758,67 +413,14 @@ typedef struct rx_t
       ID3D11DeviceContext    *ctx; };
   } d3d11;
 
-  rxmatrix_t     view_matrix;
-  rxmatrix_t     world_matrix;
-
-  /* immediate mode pass */
-  struct
-  { struct
-    { rxmatrix_t matrix;
-
-      rxvec2_t   xyscreen;
-      rxvec2_t   xysource;/* this should be an array */
-      rxvec2_t   xycursor;
-
-      double     total_seconds;
-      double     delta_seconds;
-    } var;
-
-    rxuniform_buffer_t  varying;
-
-    struct
-    {
-                      int count;
-      rxdrawing_texture_t array[2];
-
-      rxstencil_texture_t depth;    } out;
-
-
-    struct
-    {
-      rxshader_t sha_vtx_sdf;
-      rxshader_t sha_pxl_sdf_cir;
-      rxshader_t sha_pxl_sdf_box;
-
-      rxshader_t sha_pxl_txt;
-
-      rxshader_t sha_vtx;
-      rxshader_t sha_pxl; };
-
-    /* assembler buffers */
-    rxvertex_buffer_t   asm_vtx;
-    rxindex_buffer_t    asm_idx;
-
-    /* todo: cleanup */
-    rxborrowed_t       vertex_buffer_writeonly;
-    rxvertex_imp_t    *vertex_array;
-             int       vertex_tally;
-
-    /* todo: cleanup */
-    rxborrowed_t       index_buffer_writeonly;
-    rxvindex_imp_t    *index_array;
-             int       index_tally;
-
-             int       index_offset;
-    rxvertex_imp_t     attr;
-  } imp;
+  Emu_imp_t imp;
 
   /* current pipeline state, not recommended to modify directly,
-    use the appropriate functions instead which will flush if necessary */
+    use the appropriate functions instead which will flush if necessary and if specified
+    to do so */
   pipenv_t pip;
 
-  /* whether the current pipeline differs from the one set in the render
-    context (effectively the GPU) and should be uploaded */
+  /* whether the current pipeline should be uploaded */
   int      upl;
 
   /* window related structure, we only support one window for now but it'd be
@@ -842,7 +444,7 @@ typedef struct rx_t
 
     /* output media */
     struct
-    { rxdrawing_texture_t tar;
+    { Emu_texture_t *tar;
 
       struct
       { IDXGISwapChain2 *swap_chain;
@@ -895,13 +497,16 @@ typedef struct rx_t
 /* the source of all evil is here */
 ccglobal rx_t rx;
 
+
 /* section: basic system functions */
 
 void
-rxsys_setcur(/*todo*/HCURSOR cursor)
+Emu_system_set_cursor(/*todo*/HCURSOR cursor)
 {
   SetCursor(cursor);
 }
+
+#include "rx.program.cc"
 
 
 /* section: windowing functions */
@@ -912,7 +517,7 @@ LRESULT CALLBACK
 rxwndmsg_callback_win32(HWND,UINT,WPARAM,LPARAM);
 
 ccfunc void
-rxwindow_poll();
+Emu_window_poll();
 
 
 /* todo: rename */
@@ -952,8 +557,6 @@ int rxchr()
   return rx.wnd.in.kbrd.chr;
 }
 
-#include "rx.shader.cc"
-
 void rxunknown_delete(void *unknown)
 {
   if(unknown != 0)
@@ -974,47 +577,46 @@ void rxindex_buffer_delete(rxindex_buffer_t buffer)
 
 /* section: pipeline config */
 void
-rxpipset_program(
-  rxshader_t vs,
-  rxshader_t ps )
+rxpipset_program(Emu_shader_t vs, Emu_shader_t ps, int flush)
 {
   if( rx.pip.d3d11.vs != vs.d3d11.vertex_shader )
   {
-    rximp_flush();
+  	if(flush) {
+    	Emu_imp_flush();
+  	}
 
     rx.pip.d3d11.vs = vs.d3d11.vertex_shader;
     rx.pip.d3d11.in = vs.d3d11.layout;
     rx.upl = TRUE;
+
+    ccassert(rx.pip.d3d11.in != NULL);
   }
 
   if( rx.pip.d3d11.ps != ps.d3d11.pixel_shader )
   {
-    rximp_flush();
+  	if(flush) {
+    	Emu_imp_flush();
+  	}
+
+    rx.pip.ps_ = ps;
 
     rx.pip.d3d11.ps = ps.d3d11.pixel_shader;
     rx.upl = TRUE;
-  }
-}
 
-void
-optset(int opt, int val)
-{
-  if(rx.pip.opt[opt] != val)
-  {
-    rximp_flush();
-
-    rx.pip.opt[opt] = val;
-    rx.upl = TRUE;
+    rx.pip.dual_source_blending =
+      (ps.flags & EMU_kSOURCE_BLENDING_BIT) != 0;
   }
 }
 
 void
 regset(
-  int reg, void *val)
+  int reg, void *val, int flush)
 {
   if(rx.pip.reg[reg].val != val)
   {
-    rximp_flush();
+  	if(flush) {
+    	Emu_imp_flush();
+  	}
 
     rx.pip.reg[reg].val  = val;
     rx.upl = TRUE;
@@ -1024,29 +626,30 @@ regset(
 /* todo: this should take the id of the resource */
 void
 rxpipset_sampler(
-  int reg, rxsampler_t sampler )
+  int reg, rxsampler_t sampler, int flush)
 {
-  regset(reg,sampler.d3d11.state);
+  regset(reg,sampler.d3d11.state,flush);
 }
 
 void
 rxpipset_texture(
-  int reg, rxtexture_t texture )
+  int reg, Emu_texture_t *texture, int flush)
 {
-  regset(reg,texture.d3d11.view);
+  regset(reg,texture->d3d11.shader_target,flush);
 
-  /* todo: this shouldn't have to be set here */
-  rx.imp.var.xysource.x = texture.size_x;
-  rx.imp.var.xysource.y = texture.size_y;
+  /* we should have a vtable type thing here? this way we can set these things?
+  	or in the flush function instead? idk #todo */
+  rx.imp.var.xysource.x = texture->size_x;
+  rx.imp.var.xysource.y = texture->size_y;
 }
 
 
 /* todo: this should take the id of the resource */
 void
 rxpipset_varying(
-  int reg, rxuniform_buffer_t buffer )
+  int reg, rxuniform_buffer_t buffer, int flush)
 {
-  regset(reg,buffer.unknown);
+  regset(reg,buffer.unknown,flush);
 }
 
 void
@@ -1059,22 +662,17 @@ pipupl()
 
   rx.upl = FALSE;
 
-  rxmatrix_t matrix = rxmatrix_multiply(rx.world_matrix,rx.view_matrix);
-
-  rx.imp.var.       matrix=matrix;
-  rx.imp.var.xyscreen.x=(float)(rx.wnd.size_x);
-  rx.imp.var.xyscreen.y=(float)(rx.wnd.size_y);
-  rx.imp.var.xycursor.x=(float)(rx.wnd.in.mice.xcursor) / rx.wnd.size_x; // todo!!:
-  rx.imp.var.xycursor.y=(float)(rx.wnd.in.mice.ycursor) / rx.wnd.size_y; // todo!!:
-  rx.imp.var.total_seconds=rx.total_seconds;
-  rx.imp.var.delta_seconds=rx.delta_seconds;
-
-  /* todo: only update if necessary */
-  rxuniform_buffer_update(rx.imp.varying,&rx.imp.var,sizeof(rx.imp.var));
-
   /* #todo */
-  ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,
-    rx.imp.out.depth.d3d11.state,1);
+  ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,rx.pip.d3d11.ds,1);
+
+  if(rx.pip.dual_source_blending != FALSE) {
+    ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,
+      rx.imp.d3d11.subpixel_dual_blending_blend_state,0x00,0xFFFFFFFu);
+  } else {
+    ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,
+      rx.imp.d3d11.default_blend_state,0x00,0xFFFFFFFu);
+  }
+
 
   ID3D11DeviceContext_VSSetShader(rx.d3d11.ctx,rx.pip.d3d11.vs,0x00,0);
   ID3D11DeviceContext_PSSetShader(rx.d3d11.ctx,rx.pip.d3d11.ps,0x00,0);
@@ -1083,29 +681,31 @@ pipupl()
   for(int i=0;i<2;i+=1)
   { ID3D11DeviceContext_VSSetConstantBuffers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_BLC_0+i].d3d11.buffer);
     ID3D11DeviceContext_PSSetConstantBuffers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_BLC_0+i].d3d11.buffer);
-    ID3D11DeviceContext_CSSetConstantBuffers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_CS_BLC_0+i].d3d11.buffer);
 
-    ID3D11DeviceContext_VSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_TEX_0+i].d3d11.texture_2d);
-    ID3D11DeviceContext_PSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_TEX_0+i].d3d11.texture_2d);
-    ID3D11DeviceContext_CSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_CS_TEX_0+i].d3d11.texture_2d);
+    ID3D11DeviceContext_VSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_TEX_0+i].d3d11.resource_view);
+    ID3D11DeviceContext_PSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_TEX_0+i].d3d11.resource_view);
 
     ID3D11DeviceContext_VSSetSamplers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_SAM_0+i].d3d11.sampler);
     ID3D11DeviceContext_PSSetSamplers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_SAM_0+i].d3d11.sampler);
-    ID3D11DeviceContext_CSSetSamplers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_CS_SAM_0+i].d3d11.sampler);
   }
 
   /* pending: this a good placement? */
   ID3D11DeviceContext_IASetInputLayout(rx.d3d11.ctx,rx.pip.d3d11.in);
 
-  /* ensure the proper render target is set */
-  ID3D11RenderTargetView *render_targets[2] =
-  { rx.imp.out.array[0].d3d11.view,
-    rx.imp.out.array[1].d3d11.view };
+  /* todo */
+  ID3D11RenderTargetView *render_targets[2] = { 0 };
+
+  if(rx.pip.out.color[0] != NULL) {
+  	render_targets[0] = rx.pip.out.color[0]->d3d11.color_target;
+  }
+  if(rx.pip.out.color[1] != NULL) {
+  	render_targets[1] = rx.pip.out.color[1]->d3d11.color_target;
+  }
 
   ID3D11DeviceContext_OMSetRenderTargets(rx.d3d11.ctx,
-    rx.imp.out.count,render_targets,rx.imp.out.depth.d3d11.view);
+    rx.pip.out.count,render_targets,rx.pip.out.depth->d3d11.depth_target);
 
-  unsigned int Stride=sizeof(rxvertex_imp_t);
+  unsigned int Stride=sizeof(Emu_imp_vertex_t);
   unsigned int Offset=0;
 
   ID3D11DeviceContext_IASetVertexBuffers(rx.d3d11.ctx,0,1,
@@ -1132,31 +732,6 @@ void rxpipset_viewport(float w, float h)
   ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
 }
 
-ccfunc void
-rx3d()
-{
-  /* todo: */
-  rx.world_matrix = rxmatrix_identity();
-  rx. view_matrix = rxmatrix_identity();
-  rx. view_matrix = rxmatrix_projection(
-    (double)(rx.wnd.size_y)/(double)(rx.wnd.size_x),90,0.01,1000);
-
-  optset(OPT_ZTST,TRUE);
-}
-
-ccfunc void
-rx2d()
-{
-  rx.world_matrix = rxmatrix_identity();
-  rx. view_matrix = rxmatrix_identity();
-  rx.view_matrix.m[0][0]=  2. / rx.wnd.size_x;
-  rx.view_matrix.m[1][1]=  2. / rx.wnd.size_y;
-  rx.view_matrix.m[2][2]= .5;
-  rx.view_matrix.m[3][0]=- 1.;
-  rx.view_matrix.m[3][1]=- 1.;
-
-  optset(OPT_ZTST,FALSE);
-}
 
 void rximp_clip(int x0, int y0, int x1, int y1)
 {
@@ -1177,186 +752,28 @@ void rximp_clip(int x0, int y0, int x1, int y1)
   ID3D11DeviceContext_RSSetScissorRects(rx.d3d11.ctx,1,&rect_d3d);
 }
 
-/* YOU MUST CALL THIS FUNCTION, CAN'T YOU SEE
- IT IS FUNDAMENTAL */
-ccfunc ccinle void
-rximp_end()
-{
-}
-
-ccfunc void
-rximp_begin()
-{
-  /* #pending is this something that we want to do? */
-  rx.imp.attr.xyzw.x = .0;
-  rx.imp.attr.xyzw.y = .0;
-  rx.imp.attr.xyzw.z = .5;
-  rx.imp.attr.xyzw.w =  1;
-  rx.imp.attr.rgba.r = .0;
-  rx.imp.attr.rgba.g = .0;
-  rx.imp.attr.rgba.b = .0;
-  rx.imp.attr.rgba.a = .0;
-  rx.imp.attr.  uv.x = .0;
-  rx.imp.attr.  uv.y = .0;
-
-  rx.imp.index_offset = rx.imp.vertex_tally;
-
-  if(rx.imp.vertex_array == NULL)
-  {
-    rx.imp.vertex_buffer_writeonly = rxborrow_vertex_buffer(rx.imp.asm_vtx);
-    rx.imp. index_buffer_writeonly =  rxborrow_index_buffer(rx.imp.asm_idx);
-    rx.imp. vertex_array=rx.imp.vertex_buffer_writeonly.memory;
-    rx.imp.  index_array=rx.imp. index_buffer_writeonly.memory;
-    rx.imp. vertex_tally=0;
-    rx.imp.  index_tally=0;
-
-    rx.imp.index_offset =0;
-  }
-
-  ccassert(rx.imp.vertex_array != 0);
-  ccassert(rx.imp. index_array != 0);
-}
+#include "emu_texture.c"
+#include "emu_shader.c"
+#include "emu_imp.c"
 
 ccfunc ccinle void
-rxaddidx(rxvindex_imp_t value)
+Emu_window_clear()
 {
-  if(rx.imp.index_tally < RX_INDEX_BUFFER_SIZE)
-  {
-    rx.imp.index_array[
-    rx.imp.index_tally] = rx.imp.index_offset + value;
-
-    rx.imp.index_tally += 1;
-  }
-}
-
-ccfunc ccinle void
-rxaddnidx(int num, ...)
-{
-  va_list vli;
-  va_start(vli,num);
-
-  for(int i=0;i<num;i+=1)
-  {
-    rxaddidx(va_arg(vli,rxvindex_imp_t));
-  }
-
-  va_end(vli);
-}
-
-ccfunc ccinle void
-rxaddvtx(rxvertex_imp_t vertex)
-{
-  if(rx.imp.vertex_tally < RX_VERTEX_BUFFER_SIZE)
-  {
-    rx.imp.vertex_array[
-    rx.imp.vertex_tally] = vertex;
-
-    rx.imp.vertex_tally += 1;
-  }
-}
-
-ccfunc ccinle void
-rxaddnvtx(int num, ...)
-{
-  va_list vli;
-  va_start(vli,num);
-
-  for(int i=0;i<num;i+=1)
-  {
-    rxaddvtx(va_arg(vli,rxvertex_imp_t));
-  }
-
-  va_end(vli);
-}
-
-ccfunc ccinle rxvertex_imp_t
-rxvtx_xy(float x, float y)
-{
-  rx.imp.attr.xyzw.x =  x;
-  rx.imp.attr.xyzw.y =  y;
-  return rx.imp.attr;
-}
-
-ccfunc ccinle rxvertex_imp_t
-rxvtx_xyuv(float x, float y, float u, float v)
-{
-  rx.imp.attr.xyzw.x =  x;
-  rx.imp.attr.xyzw.y =  y;
-  rx.imp.attr.xyzw.z = .5;
-  rx.imp.attr.xyzw.w =  1;
-  rx.imp.attr.  uv.x =  u;
-  rx.imp.attr.  uv.y =  v;
-  return rx.imp.attr;
-}
-
-ccfunc ccinle rxvertex_imp_t
-rxvtx_xyuv_col(float x, float y, float u, float v, rxcolor_t rgba)
-{
-  rx.imp.attr.xyzw.x =  x;
-  rx.imp.attr.xyzw.y =  y;
-  rx.imp.attr.xyzw.z = .5;
-  rx.imp.attr.xyzw.w =  1;
-  rx.imp.attr.  uv.x =  u;
-  rx.imp.attr.  uv.y =  v;
-  rx.imp.attr.rgba   = rgba;
-  return rx.imp.attr;
-}
-
-#include "rx.texture.cc"
-
-
-ccfunc ccinle void
-rximp_clear()
-{
-  /* #todo temporary */
+  /* should be the window stuff here instead dude #todo */
   float clear_color[]={.0f,.0f,.0f,1.f};
 
-  ID3D11DeviceContext_ClearDepthStencilView(
-    rx.d3d11.ctx,rx.imp.out.depth.d3d11.view,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
+  ID3D11DeviceContext_ClearDepthStencilView(rx.d3d11.ctx,
+  	rx.pip.out.depth->d3d11.depth_target,
+    	D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
 
-  for(int i=0; i<rx.imp.out.count; i+=1)
+  for(int i=0; i<rx.pip.out.count; i+=1)
   {
     ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,
-      rx.imp.out.array[i].d3d11.view,clear_color);
+      rx.pip.out.color[i]->d3d11.color_target,clear_color);
   }
-}
-
-ccfunc ccinle void
-rximp_apply()
-{
-  rxpipset_program(
-    rx.imp.sha_vtx,
-    rx.imp.sha_pxl );
-
-  rx2d();
-
-  rxpipset_varying(REG_VS_BLC_0,rx.imp.varying);
-  rxpipset_varying(REG_PS_BLC_0,rx.imp.varying);
 }
 
 #include "rx.win32.cc"
-
-ccfunc void
-rximp_flush()
-{
-  if(rx.imp.index_tally != 0)
-  {
-    /* return immediate mode resources */
-    rxreturn(rx.imp.vertex_buffer_writeonly);
-    rxreturn(rx.imp. index_buffer_writeonly);
-    rx.imp.vertex_array=ccnull;
-    rx.imp. index_array=ccnull;
-
-    /* upload pipeline changes if necessary */
-    pipupl();
-
-    ID3D11DeviceContext_DrawIndexed(rx.d3d11.ctx,rx.imp.index_tally,0,0);
-  }
-
-  rx.imp.index_tally = 0;
-  rx.imp.vertex_tally = 0;
-}
-
 
 void rxtime()
 {
@@ -1375,139 +792,92 @@ int rxtick()
 {
   rx.tick_count += 1;
 
-  rxwindow_poll();
+  Emu_window_poll();
 
   /* todo */
-  rxsys_setcur(rx.win32.cursor.arrow);
+  Emu_system_set_cursor(rx.win32.cursor.arrow);
 
-  rximp_flush();
+  Emu_imp_flush();
 
   /* this has to be formalized #todo */
-  rxtexture_copy(
-    &rx.wnd.out.     tar.texture ,
-    &rx.imp.out.array[0].texture );
+  Emu_texture_copy(
+    rx.wnd.out.tar,rx.pip.out.color[0]);
 
   IDXGISwapChain_Present(rx.wnd.out.d3d11.swap_chain,1u,0);
 
   /* this does not serve any purpose in full screen mode */
   WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
 
-  rxwnd_show();
+  Emu_window_show();
 
-  rximp_clear();
+  Emu_window_clear();
 
   rxtime();
 
   return !rx.wnd.off;
 }
 
-/* todo: revise */
-rxstencil_texture_t
-rxstencil_texture_create(
-  int size_x, int size_y, int depth_enabled, int stencil_enabled)
+Emu_texture_t *
+Emu_window_create_color_target()
 {
-  rxtexture_config_t texture_config =
-    rxtexture_config_init(size_x,size_y,DXGI_FORMAT_D32_FLOAT,0,NULL,1,0,
-      D3D11_USAGE_DEFAULT,D3D11_BIND_DEPTH_STENCIL,0);
+	Emu_texture_t *result = NULL;
 
-  rxtexture_t texture;
-  rxtexture_init(&texture,&texture_config);
+  IDXGIDevice * device_dxgi = NULL;
+  IDXGIAdapter * adapter_dxgi = NULL;
+  IDXGIFactory2 * factory_dxgi = NULL;
 
-  ID3D11DepthStencilView *stencil_view_d3d;
-  ID3D11Device_CreateDepthStencilView(rx.d3d11.dev,
-    texture_config.d3d11.resource,NULL,&stencil_view_d3d);
+  ID3D11Device_QueryInterface(rx.d3d11.dev,&IID_IDXGIDevice,(void **)&device_dxgi);
+  IDXGIDevice_GetAdapter(device_dxgi,&adapter_dxgi);
+  IDXGIAdapter_GetParent(adapter_dxgi,&IID_IDXGIFactory2,(void**)&factory_dxgi);
 
-  D3D11_DEPTH_STENCIL_DESC stencil_config_d3d;
-  stencil_config_d3d.     DepthEnable=depth_enabled;
-  stencil_config_d3d.   StencilEnable=stencil_enabled;
-  stencil_config_d3d.  DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;
-  stencil_config_d3d.       DepthFunc=D3D11_COMPARISON_LESS;
-  stencil_config_d3d. StencilReadMask=D3D11_DEFAULT_STENCIL_READ_MASK;
-  stencil_config_d3d.StencilWriteMask=D3D11_DEFAULT_STENCIL_WRITE_MASK;
-  stencil_config_d3d.FrontFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
-  stencil_config_d3d.FrontFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
-  stencil_config_d3d.FrontFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
-  stencil_config_d3d.FrontFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
-  stencil_config_d3d. BackFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
-  stencil_config_d3d. BackFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
-  stencil_config_d3d. BackFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
-  stencil_config_d3d. BackFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
-
-  ID3D11DepthStencilState *stencil_d3d;
-  ID3D11Device_CreateDepthStencilState(rx.d3d11.dev,&stencil_config_d3d,&stencil_d3d);
-
-  rxstencil_texture_t stencil;
-  stencil.texture     = texture;
-  stencil.d3d11.state = stencil_d3d;
-  stencil.d3d11.view  = stencil_view_d3d;
-  return stencil;
-}
-
-
-void rxinit_default_font();
-
-rxdrawing_texture_t
-rxcreate_window_surface()
-{
-  IDXGIFactory2 * DXGIFactory=NULL;
-  IDXGIDevice   *  DXGIDevice=NULL;
-  IDXGIAdapter  * DXGIAdapter=NULL;
-  ID3D11Device_QueryInterface(rx.d3d11.dev,&IID_IDXGIDevice,(void **)&DXGIDevice);
-  IDXGIDevice_GetAdapter(DXGIDevice,&DXGIAdapter);
-  IDXGIAdapter_GetParent(DXGIAdapter,&IID_IDXGIFactory2,(void**)&DXGIFactory);
-  IDXGIAdapter_Release(DXGIAdapter);
-  IDXGIDevice_Release(DXGIDevice);
-
-  DXGI_SWAP_CHAIN_DESC1 swapchain_config_d3d;
-  ZeroMemory(&swapchain_config_d3d,sizeof(swapchain_config_d3d));
-  swapchain_config_d3d.      Width=rx.wnd.size_x;
-  swapchain_config_d3d.     Height=rx.wnd.size_y;
-  swapchain_config_d3d.     Format=DXGI_FORMAT_R8G8B8A8_UNORM;
-  swapchain_config_d3d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT; // DXGI_USAGE_UNORDERED_ACCESS
-  swapchain_config_d3d.BufferCount=2;
-  swapchain_config_d3d. SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-  swapchain_config_d3d.      Flags=DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH|
-                            DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+  DXGI_SWAP_CHAIN_DESC1 sc_config_d3d;
+  ZeroMemory(&sc_config_d3d,sizeof(sc_config_d3d));
+  sc_config_d3d.Width=rx.wnd.size_x;
+  sc_config_d3d.Height=rx.wnd.size_y;
+  sc_config_d3d.Format=DXGI_FORMAT_R8G8B8A8_UNORM;
+  sc_config_d3d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT; // DXGI_USAGE_UNORDERED_ACCESS
+  sc_config_d3d.BufferCount=2;
+  sc_config_d3d.SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
+  sc_config_d3d.Flags=DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH|
+                      DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
   /* todo: allow the user to specify this */
-  swapchain_config_d3d. SampleDesc.  Count=1;
-  swapchain_config_d3d. SampleDesc.Quality=0;
+  sc_config_d3d.SampleDesc.  Count=1;
+  sc_config_d3d.SampleDesc.Quality=0;
 
-  DXGI_SWAP_CHAIN_FULLSCREEN_DESC swapchain_fullscreen_config_d3d;
-  ZeroMemory(&swapchain_fullscreen_config_d3d,sizeof(swapchain_fullscreen_config_d3d));
-  swapchain_fullscreen_config_d3d.RefreshRate.  Numerator=_RX_REFRESH_RATE;
-  swapchain_fullscreen_config_d3d.RefreshRate.Denominator=1;
-  swapchain_fullscreen_config_d3d.Windowed               =TRUE;
+  DXGI_SWAP_CHAIN_FULLSCREEN_DESC sc_fs_config;
+  ZeroMemory(&sc_fs_config,sizeof(sc_fs_config));
+  sc_fs_config.RefreshRate.Numerator=_RX_REFRESH_RATE;
+  sc_fs_config.RefreshRate.Denominator=1;
+  sc_fs_config.Windowed=TRUE;
 
-  IDXGIFactory2_CreateSwapChainForHwnd(DXGIFactory,
-    (IUnknown *) rx.d3d11.dev,rx.wnd.win32.obj,
-    &swapchain_config_d3d,&swapchain_fullscreen_config_d3d,NULL,
+  IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,
+    (IUnknown *)rx.d3d11.dev,rx.wnd.win32.obj,
+    &sc_config_d3d,&sc_fs_config,NULL,
       (IDXGISwapChain1 **)&rx.wnd.out.d3d11.swap_chain);
-
-  ID3D11Texture2D          *texture_d3d;
-  ID3D11RenderTargetView   *texture_view_d3d;
-  IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
-
-  IDXGIFactory_Release(DXGIFactory);
-
-  D3D11_RENDER_TARGET_VIEW_DESC view_config_d3d;
-  ZeroMemory(&view_config_d3d,sizeof(view_config_d3d));
-  view_config_d3d.       Format=DXGI_FORMAT_UNKNOWN;
-  view_config_d3d.ViewDimension=D3D11_RTV_DIMENSION_TEXTURE2D;
-
-  ID3D11Device_CreateRenderTargetView(rx.d3d11.dev,
-    (ID3D11Resource*)texture_d3d,&view_config_d3d,&texture_view_d3d);
 
   rx.wnd.out.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(rx.wnd.out.d3d11.swap_chain);
 
-  rxdrawing_texture_t drawing;
-  drawing.texture.size_x           = swapchain_config_d3d. Width;
-  drawing.texture.size_y           = swapchain_config_d3d.Height;
-  drawing.texture.format           = swapchain_config_d3d.Format;
-  drawing.texture.d3d11.texture_2d = texture_d3d;
-  drawing.texture.d3d11.view       = NULL;
-  drawing.d3d11.view               = texture_view_d3d;
 
-  return drawing;
+  ID3D11Texture2D *texture_d3d;
+  IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
+
+  Emu_texture_config_t config;
+  ZeroMemory(&config,sizeof(config));
+  config.memtype = D3D11_USAGE_DEFAULT;
+  config.useflag = D3D11_BIND_RENDER_TARGET;
+ 	config.size_x = sc_config_d3d. Width;
+  config.size_y = sc_config_d3d.Height;
+  config.format = sc_config_d3d.Format;
+  config.d3d11.texture_2d = texture_d3d;
+
+  result = Emu_texture_create(&config);
+
+leave:
+  IDXGIFactory_Release(factory_dxgi);
+  IDXGIAdapter_Release(adapter_dxgi);
+  IDXGIDevice_Release(device_dxgi);
+
+  return result;
 }
 
 void rxinit(const wchar_t *window_title)
@@ -1542,46 +912,42 @@ void rxinit(const wchar_t *window_title)
 
 
   rxwindow_init(window_title);
-  rxwindow_poll();
+  Emu_window_poll();
 
   // note: we can use the adapter to enumerate display devices,
   // this might come useful to the user!
 
-  rx.wnd.out.tar = rxcreate_window_surface();
+  rx.wnd.out.tar = Emu_window_create_color_target();
 
-  /* determine the proper size for this */
-  rx.white = rxtexture_create(512,512,rxRGBA8888);
-  rxborrowed_t t = rxtexture_borrow(rx.white);
-  memset(t.memory,0xff,t.stride*rx.white.size_y);
-  rxreturn(t);
+  rx.pip.out.count = 1;
+  rx.pip.out.color[0] = Emu_texture_create_color_target(
+      rx.wnd.out.tar->size_x,
+      rx.wnd.out.tar->size_y, rx.wnd.out.tar->format,_RX_MSAA,0);
 
-  /* create immediate mode renderer */
-  rx.imp.varying = rxuniform_buffer_create(sizeof(rx.imp.var),NULL);
+  rx.pip.out.depth = Emu_texture_create_depth_target(
+  	rx.wnd.out.tar->size_x,
+  	rx.wnd.out.tar->size_y, DXGI_FORMAT_D32_FLOAT);
 
-  rx.imp.out.count = 1;
-  rx.imp.out.array[0] = rxdrawing_texture_create(
-      rx.wnd.out.tar.texture.size_x,
-      rx.wnd.out.tar.texture.size_y,
-      rx.wnd.out.tar.texture.format,_RX_MSAA,0);
-  // rx.imp.out.array[1] = rxdrawing_texture_create(
-  //     rx.wnd.out.tar.texture.size_x,
-  //     rx.wnd.out.tar.texture.size_y,
-  //     rx.wnd.out.tar.texture.format,_RX_MSAA,0);
-  rx.imp.out.depth    = rxstencil_texture_create(
-    rx.wnd.out.tar.texture.size_x,
-    rx.wnd.out.tar.texture.size_y,FALSE,FALSE);
+  D3D11_DEPTH_STENCIL_DESC stencil_config_d3d;
+  stencil_config_d3d.     DepthEnable=FALSE;
+  stencil_config_d3d.   StencilEnable=FALSE;
+  stencil_config_d3d.  DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;
+  stencil_config_d3d.       DepthFunc=D3D11_COMPARISON_LESS;
+  stencil_config_d3d. StencilReadMask=D3D11_DEFAULT_STENCIL_READ_MASK;
+  stencil_config_d3d.StencilWriteMask=D3D11_DEFAULT_STENCIL_WRITE_MASK;
+  stencil_config_d3d.FrontFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
+  stencil_config_d3d.FrontFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
+  stencil_config_d3d.FrontFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
+  stencil_config_d3d.FrontFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
+  stencil_config_d3d. BackFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
+  stencil_config_d3d. BackFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
+  stencil_config_d3d. BackFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
+  stencil_config_d3d. BackFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
 
-  rx.imp.sha_vtx         = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
-  rx.imp.sha_pxl         = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
-  rx.imp.sha_pxl_txt     = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
-  rx.imp.sha_vtx_sdf     = rxshader_create(RX_OBJECT_TYPE_kVERTEX_SHADER,sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
-  rx.imp.sha_pxl_sdf_cir = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
-  rx.imp.sha_pxl_sdf_box = rxshader_create(RX_OBJECT_TYPE_kPIXEL_SHADER ,sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
+  ID3D11Device_CreateDepthStencilState(rx.d3d11.dev,&stencil_config_d3d,
+  	&rx.pip.d3d11.ds);
 
-
-
-  rx.imp.asm_idx =  rxcreate_index_buffer(sizeof(rxvindex_imp_t),  RX_INDEX_BUFFER_SIZE);
-  rx.imp.asm_vtx = rxcreate_vertex_buffer(sizeof(rxvertex_imp_t), RX_VERTEX_BUFFER_SIZE);
+  Emu_imp_init();
 
   /* todo */
   D3D11_RASTERIZER_DESC raster_config_d3d;
@@ -1598,39 +964,39 @@ void rxinit(const wchar_t *window_title)
   raster_config_d3d.AntialiasedLineEnable= FALSE;
   ID3D11Device_CreateRasterizerState(rx.d3d11.dev,&raster_config_d3d,&rx.pip.d3d11.rastr_state);
 
-  // 132 glBlendFunc(GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR)
-
   D3D11_BLEND_DESC blender_config_d3d;
   ZeroMemory(&blender_config_d3d,sizeof(blender_config_d3d));
-  for(int I=0; I<1; I +=1)
-  { blender_config_d3d.RenderTarget[I].          BlendEnable=TRUE;
-    blender_config_d3d.RenderTarget[I].             SrcBlend=D3D11_BLEND_SRC_ALPHA;
-    blender_config_d3d.RenderTarget[I].            DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
-    blender_config_d3d.RenderTarget[I].              BlendOp=D3D11_BLEND_OP_ADD;
 
-    blender_config_d3d.RenderTarget[I].        SrcBlendAlpha=D3D11_BLEND_ZERO;
-    blender_config_d3d.RenderTarget[I].       DestBlendAlpha=D3D11_BLEND_ZERO;
-    blender_config_d3d.RenderTarget[I].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
-    blender_config_d3d.RenderTarget[I].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+  blender_config_d3d.RenderTarget[0].          BlendEnable=TRUE;
+  blender_config_d3d.RenderTarget[0].             SrcBlend=D3D11_BLEND_SRC_ALPHA;
+  blender_config_d3d.RenderTarget[0].            DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
+  blender_config_d3d.RenderTarget[0].              BlendOp=D3D11_BLEND_OP_ADD;
+  blender_config_d3d.RenderTarget[0].        SrcBlendAlpha=D3D11_BLEND_ZERO;
+  blender_config_d3d.RenderTarget[0].       DestBlendAlpha=D3D11_BLEND_ZERO;
+  blender_config_d3d.RenderTarget[0].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
+  blender_config_d3d.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
 
-    blender_config_d3d.RenderTarget[0].BlendEnable = TRUE;
-    blender_config_d3d.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
-    blender_config_d3d.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
-    blender_config_d3d.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-    blender_config_d3d.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-    blender_config_d3d.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-    blender_config_d3d.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-    blender_config_d3d.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+  ID3D11Device_CreateBlendState(rx.d3d11.dev,
+    &blender_config_d3d,&rx.imp.d3d11.default_blend_state);
 
-  }
-  ID3D11Device_CreateBlendState(rx.d3d11.dev,&blender_config_d3d,&rx.pip.d3d11.blend_state);
+  blender_config_d3d.RenderTarget[0].BlendEnable = TRUE;
+  blender_config_d3d.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
+  blender_config_d3d.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
+  blender_config_d3d.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+  blender_config_d3d.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+  blender_config_d3d.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+  blender_config_d3d.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+  blender_config_d3d.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+  ID3D11Device_CreateBlendState(rx.d3d11.dev,
+    &blender_config_d3d,&rx.imp.d3d11.subpixel_dual_blending_blend_state);
 
+  /* create some default samplers */
   D3D11_SAMPLER_DESC SamplerInfo;
   ZeroMemory(&SamplerInfo,sizeof(SamplerInfo));
   SamplerInfo.AddressU=D3D11_TEXTURE_ADDRESS_WRAP;
   SamplerInfo.AddressV=D3D11_TEXTURE_ADDRESS_WRAP;
   SamplerInfo.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
-  SamplerInfo.MaxAnisotropy  = 1;
+  SamplerInfo.MaxAnisotropy  = 0;
   SamplerInfo.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
   SamplerInfo.MinLOD         = 0;
   SamplerInfo.MaxLOD         = D3D11_FLOAT32_MAX;
@@ -1649,185 +1015,12 @@ void rxinit(const wchar_t *window_title)
   rxpipset_viewport(rx.wnd.size_x,rx.wnd.size_y);
 
   ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.pip.d3d11.rastr_state);
-  ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,rx.pip.d3d11.blend_state,0x00,0xFFFFFFFu);
 
   rx.start_ticks=ccclocktick();
   rx.frame_ticks=rx.start_ticks;
   rxtime();
 }
 
-/* section: basic drawing functions */
-/* todo: instead of center based we should take corner based arguments, makes everything easier */
-void
-draw_box_sdf(
-  rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softness )
-{
-  float x0,y0,x1,y1;
-  x0 = center.x - (radius.x + softness);
-  y0 = center.y - (radius.y + softness);
-  x1 = center.x + (radius.x + softness);
-  y1 = center.y + (radius.y + softness);
-
-  rxpipset_program(rx.imp.sha_vtx_sdf,
-         rx.imp.sha_pxl_sdf_box);
-  rximp_begin();
-    rx.imp.attr.rect.xy     = rxvec2_xy(x0,y0);
-    rx.imp.attr.rect.xyxy   = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
-    rx.imp.attr.rect.rgba   = color;
-    rx.imp.attr.rect.flag.x = roundness;
-    rx.imp.attr.rect.flag.w = softness;
-    rxaddvtx(rx.imp.attr);
-
-    rx.imp.attr.rect.xy    = rxvec2_xy(x0,y1);
-    rx.imp.attr.rect.xyxy  = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
-    rx.imp.attr.rect.rgba  = color;
-    rx.imp.attr.rect.flag.x = roundness;
-    rx.imp.attr.rect.flag.w = softness;
-    rxaddvtx(rx.imp.attr);
-
-    rx.imp.attr.rect.xy    = rxvec2_xy(x1,y1);
-    rx.imp.attr.rect.xyxy  = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
-    rx.imp.attr.rect.rgba  = color;
-    rx.imp.attr.rect.flag.x = roundness;
-    rx.imp.attr.rect.flag.w = softness;
-    rxaddvtx(rx.imp.attr);
-
-    rx.imp.attr.rect.xy    = rxvec2_xy(x1,y0);
-    rx.imp.attr.rect.xyxy  = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
-    rx.imp.attr.rect.rgba  = color;
-    rx.imp.attr.rect.flag.x = roundness;
-    rx.imp.attr.rect.flag.w = softness;
-    rxaddvtx(rx.imp.attr);
-
-    rxaddnidx(6, 0,1,2, 0,2,3);
-  rximp_end();
-}
-
-
-
-
-ccfunc ccinle void
-rxadd_colatex4(
-  rxvec2_t xy0, rxvec2_t xy1,
-  rxvec2_t uv0, rxvec2_t uv1,
-  rxcolor_t c0,rxcolor_t c1,rxcolor_t c2,rxcolor_t c3)
-{
-  rximp_begin();
-    rxaddnvtx(4,
-      rxvtx_xyuv_col(xy0.x,xy0.y, uv0.x,uv1.y, c0),
-      rxvtx_xyuv_col(xy0.x,xy1.y, uv0.x,uv0.y, c1),
-      rxvtx_xyuv_col(xy1.x,xy1.y, uv1.x,uv0.y, c2),
-      rxvtx_xyuv_col(xy1.x,xy0.y, uv1.x,uv1.y, c3));
-    rxaddnidx(6, 0,1,2, 0,2,3);
-  rximp_end();
-}
-
-ccfunc ccinle void
-rxadd_latex4(
-  rxvec2_t xy0, rxvec2_t xy1,
-  rxvec2_t uv0, rxvec2_t uv1 )
-{
-  rximp_begin();
-    rxaddnvtx(4,
-      rxvtx_xyuv(xy0.x,xy0.y, uv0.x,uv1.y),
-      rxvtx_xyuv(xy0.x,xy1.y, uv0.x,uv0.y),
-      rxvtx_xyuv(xy1.x,xy1.y, uv1.x,uv0.y),
-      rxvtx_xyuv(xy1.x,xy0.y, uv1.x,uv1.y));
-    rxaddnidx(6, 0,1,2, 0,2,3);
-  rximp_end();
-}
-
-ccfunc ccinle void
-rxadd_rec4_col(
-  rxcolor_t color, float x, float y, float w, float h, float tx, float ty, float tw, float th)
-{
-  rxadd_colatex4(
-    rxvec2_xy( x, y),rxvec2_xy( x+ w, y+ h),
-    rxvec2_xy(tx,ty),rxvec2_xy(tx+tw,ty+th), color,color,color,color);
-}
-
-void rxdraw_skinned_unnormalized(
-  rxtexture_t texture, rxcolor_t color, float x, float y, float w, float h, float tx, float ty, float tw, float th)
-{
-  rximp_apply();
-
-  rxpipset_texture(REG_PS_TEX_0,texture);
-  rxadd_rec4_col(color,x,y,w,h,tx,ty,tw,th);
-}
-
-void rxdraw_rect(rxcolor_t color, float x, float y, float w, float h)
-{
-  rximp_apply();
-
-  rxpipset_sampler(REG_PS_SAM_0,rx.point_sampler);
-  rxdraw_skinned_unnormalized(rx.white,color,x,y,w,h,0,0,1,1);
-}
-
-// todo!!: this is disgusting!
-void rxdraw_circle(rxcolor_t color, float x, float y, float r)
-{
-  rximp_apply();
-
-  rxpipset_texture(REG_PS_TEX_0,rx.white);
-
-  rximp_begin();
-  rx.imp.attr.rgba = color;
-  for(int i=0; i<360; ++i)
-  {
-    float ex,ey;
-    ex = x;
-    ey = y;
-
-    rxaddvtx(rxvtx_xyuv(ex,ey,0,0));
-
-    ex=x + sinf((i - .5f) * (rxPI_F/180)) * r;
-    ey=y + cosf((i - .5f) * (rxPI_F/180)) * r;
-
-    rxaddvtx(rxvtx_xyuv(ex,ey,0,1));
-
-    ex=x + sinf((i + .5f) * (rxPI_F/180)) * r;
-    ey=y + cosf((i + .5f) * (rxPI_F/180)) * r;
-
-    rxaddvtx(rxvtx_xyuv(ex,ey,1,1));
-
-    rxaddidx(i*3+0); rxaddidx(i*3+1); rxaddidx(i*3+2);
-  }
-  rximp_end();
-}
-
-ccfunc void
-rxdraw_line(
-  rxcolor_t color, float thickness, float x0, float y0, float x1, float y1)
-{
-  float xdist=x1-x0;
-  float ydist=y1-y0;
-  float length=sqrtf(xdist*xdist + ydist*ydist);
-
-  float xnormal=.5f * thickness * -ydist/length;
-  float ynormal=.5f * thickness * +xdist/length;
-
-  rximp_apply();
-
-  rxpipset_texture(REG_PS_TEX_0,rx.white);
-  rximp_begin();
-    rx.imp.attr.rgba = color;
-    rxaddnvtx(4,
-      rxvtx_xyuv(x0-xnormal,y0-ynormal,0,1),
-      rxvtx_xyuv(x0+xnormal,y0+ynormal,0,0),
-      rxvtx_xyuv(x1+xnormal,y1+ynormal,1,0),
-      rxvtx_xyuv(x1-xnormal,y1-ynormal,1,1));
-    rxaddnidx(6, 0,1,2, 0,2,3);
-  rximp_end();
-}
-
-/* todo: this has to be re-visited for sub-pixel rendering */
-void rxdraw_outline(rxcolor_t color, float x, float y, float w, float h)
-{
-  rxdraw_rect(color,x-.5,y+h-.5,w+.5,1.);
-  rxdraw_rect(color,x-.5,y+0-.5,w+.5,1.);
-  rxdraw_rect(color,x+0-.5,y-.5,1.,h+.5);
-  rxdraw_rect(color,x+w-.5,y-.5,1.,h+.5);
-}
 
 #pragma warning(pop)
 #endif

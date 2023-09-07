@@ -123,7 +123,7 @@ void rxwindow_init(LPCWSTR window_title)
           WindowSizeX,WindowSizeY,NULL,NULL,WindowClass.hInstance,NULL);
 }
 
-void rxwnd_show()
+void Emu_window_show()
 {
   if(rx.wnd.vis)
     return;
@@ -154,7 +154,7 @@ void rxwindow_xy(int x, int y)
 }
 
 /* XXXX */
-void rxwindow_poll()
+void Emu_window_poll()
 {
   /* todo: */
   memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));
@@ -163,6 +163,10 @@ void rxwindow_poll()
 
   rx.wnd.in.mice.yscroll = 0;
   rx.wnd.in.mice.xscroll = 0;
+
+  rx.wnd.in.mice.btn_old = rx.wnd.in.mice.btn_cur;
+  rx.wnd.in.mice.btn_cur = 0;
+
 
 
   MSG message;
@@ -216,19 +220,13 @@ rxwndmsg_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam)
       // rx.key[rx_kMVWHEEL] = TRUE;
     } break;
     case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP:
-    {
-      rx.wnd.in.mice.btn_old  = rx.wnd.in.mice.btn_cur;
-      rx.wnd.in.mice.btn_cur |= (Message!=WM_LBUTTONUP) << 1;
+    { rx.wnd.in.mice.btn_cur |= (Message!=WM_LBUTTONUP) << 0;
     } break;
     case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP:
-    {
-      rx.wnd.in.mice.btn_old  = rx.wnd.in.mice.btn_cur;
-      rx.wnd.in.mice.btn_cur |= (Message!=WM_RBUTTONUP) << 2;
+    { rx.wnd.in.mice.btn_cur |= (Message!=WM_RBUTTONUP) << 1;
     } break;
     case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP:
-    {
-      rx.wnd.in.mice.btn_old  = rx.wnd.in.mice.btn_cur;
-      rx.wnd.in.mice.btn_cur |= (Message!=WM_MBUTTONUP) << 3;
+    { rx.wnd.in.mice.btn_cur |= (Message!=WM_MBUTTONUP) << 2;
     } break;
 
     // case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK:
