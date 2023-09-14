@@ -98,15 +98,15 @@ typedef struct
 
   struct
   {
-    Emu_shader_t sha_vtx_sdf;
-    Emu_shader_t sha_pxl_sdf_cir;
-    Emu_shader_t sha_pxl_sdf_box;
+    rxShader sha_vtx_sdf;
+    rxShader sha_pxl_sdf_cir;
+    rxShader sha_pxl_sdf_box;
 
-    Emu_shader_t sha_pxl_txt;
-    Emu_shader_t sha_pxl_txt_sdf;
+    rxShader sha_pxl_txt;
+    rxShader sha_pxl_txt_sdf;
 
-    Emu_shader_t sha_vtx;
-    Emu_shader_t sha_pxl; };
+    rxShader sha_vtx;
+    rxShader sha_pxl; };
 
   rxvertex_buffer_t   asm_vtx;
   rxindex_buffer_t    asm_idx;

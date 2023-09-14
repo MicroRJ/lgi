@@ -460,7 +460,7 @@ rxvec2_t rxmul_vec2(rxvec2_t v0, rxvec2_t v1)
   return r;
 }
 
-rxvec2_t rxvec2_xy(int x, int y)
+rxvec2_t rxvec2_xy(float x, float y)
 {
 
   rxvec2_t r;

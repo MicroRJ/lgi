@@ -115,7 +115,7 @@ typedef struct
 
   } d3d11;
 
-  Emu_shader_t ps_;
+  rxShader ps_;
 
   unsigned dual_source_blending: 1;
 
@@ -130,8 +130,8 @@ typedef struct
 /* todo: these are temporary */
 void
 rxpipset_program(
-  Emu_shader_t vs,
-  Emu_shader_t ps, int flush);
+  rxShader vs,
+  rxShader ps, int flush);
 
 void
 regset(
