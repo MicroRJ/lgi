@@ -1,7 +1,6 @@
 @IF "%INCLUDE%"=="" (
 	@CALL vcvars64
 )
-
 @SETLOCAL
 @REM /Qstrip_reflect /Qstrip_priv
 @SET myOptions=/Qstrip_debug rx.hlsl
