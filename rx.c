@@ -868,7 +868,7 @@ Emu_window_create_color_target()
 	return result;
 }
 
-void rlInitWithWindow(const wchar_t *window_title) {
+void rxInitWindowed(const wchar_t *window_title) {
 	rxsystem_init();
 
 	UINT DriverModeFlags =
