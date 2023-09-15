@@ -21,12 +21,6 @@
 #ifndef _CC_C
 #define _CC_C 1
 
-// todo: this is not complete!
-
-// todo!!!: these are to be removed!
-typedef double ccf64_t;
-typedef float  ccf32_t;
-
 /* todo: */
 #ifdef _CC_LONG_INT
 typedef signed   long int cci32_t;
@@ -35,29 +29,15 @@ typedef unsigned long int ccu32_t;
 typedef signed   int cci32_t;
 typedef unsigned int ccu32_t;
 #endif
-
-// todo:
-#if _MSC_VER
+#ifdef _MSC_VER
 typedef signed   __int64 cci64_t;
 typedef unsigned __int64 ccu64_t;
-
-typedef signed   __int16 cci16_t;
-typedef unsigned __int16 ccu16_t;
-typedef signed   __int8  cci8_t;
-typedef unsigned __int8  ccu8_t;
 #else
-// todo:
 typedef signed   long long int cci64_t;
 typedef unsigned long long int ccu64_t;
-
-typedef signed   short cci16_t;
-typedef unsigned short ccu16_t;
-typedef signed   char  cci8_t;
-typedef unsigned char  ccu8_t;
 #endif
 
-/* dynamic length buffer (dlb) */
-
+// todo: remove
 #define CCWITHIN(x,l,r) (((x)>=(l))&&((x)<=(r)))
 
 #ifdef __cplusplus
@@ -71,9 +51,6 @@ extern "C" {
 # endif//_CC_STATIC_MEMORY
 # endif//_CC_NO_STATIC_MEMORY
 
-#if defined(_DEBUG) || defined(DEBUG) || defined(DBG)
-# define _CCDEBUG
-#endif//_DEBUG
 
 #define _CCGUID __COUNTER__
 #define _CCFILE __FILE__
@@ -115,62 +92,44 @@ extern "C" {
 #define  ccCstrlenS(x) cccast(ccu32_t,strlen(x))
 # endif//ccCstrlenS
 
+typedef enum {
+	CC_ERROR_kNONE               = 0,
+	CC_ERROR_kNOT_IN_TABLE,
+	CC_ERROR_kALREADY_IN_TABLE,
+} ccerror_k;
 
-	typedef enum ccerror_k
-	{
-		CC_ERROR_kNONE               = 0,
-		CC_ERROR_kNOT_IN_TABLE,
-		CC_ERROR_kALREADY_IN_TABLE,
-	} ccerror_k;
+typedef struct {
+	int           guid;
+	const char   *file;
+	int           line;
+	const char   *func;
+} cccaller_t;
 
-	typedef ccu64_t ccclocktick_t;
+typedef struct ccentry_t {
+	cccaller_t  caller;
+	struct ccentry_t * nex;
+	cci32_t     len;
+	char      * key;
+	cci64_t     val;
+} ccentry_t;
 
-	typedef struct cccaller_t cccaller_t;
-	typedef struct cccaller_t
-	{ int           guid;
-		const char   *file;
-		int           line;
-		const char   *func;
-	} cccaller_t;
+typedef struct {
+	unsigned        rem_add: 1;
+	unsigned        rem_rze: 1;
+	ccentry_t     * entries;
+	cci64_t         sze_max;
+	cci64_t         sze_min;
+} ccdlb_t;
 
-	typedef struct ccentry_t ccentry_t;
-	typedef struct ccentry_t
-	{ cccaller_t  caller;
-		ccentry_t * nex;
-		cci32_t     len;
-		char      * key;
-		cci64_t     val;
-	} ccentry_t;
-
-	typedef char *ccstr_t;
-
-	typedef struct ccdlb_t ccdlb_t;
-	typedef struct ccdlb_t
-	{ unsigned        rem_add: 1;
-		unsigned        rem_rze: 1;
-		ccentry_t     * entries;
-		cci64_t         sze_max;
-		cci64_t         sze_min;
-	} ccdlb_t;
-
-/* please remove this you mother-trucker todo: */
-	struct
-	{
-		cci16_t color_value;
-		cci16_t color_index;
-		cci16_t color_stack[0x10];
-
-		ccerror_k  error;
-		ccentry_t *entry;
-
+/* todo: please find a way to remove this */
+struct {
+	ccerror_k  error;
+	ccentry_t *entry;
 #ifdef _CC_STATIC_MEMORY
-		char static_memory[_CC_STATIC_MEMORY];
-		int  static_cursor;
+	char static_memory[_CC_STATIC_MEMORY];
+	int  static_cursor;
 #endif
-
-		void *console;
-
-	} ccglobal ccthread_local cc = {7};
+} ccglobal ccthread_local cc;
 
 // merge: ++ re-added ccerrnit()
 #define ccerrset(x) ((cc.error=x),0)
@@ -183,14 +142,11 @@ extern "C" {
 #define cctrue  cccast(cci32_t,1)
 #define ccfalse cccast(cci32_t,0)
 
-	ccfunc ccinle int   ccformatvex (char *,int,const char *,va_list);
-	ccfunc ccinle char *ccformatv   (const char *, va_list);
-	ccfunc        int   ccformatex  (char *, int, const char *, ...);
-	ccfunc        char *ccformat    (const char *, ...);
+ccfunc ccinle int   ccformatvex (char *,int,const char *,va_list);
+ccfunc ccinle char *ccformatv   (const char *, va_list);
+ccfunc        int   ccformatex  (char *, int, const char *, ...);
+ccfunc        char *ccformat    (const char *, ...);
 
-// todo: this has to be reworked!
-	ccfunc ccinle ccclocktick_t ccclocktick();
-	ccfunc ccinle ccf64_t       ccclocksecs(ccu64_t);
 
 // todo: hmm...
 #define ccnil  0
@@ -205,75 +161,75 @@ extern "C" {
 # ifdef _DEBUG
 #  define ccassert(is_true,...) do{ if(!(is_true)) { cctraceerr("assertion triggered",0); ccbreak(); } } while(0)
 # else
-#  define ccassert(is_true,...) ccnil
+#  define ccassert(is_true,...) ccnull
 # endif
 #endif
 
 // Note:
-	ccfunc ccinle cccaller_t cccaller(int guid, const char *file, int line, const char *func);
+ccfunc ccinle cccaller_t cccaller(int guid, const char *file, int line, const char *func);
 #define cccall() (cccaller(__COUNTER__,_CCFILE,_CCLINE,_CCFUNC))
 
 /* everyone know you need to always create your own allocator functions,
   otherwise you have a small pp */
-	void *
-	ccmalloc(size_t length)
-	{
-		return malloc(length);
-	}
+void *
+ccmalloc(size_t length)
+{
+	return malloc(length);
+}
 
-	void *
-	ccrealloc(void *memory, size_t length)
-	{
-		return realloc(memory,length);
-	}
+void *
+ccrealloc(void *memory, size_t length)
+{
+	return realloc(memory,length);
+}
 
-	void
-	ccfree(void const *memory)
-	{
-		free((void*)memory);
-	}
+void
+ccfree(void const *memory)
+{
+	free((void*)memory);
+}
 
 #define ccmalloc_T(T) cccast(T*,ccmalloc(sizeof(T)))
 
 
 // note: add an item to a dynamic length buffer
-	ccfunc cci64_t ccdlbadd_(void **, cci32_t item_size, cci64_t reserve_count, cci64_t commit_count);
+ccfunc cci64_t ccdlbadd_(void **, cci32_t item_size, cci64_t reserve_count, cci64_t commit_count);
 // note: removes a number of items from the end of the dynamic length buffer
-	ccfunc cci64_t ccdlbpop_(void **, cci32_t item_size, cci64_t removal_count);
+ccfunc cci64_t ccdlbpop_(void **, cci32_t item_size, cci64_t removal_count);
 // note: finds an item by key in a dynamic length buffer, if the item is not found,
 // the last entry is returned, UNLESS create_always is specified, in which
 // case a new entry is returned, UNLESS there are no entries in the bucket, in which
 // case the first entry is returned.
-	ccfunc int     cctblhsh_(cccaller_t, void **, cci32_t item_size, int len, char *key, int create_always);
+ccfunc int     cctblhsh_(cccaller_t, void **, cci32_t item_size, int len, char *key, int create_always);
 
 // note: finds an item by key in a dynamic length buffer, if the item is not found
 // the global error is set to 'CC_ERROR_kNOT_IN_TABLE', ('not in table') use 'ccerrnon()' or 'ccerrnit()' respectively.
-	ccfunc cci64_t cctblgeti_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
+ccfunc cci64_t cctblgeti_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
 
 // note: puts an item by key if not already present in a dynamic length buffer, if the item is present
 // the global error is set to 'CC_ERROR_kALREADY_IN_TABLE' ('already in table') use 'ccerrnon()' or 'ccerrait()' respectively.
-	ccfunc cci64_t cctblputi_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
+ccfunc cci64_t cctblputi_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
 
 // note: puts an item by key overwriting if already present or creating a new one otherwise
 // in a dynamic length buffer, this function does not report errors.
-	ccfunc cci64_t cctblseti_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
+ccfunc cci64_t cctblseti_(cccaller_t, void **, cci32_t item_size, cci32_t key_length, char *key);
 
 // note: commits/reserves memory in a string taking into account the null terminator that is
 // always present for convenient compatibility.
-	ccfunc cci64_t ccstraddi_(char **, cci64_t reserve_size, cci64_t commit_size, const char *);
+ccfunc cci64_t ccstraddi_(char **, cci64_t reserve_size, cci64_t commit_size, const char *);
 
 // note: concatenates a variadic format specifier to a string.
-	ccfunc cci64_t ccstrcatiV_(char **, const char *, va_list);
+ccfunc cci64_t ccstrcatiV_(char **, const char *, va_list);
 
 // note: concatenates a format specifier to a string.
-	ccfunc cci64_t ccstrcatiF_(char **, const char *, ...);
+ccfunc cci64_t ccstrcatiF_(char **, const char *, ...);
 
 // note: casts a memory address to a dynamic length buffer
 #define ccdlb_(ccm) (cccast(ccdlb_t*,ccm)-1)
 #define ccdlb(ccm) ((ccm)?ccdlb_(ccm):(ccnull))
 
 // note: deletes a dynamic length buffer
-	ccfunc void ccdlbdel_(ccdlb_t *dlb);
+ccfunc void ccdlbdel_(ccdlb_t *dlb);
 // note: deletes a dynamic length buffer, expects the memory address
 #define ccdlbdel(ccm) ccdlbdel_(ccdlb(ccm))
 /* Array nomenclature, it is \important that you use this macro \specifically for cc-arrays,
@@ -392,78 +348,53 @@ extern "C" {
 
 
 
-
-
-	ccfunc const char *ccfnames(const char *name);
-
-	ccfunc void cctrace_(cccaller_t caller, const char *label, const char *format, ...);
+// todo: remove
+ccfunc void cctrace_(cccaller_t caller, const char *label, const char *format, ...);
 #define cctrace(label,fmt,...) (cctrace_(cccaller(__COUNTER__,_CCFILE,_CCLINE,_CCFUNC),label,fmt,__VA_ARGS__),0)
 #define cctracelog(fmt,...) (cctrace("log",fmt,__VA_ARGS__),0)
 #define cctracewar(fmt,...) (cctrace("war",fmt,__VA_ARGS__),0)
 #define cctraceerr(fmt,...) (cctrace("err",fmt,__VA_ARGS__),0)
 #define ccdebuglog(fmt,...) (cctrace("dbg",fmt,__VA_ARGS__),0)
 #define ccannoylog(fmt,...) (cctrace("any",fmt,__VA_ARGS__),0)
-
 #ifdef _CCEXECLOG
 # define ccexeclog(fmt,...) (cctrace("exec",fmt,__VA_ARGS__),0)
 #else
 # define ccexeclog(fmt,...) (0)
 #endif
 
-// todo: this is not complete!
-	ccfunc void ccprintf(const char *fmt, ...);
+// todo: remove
+ccfunc const char *ccfnames(const char *name);
 
-	ccfunc ccinle ccclocktick_t
-	ccclockfreq()
-	{
-		LARGE_INTEGER l;
-		QueryPerformanceFrequency(&l);
-		return l.QuadPart;
-	}
+#if 0
 
-	ccfunc ccinle ccclocktick_t
-	ccclocktick()
-	{
-#ifdef _WIN32
-		LARGE_INTEGER l;
-		QueryPerformanceCounter(&l);
-		return l.QuadPart;
-#endif
-	}
-
-	ccfunc ccinle void
-	ccout(const char *string)
-	{
+ccfunc ccinle void
+ccout(const char *string)
+{
 #if defined(_WIN32) && defined(_CCDEBUG)
-		OutputDebugStringA(string);
+	OutputDebugStringA(string);
 #endif
-		printf(string);
-	}
+	printf(string);
+}
+#endif
 
-	ccfunc ccinle ccf64_t
-	ccclocksecs(ccclocktick_t t)
-	{
-  return t / (double) ccclockfreq();/* help */
-	}
-
-	ccfunc ccinle char *
-	ccstatic_alloc(int length, int zero)
-	{
+ccfunc ccinle char *
+ccstatic_alloc(int length, int zero)
+{
   /* XX we may just want to allocate this as a buffer */
-		ccassert(length <= _CC_STATIC_MEMORY);
+	ccassert(length <= _CC_STATIC_MEMORY);
 
-		if(cc.static_cursor+length>=_CC_STATIC_MEMORY)
-		cc.static_cursor=0;
+	if(cc.static_cursor+length>=_CC_STATIC_MEMORY)
+	cc.static_cursor=0;
 
-	char *memory=cc.static_memory+cc.static_cursor;
-	cc.static_cursor += length;
+char *memory=cc.static_memory+cc.static_cursor;
+cc.static_cursor += length;
 
-	if(zero != 0)
-	{
-		memset(memory,0,length);
-	}
+if(zero != 0)
+{
+	memset(memory,0,length);
+}
 
-	return memory;
+return memory;
 }
 
 ccfunc ccinle int
@@ -472,46 +403,48 @@ ccformatvex(char *buf, int len, const char * fmt, va_list vli)
 	return stbsp_vsnprintf(buf,len,fmt,vli);
 }
 
-ccfunc ccinle char *
-ccformatv(const char *fmt, va_list vli)
-{ int length=ccformatvex(ccnull,ccnull,fmt,vli);
-	int static_length=ccCarrlenL(cc.static_memory);
-	if(cc.static_cursor+length>=static_length)
-	cc.static_cursor=0;
-char *string=cc.static_memory+cc.static_cursor;
-ccformatvex(string,static_length-cc.static_cursor,fmt,vli);
-cc.static_cursor+=length+1;
-return string;
-}
-
-ccfunc int
-ccformatex(char *buf, int len, const char * fmt, ...)
-{ va_list vli;
-	va_start(vli,fmt);
-	int res=ccformatvex(buf,len,fmt,vli);
-	va_end(vli);
-	return res;
-}
-
 ccfunc char *
-ccformat(const char * fmt, ...)
-{ va_list vli;
+ccformatv(const char *fmt, va_list vli) {
+
+	int length=ccformatvex(0,0,fmt,vli);
+
+	int static_length=ccCarrlenL(cc.static_memory);
+	if(cc.static_cursor+length>=static_length) {
+		cc.static_cursor=0;
+	}
+
+	char *result = cc.static_memory+cc.static_cursor;
+
+	ccformatvex(result,static_length-cc.static_cursor,fmt,vli);
+
+	cc.static_cursor += length+1;
+
+	return result;
+}
+
+ccfunc ccinle int
+ccformatex(char *buf, int len, const char * fmt, ...) {
+	va_list vli;
 	va_start(vli,fmt);
-	char *res=ccformatv(fmt,vli);
+	int result=ccformatvex(buf,len,fmt,vli);
 	va_end(vli);
-	return res;
+	return result;
+}
+
+ccfunc ccinle char *
+ccformat(const char * fmt, ...) {
+	va_list vli;
+	va_start(vli,fmt);
+	char *result=ccformatv(fmt,vli);
+	va_end(vli);
+	return result;
 }
 
 ccfunc void
-cctrace_(cccaller_t caller, const char *label, const char *format, ...)
-{
+cctrace_(cccaller_t caller, const char *label, const char *format, ...) {
 	va_list vli;
 	va_start(vli,format);
-
-	ccout(
-	ccformat("%s: %s[%i] %s() %s\n",
-	label,ccfnames(caller.file),caller.line,caller.func,ccformatv(format,vli)));
-
+	printf("%s: %s[%i] %s() %s\n",label,ccfnames(caller.file),caller.line,caller.func,ccformatv(format,vli));
 	va_end(vli);
 }
 
@@ -526,18 +459,18 @@ ccdlbdel_(ccdlb_t *dlb)
 			ccentry_t *i,*f,*e;
 			ccarrfor(dlb->entries,e)
 			{ for(i=e->nex;i;)
-				{ f=i;
-					i=i->nex;
+			{ f=i;
+			i=i->nex;
 
-					ccfree(f);
-				}
-			}
-
-			ccarrdel(dlb->entries);
+			ccfree(f);
 		}
-
-		ccfree(dlb);
 	}
+
+	ccarrdel(dlb->entries);
+}
+
+ccfree(dlb);
+}
 }
 
 ccfunc cci64_t
@@ -574,40 +507,40 @@ ccdlbadd_(void **lpp, cci32_t isze, cci64_t rsze, cci64_t csze)
 
 	if(*lpp)
 	{ dlb=ccdlb_(*lpp);
-		sze_max  = dlb->sze_max;
-		sze_min  = dlb->sze_min;
-		rem_rze  = dlb->rem_rze;
-		rem_add  = dlb->rem_add;
-		ccassert(!rem_add);
-	} else
-	{ dlb=ccnull;
-		sze_max=0;
-		sze_min=0;
-		rem_rze=0;
-		rem_add=0;
-	}
+sze_max  = dlb->sze_max;
+sze_min  = dlb->sze_min;
+rem_rze  = dlb->rem_rze;
+rem_add  = dlb->rem_add;
+ccassert(!rem_add);
+} else
+{ dlb=ccnull;
+sze_max=0;
+sze_min=0;
+rem_rze=0;
+rem_add=0;
+}
 
-	ccassert(csze<=rsze+sze_max-sze_min);
+ccassert(csze<=rsze+sze_max-sze_min);
 
+if(sze_max<sze_min+rsze)
+{
+	ccassert(!rem_rze);
+
+	sze_max<<=1;
 	if(sze_max<sze_min+rsze)
-	{
-		ccassert(!rem_rze);
+	sze_max=sze_min+rsze;
 
-		sze_max<<=1;
-		if(sze_max<sze_min+rsze)
-		sze_max=sze_min+rsze;
+dlb = cccast(ccdlb_t*,ccrealloc(dlb,sizeof(*dlb)+sze_max*isze));
 
-	dlb = cccast(ccdlb_t*,ccrealloc(dlb,sizeof(*dlb)+sze_max*isze));
+if(!*lpp)
+{ dlb->rem_rze=rem_rze;
+dlb->rem_add=rem_add;
+dlb->entries=ccnull;
+}
 
-	if(!*lpp)
-	{ dlb->rem_rze=rem_rze;
-		dlb->rem_add=rem_add;
-		dlb->entries=ccnull;
-	}
+*lpp=dlb+1;
 
-	*lpp=dlb+1;
-
-	dlb->sze_max=sze_max;
+dlb->sze_max=sze_max;
 }
 
 dlb->sze_min=sze_min+csze;
@@ -679,17 +612,17 @@ for(;cc.entry->key;cc.entry=cc.entry->nex)
     // return immediately if we've found a match
 	if(cc.entry->len==len)
 	{ if(len>0)
-		{ if(!memcmp(cc.entry->key,key,len))
-			return cctrue;
-		} else
-		{ if(cc.entry->key==key)
-			return cctrue;
-		}
-	}
+{ if(!memcmp(cc.entry->key,key,len))
+return cctrue;
+} else
+{ if(cc.entry->key==key)
+return cctrue;
+}
+}
 
     // otherwise return the last entry in this bucket
-	if(!cc.entry->nex)
-	break;
+if(!cc.entry->nex)
+break;
 }
 
 if(create_always)
@@ -717,23 +650,23 @@ return ccfalse;
 ccfunc cci64_t
 cctblremi_(cccaller_t caller, void **ccm, cci32_t ize, cci32_t len, char *key)
 { ccassert(ccm!=0);
-	ccerrset(CC_ERROR_kNOT_IN_TABLE);
-	if(cctblhsh_(caller,ccm,ize,len,key,ccfalse))
-	{ ccerrset(CC_ERROR_kNONE);
+ccerrset(CC_ERROR_kNOT_IN_TABLE);
+if(cctblhsh_(caller,ccm,ize,len,key,ccfalse))
+{ ccerrset(CC_ERROR_kNONE);
 
-		cc.entry->key = 0;
-		cc.entry->len = 0;
-	}
-	return cc.entry? cc.entry->val :0;
+cc.entry->key = 0;
+cc.entry->len = 0;
+}
+return cc.entry? cc.entry->val :0;
 }
 
 // Todo: remove caller in release mode!
 ccfunc cci64_t
 cctblgeti_(cccaller_t caller, void **ccm, cci32_t ize, cci32_t len, char *key)
 { ccassert(ccm!=0);
-	ccerrset(CC_ERROR_kNOT_IN_TABLE);
-	if(cctblhsh_(caller,ccm,ize,len,key,ccfalse))
-	ccerrset(CC_ERROR_kNONE);
+ccerrset(CC_ERROR_kNOT_IN_TABLE);
+if(cctblhsh_(caller,ccm,ize,len,key,ccfalse))
+ccerrset(CC_ERROR_kNONE);
 return cc.entry? cc.entry->val :0;
 }
 
@@ -741,10 +674,10 @@ return cc.entry? cc.entry->val :0;
 ccfunc cci64_t
 cctblputi_(cccaller_t caller, void **ccm, cci32_t ize, cci32_t len, char *key)
 { ccassert(ccm!=0);
-	ccerrset(CC_ERROR_kALREADY_IN_TABLE);
-	if(cctblhsh_(caller,ccm,ize,len,key,cctrue))
-	{ cctrace_(caller,"war","already in table, added by %s[%i]::%s()",
-	ccfnames(cc.entry->caller.file),cc.entry->caller.line,cc.entry->caller.func);
+ccerrset(CC_ERROR_kALREADY_IN_TABLE);
+if(cctblhsh_(caller,ccm,ize,len,key,cctrue))
+{ cctrace_(caller,"war","already in table, added by %s[%i]::%s()",
+ccfnames(cc.entry->caller.file),cc.entry->caller.line,cc.entry->caller.func);
 } else
 ccerrset(CC_ERROR_kNONE);
 return cc.entry? cc.entry->val :0;
@@ -754,10 +687,10 @@ return cc.entry? cc.entry->val :0;
 ccfunc cci64_t
 cctblseti_(cccaller_t caller, void **ccm, cci32_t ize, cci32_t len, char *key)
 { ccassert(ccm!=0);
-	ccerrset(CC_ERROR_kNONE);
-	cctblhsh_(caller,ccm,ize,len,key,cctrue);
+ccerrset(CC_ERROR_kNONE);
+cctblhsh_(caller,ccm,ize,len,key,cctrue);
 
-	return cc.entry? cc.entry->val :0;
+return cc.entry? cc.entry->val :0;
 }
 
 ccfunc cci64_t
@@ -781,19 +714,19 @@ ccstraddi_(char **ccm, cci64_t res, cci64_t com, const char *mem)
 ccfunc cci64_t
 ccstrcatiV_(char **ccm, const char *fmt, va_list vli)
 { int len=stbsp_vsnprintf(0,0,fmt,vli);
-	cci64_t res=ccdlbadd_(cccast(void**,ccm),1,len+1,len);
-	len=stbsp_vsnprintf((char*)*ccm+res,len+1,fmt,vli);
-	return res;
+cci64_t res=ccdlbadd_(cccast(void**,ccm),1,len+1,len);
+len=stbsp_vsnprintf((char*)*ccm+res,len+1,fmt,vli);
+return res;
 }
 
 // Todo: remove from here?
 ccfunc cci64_t
 ccstrcatiF_(char **ccm, const char *fmt, ...)
 { va_list vli;
-	va_start(vli,fmt);
-	cci64_t res=ccstrcatiV_(ccm,fmt,vli);
-	va_end(vli);
-	return res;
+va_start(vli,fmt);
+cci64_t res=ccstrcatiV_(ccm,fmt,vli);
+va_end(vli);
+return res;
 }
 
 // Todo: actually setup the color table properly ...
@@ -810,14 +743,14 @@ ccstrcatiF_(char **ccm, const char *fmt, ...)
 #ifdef _CCTEST_COMPILE
 unsigned int cctestxorshift32(unsigned int *p)
 { unsigned int q = *p;
-	q = q ^ q << 13;
-	q = q ^ q >> 17;
-	q = q ^ q << 5;
-	return *p=q;
+q = q ^ q << 13;
+q = q ^ q >> 17;
+q = q ^ q << 5;
+return *p=q;
 }
 unsigned int cctestrandi(unsigned int limit)
 { ccglobal ccthread_local unsigned int ccxorstate32=38747;
-	return cctestxorshift32(&ccxorstate32)%limit;
+return cctestxorshift32(&ccxorstate32)%limit;
 }
 void cctest()
 {
@@ -841,50 +774,50 @@ for(j=0; j<ccCarrlenL(r[0])-1; r[i][j++]=h[cctestrandi(ccCstrlenL(h))]);
 	_t *tt=ccnull;
 	for(j=0;j<1024;++j)
 	{ for(i=0; i<ccCarrlenL(r); ++i)
-		{ _t *a=cctblputS(tt,r[i]);
-			ccassert(ccerrnon());
-			a->s=cckeyget();
-			_t *b=cctblremS(tt,r[i]);
-			ccassert(ccerrnon());
-			ccassert(a==b);
-			ccassert(!memcmp(a->s,b->s,sizeof(h)));
-		}
-	}
-	ccdlbdel(tt);
+{ _t *a=cctblputS(tt,r[i]);
+ccassert(ccerrnon());
+a->s=cckeyget();
+_t *b=cctblremS(tt,r[i]);
+ccassert(ccerrnon());
+ccassert(a==b);
+ccassert(!memcmp(a->s,b->s,sizeof(h)));
+}
+}
+ccdlbdel(tt);
 }
 {
 	_t *tt=ccnull;
 	for(i=0; i<ccCarrlenL(r); ++i)
 	{ _t *a=cctblputS(tt,r[i]);
-		ccassert(ccerrnon());
-		a->s=cckeyget();
-		_t *b=cctblgetS(tt,r[i]);
-		ccassert(ccerrnon());
-		ccassert(a==b);
-		ccassert(!memcmp(a->s,b->s,sizeof(h)));
-	}
-	ccdlbdel(tt);
+ccassert(ccerrnon());
+a->s=cckeyget();
+_t *b=cctblgetS(tt,r[i]);
+ccassert(ccerrnon());
+ccassert(a==b);
+ccassert(!memcmp(a->s,b->s,sizeof(h)));
+}
+ccdlbdel(tt);
 }
 
 ccdbenter("test-ccdlbputS");
 _t *a=ccnull;
 for(i=0; i<ccCarrlenL(r); ++i)
 { _t *t=cctblputS(a,r[i]);
-	ccassert(ccerrnon());
-	t->s=cckeyget();
-	ccassert(!strcmp(t->s,r[i]));
+ccassert(ccerrnon());
+t->s=cckeyget();
+ccassert(!strcmp(t->s,r[i]));
 }
 ccdbleave("test-ccdlbputS");
 
 ccdbenter("test-ccdlbgetS");
 for(i=0; i<ccCarrlenL(r); ++i)
 { _t *t=cctblgetS(a,r[i]);
-	ccassert(ccerrnon());
-	ccassert(t->s!=0);
-	ccassert(!strcmp(t->s,r[i]));
-	ccassert(!strcmp(t->s,cckeyget()));
+ccassert(ccerrnon());
+ccassert(t->s!=0);
+ccassert(!strcmp(t->s,r[i]));
+ccassert(!strcmp(t->s,cckeyget()));
 
-	t=cctblgetS(a,r[i]);
+t=cctblgetS(a,r[i]);
 }
 
 ccdbleave("test-ccdlbgetS");

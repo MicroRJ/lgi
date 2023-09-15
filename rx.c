@@ -372,18 +372,17 @@ rxsampler_t sampler);
 #include <src/rx.program.c>
 #include <src/emu_imp.h>
 
-/* this struct is typedef'd should you want to avoid allocating it globally,
-for instance say you had your own global state and within that state you'd
-like to have the rx object, in such case simply use the appropriate macro to
-prevent this file from adding rx to the global scope. */
+/* todo */
+typedef unsigned __int64 rxclocktick_t;
+
 typedef struct rx_t rx_t;
 typedef struct rx_t {
 /* timing stuff */
 	int   tick_count;
-	ccclocktick_t   start_ticks;
-	ccclocktick_t   frame_ticks;
-	ccclocktick_t   total_ticks;
-	ccclocktick_t   delta_ticks;
+	rxclocktick_t   start_ticks;
+	rxclocktick_t   frame_ticks;
+	rxclocktick_t   total_ticks;
+	rxclocktick_t   delta_ticks;
 /* todo!: there are more correct and robust ways to store time long term, @TomForsyth */
 	double          total_seconds;
 	double          delta_seconds;
@@ -486,6 +485,25 @@ trivial to extend this */
 /* the source of all evil is here */
 ccglobal rx_t rx;
 
+
+ccfunc ccinle rxclocktick_t
+rxclockfreq()
+{
+	LARGE_INTEGER l;
+	QueryPerformanceFrequency(&l);
+	return l.QuadPart;
+}
+
+ccfunc ccinle rxclocktick_t
+rxticktally()
+{
+	LARGE_INTEGER l;
+	QueryPerformanceCounter(&l);
+	return l.QuadPart;
+}
+
+
+
 /* section: basic system functions */
 
 void
@@ -522,20 +540,20 @@ rxWindowPollEvents();
 #define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
 # endif
 
-ccfunc ccinle int rlIsCtrlKey()
+ccfunc ccinle int rxIsCtrlKey()
 { return rx.wnd.in.kbrd.is_ctrl; }
 
-ccfunc ccinle int rxismenu()
+ccfunc ccinle int rxIsMenuKey()
 { return rx.wnd.in.kbrd.is_menu; }
 
-ccfunc ccinle int rxisshft()
+ccfunc ccinle int rxIsShiftKey()
 { return rx.wnd.in.kbrd.is_shft; }
 
 ccfunc ccinle int rxtstbtn(int x)
 { return IS_DOWN(x); }
 
 int
-rxtstkey(int x)
+rxTestKey(int x)
 {
 	return rx.wnd.in.kbrd.key[x] != 0;
 }
@@ -763,21 +781,21 @@ Emu_window_clear()
 
 #include <src/rx.win32.cc>
 
-void rxtime()
-{
-	ccclocktick_t ticks=ccclocktick();
+void rlTickClock() {
 
-	rx.total_ticks=ticks-rx.start_ticks;
-	rx.total_seconds=ccclocksecs(rx.total_ticks);
+	/* todo: */
+	rxclocktick_t freq = rxclockfreq();
 
+	rxclocktick_t ticks = rxticktally();
+	rx.total_ticks = ticks-rx.start_ticks;
+	rx.total_seconds = rx.total_ticks / (double) freq;
 	rx.delta_ticks=ticks-rx.frame_ticks;
-	rx.delta_seconds=ccclocksecs(rx.delta_ticks);
-
+	rx.delta_seconds = rx.delta_ticks / (double) freq;
 	rx.frame_ticks=ticks;
 }
 
-int rlTick()
-{
+int rlTick() {
+
 	rx.tick_count += 1;
 
 	rxWindowPollEvents();
@@ -800,7 +818,7 @@ int rlTick()
 
 	Emu_window_clear();
 
-	rxtime();
+	rlTickClock();
 
 	return !rx.wnd.off;
 }
@@ -1006,9 +1024,9 @@ rxInitWindowed(const wchar_t *windowTitle) {
 
 	ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.pip.d3d11.rastr_state);
 
-	rx.start_ticks=ccclocktick();
+	rx.start_ticks=rxticktally();
 	rx.frame_ticks=rx.start_ticks;
-	rxtime();
+	rlTickClock();
 }
 
 #pragma warning(pop)
