@@ -158,11 +158,11 @@ Emu_texture_create_simple(
         void  *memory);
 
 ccfunc ccinle Emu_texture_t *
-Emu_texture_create_depth_target(
+rxCreateDepthTarget(
   int size_x, int size_y, int format);
 
 ccfunc ccinle Emu_texture_t *
-Emu_texture_create_color_target(
+rxCreateColorTarget(
   int size_x, int size_y, int format, int samples, int quality);
 
 ccfunc ccinle void *

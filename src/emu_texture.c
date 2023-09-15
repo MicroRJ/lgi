@@ -218,7 +218,7 @@ Emu_texture_create( Emu_texture_config_t *config )
 }
 
 ccfunc ccinle Emu_texture_t *
-Emu_texture_create_depth_target(
+rxCreateDepthTarget(
   int size_x, int size_y, int format)
 {
 	Emu_texture_config_t config =
@@ -229,7 +229,7 @@ Emu_texture_create_depth_target(
 }
 
 ccfunc ccinle Emu_texture_t *
-Emu_texture_create_color_target(
+rxCreateColorTarget(
   int size_x, int size_y, int format, int samples, int quality)
 {
 	Emu_texture_config_t config =

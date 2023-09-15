@@ -505,7 +505,7 @@ LRESULT CALLBACK
 rxwndmsg_callback_win32(HWND,UINT,WPARAM,LPARAM);
 
 ccfunc void
-Emu_window_poll();
+rxWindowPollEvents();
 
 
 /* todo: rename */
@@ -780,7 +780,7 @@ int rlTick()
 {
 	rx.tick_count += 1;
 
-	Emu_window_poll();
+	rxWindowPollEvents();
 
 /* todo */
 	Emu_system_set_cursor(rx.win32.cursor.arrow);
@@ -806,7 +806,7 @@ int rlTick()
 }
 
 Emu_texture_t *
-Emu_window_create_color_target()
+rxCreateColorTargetFromWindow()
 {
 	Emu_texture_t *result = NULL;
 
@@ -868,7 +868,8 @@ Emu_window_create_color_target()
 	return result;
 }
 
-void rxInitWindowed(const wchar_t *window_title) {
+void
+rxInitWindowed(const wchar_t *windowTitle) {
 	rxsystem_init();
 
 	UINT DriverModeFlags =
@@ -900,20 +901,20 @@ void rxInitWindowed(const wchar_t *window_title) {
 	}
 
 
-	rxwindow_init(window_title);
-	Emu_window_poll();
+	rxWindowInitTitled(windowTitle);
+	rxWindowPollEvents();
 
 // note: we can use the adapter to enumerate display devices,
 // this might come useful to the user!
 
-	rx.wnd.out.tar = Emu_window_create_color_target();
+	rx.wnd.out.tar = rxCreateColorTargetFromWindow();
 
 	rx.pip.out.count = 1;
-	rx.pip.out.color[0] = Emu_texture_create_color_target(
+	rx.pip.out.color[0] = rxCreateColorTarget(
 	rx.wnd.out.tar->size_x,
 	rx.wnd.out.tar->size_y, rx.wnd.out.tar->format,_RX_MSAA,0);
 
-	rx.pip.out.depth = Emu_texture_create_depth_target(
+	rx.pip.out.depth = rxCreateDepthTarget(
 	rx.wnd.out.tar->size_x,
 	rx.wnd.out.tar->size_y, DXGI_FORMAT_D32_FLOAT);
 
