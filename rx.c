@@ -117,8 +117,10 @@
 #		define STBTT_free(memory,u) EMU_FREE(memory,NULL)
 #		include <stb/stb_truetype.h>
 #	pragma warning(pop)
+# ifndef STB_SPRINTF_IMPLEMENTATION
 # define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
+#  endif
 #endif//_RX_STANDALONE
 
 /* todo: this is to be embedded eventually */
