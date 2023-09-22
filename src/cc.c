@@ -189,7 +189,7 @@ extern "C" {
 		free((void*)memory);
 	}
 
-#define ccmalloc_T(T) cccast(T*,ccmalloc(sizeof(T)))
+#define rlMemory_allocType(T) cccast(T*,ccmalloc(sizeof(T)))
 
 
 // note: add an item to a dynamic length buffer
@@ -277,7 +277,7 @@ extern "C" {
 // commit count
 #define ccarraddi(arr,num) ccdlbadd_((void**)(&arr),sizeof(*(arr)),num,num)
 // note: same as 'ccarraddi' but it  returns the address instead
-#define ccarradd(arr,num) ((arr)+ccarraddi(arr,num))
+#define rlArray_add(arr,num) ((arr)+ccarraddi(arr,num))
 /* You have to be careful with this because if you add items to the array it will
  use invalid memory - XXX - the one called rj */
 #define ccarrfor_ex(arr,idx,len) for(idx=arr;idx<arr+len;++idx)
@@ -584,7 +584,7 @@ cctblhsh_(cccaller_t caller, void **ccm, cci32_t ize, int len, char *key, int cr
 			dlb=ccdlb_(*ccm);
 
       // todo: we have to handle resizing the hash-table
-			ccarradd(dlb->entries,1);
+			rlArray_add(dlb->entries,1);
 			ccarrzro(dlb->entries);
 			ccarrfix(dlb->entries);
 		}
@@ -756,7 +756,7 @@ void cctest()
 
 	_t *v=ccnull;
 	for(int i=0; i<256; ++i)
-	ccarradd(v,1)->s=h;
+	rlArray_add(v,1)->s=h;
 
 ccarrdel(v);
 

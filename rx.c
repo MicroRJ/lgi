@@ -233,7 +233,7 @@ typedef enum {
 	EMU_ERROR_NONE = 0,
 	EMU_ERROR_CREATE_TEXTURE,
 	EMU_ERROR
-} emu_error;
+} rlError;
 
 enum {
 	EMU_FORMAT_R8_UNORM 		  = DXGI_FORMAT_R8_UNORM,
@@ -364,12 +364,144 @@ typedef struct rxsampler_t
 	} d3d11;
 } rxsampler_t;
 
-ccfunc void
-rxsampler_apply(
-int slot,
-rxsampler_t sampler);
+typedef struct {
+	int    format;
+	int    size_x;
+	int    size_y;
+  	/* multisampling, default should be 1,0 */
+	int    samples;
+	int    quality;
 
-#include <src/emu_texture.h>
+  	/* replace this with a single flag field instead #todo */
+	struct {
+  		/* GPU allocation flags */
+		D3D11_USAGE memtype;
+		int useflag;
+    	/* CPU access flags */
+		int memflag;
+	};
+
+	/* memory and stride are optional, if memory provided stride may not be 0 */
+	int    stride;
+	void  *memory;
+
+ 	/* optional in/out */
+	struct {
+		union {
+			ID3D11Resource  *resource;
+			ID3D11Texture2D *texture_2d;
+		};
+
+		ID3D11ShaderResourceView  *shader_target;
+		ID3D11RenderTargetView     *color_target;
+		ID3D11DepthStencilView     *depth_target;
+	} d3d11;
+
+} rlTextureConfig;
+
+rlTextureConfig
+rlGPU_textureConfigInit(
+/* +- */int size_x,
+/* +- */int size_y,
+/* +- */DXGI_FORMAT format,
+/* +- */int     stride,
+/* +- */void  * memory,
+/* +- */int    samples,
+/* +- */int    quality,
+/* +- */D3D11_USAGE    memtype,
+/* +- */int    			useflag,
+/* +- */int    			memflag );
+
+/* base texture object for all other textures */
+typedef struct
+{
+	int format;
+	int size_x;
+	int size_y;
+	int samples;
+	int quality;
+
+  /* feeling this out, do not use directly just in case #pending #important */
+	struct
+	{
+		int   stride;
+		void *memory;
+	} mapped;
+
+  /* doing too much? #pending
+  struct
+  {
+	  void    *memory;
+	  int      stride;
+	  unsigned dirty: 1;
+  } hosted; */
+
+	struct
+	{ union
+		{ ID3D11Resource  *resource;
+			ID3D11Texture2D *texture_2d;
+		};
+
+    /* views are optional  */
+		ID3D11ShaderResourceView *shader_target;
+		ID3D11RenderTargetView   *color_target;
+		ID3D11DepthStencilView   *depth_target;
+	} d3d11;
+
+} rlTexture;
+
+typedef struct {
+	int   size_x, size_y;
+	int   format;
+	int   stride;
+	void * memory;
+} rlImage;
+
+rlImage
+rlCPU_loadImage(const char *name);
+
+rlTexture *
+rlCPU_uploadImage(rlImage texture);
+
+rlImage
+rlCPU_makeImage(int size_x, int size_y, int format);
+
+rlError
+rlGPU_initTexture(rlTexture *texture, rlTextureConfig *config);
+
+rlTexture *
+rlGPU_createTexture(rlTextureConfig *config);
+
+rlTexture *
+rlGPU_makeTexture(int size_x, int size_y, DXGI_FORMAT format, int stride, void *memory);
+
+rlTexture *
+rlGPU_makeDepthTarget(int size_x, int size_y, int format);
+
+rlTexture *
+rlGPU_makeColorTarget(int size_x, int size_y, int format, int samples, int quality);
+
+void *
+rlGPU_borrowTexture(rlTexture *texture, int *stride);
+
+void
+rlGPU_returnTexture(rlTexture *texture);
+
+/* pass in the region to update #todo */
+void
+rlGPU_updateTexture(rlTexture *texture, rlImage memory_ ) {
+
+	ccassert(memory_.format == texture->format);
+
+	int   stride;
+	void *memory = rlGPU_borrowTexture(texture,&stride);
+
+	memcpy(memory,memory_.memory,memory_.size_y*memory_.stride);
+
+	rlGPU_returnTexture(texture);
+}
+
+
 #include <src/emu_shader.h>
 #include <src/rx.program.c>
 #include <src/emu_imp.h>
@@ -435,7 +567,7 @@ trivial to extend this */
 
 /* output media */
 		struct {
-			Emu_texture_t *tar;
+			rlTexture *tar;
 
 			struct {
 				IDXGISwapChain2 *swap_chain;
@@ -525,7 +657,7 @@ LRESULT CALLBACK
 rxwndmsg_callback_win32(HWND,UINT,WPARAM,LPARAM);
 
 ccfunc void
-rxWindowPollEvents();
+rlOS_pollWindowEvents();
 
 
 /* todo: rename */
@@ -542,20 +674,20 @@ rxWindowPollEvents();
 #define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
 # endif
 
-ccfunc ccinle int rxIsCtrlKey()
+ccfunc ccinle int rlIO_testCtrlKey()
 { return rx.wnd.in.kbrd.is_ctrl; }
 
-ccfunc ccinle int rxIsMenuKey()
+ccfunc ccinle int rlIO_testMenuKey()
 { return rx.wnd.in.kbrd.is_menu; }
 
-ccfunc ccinle int rxIsShiftKey()
+ccfunc ccinle int rlIO_testShiftKey()
 { return rx.wnd.in.kbrd.is_shft; }
 
 ccfunc ccinle int rxtstbtn(int x)
 { return IS_DOWN(x); }
 
 int
-rxTestKey(int x)
+rlIO_testKey(int x)
 {
 	return rx.wnd.in.kbrd.key[x] != 0;
 }
@@ -641,7 +773,7 @@ int reg, rxsampler_t sampler, int flush)
 
 void
 rxpipset_texture(
-int reg, Emu_texture_t *texture, int flush)
+int reg, rlTexture *texture, int flush)
 {
 	regset(reg,texture->d3d11.shader_target,flush);
 
@@ -800,7 +932,7 @@ int rlTick() {
 
 	rx.tick_count += 1;
 
-	rxWindowPollEvents();
+	rlOS_pollWindowEvents();
 
 /* todo */
 	Emu_system_set_cursor(rx.win32.cursor.arrow);
@@ -825,10 +957,10 @@ int rlTick() {
 	return !rx.wnd.off;
 }
 
-Emu_texture_t *
-rxCreateColorTargetFromWindow()
+rlTexture *
+rl__createColorTargetFromWindow()
 {
-	Emu_texture_t *result = NULL;
+	rlTexture *result = NULL;
 
 	IDXGIDevice * device_dxgi = NULL;
 	IDXGIAdapter * adapter_dxgi = NULL;
@@ -870,7 +1002,7 @@ rxCreateColorTargetFromWindow()
 	ID3D11Texture2D *texture_d3d;
 	IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
 
-	Emu_texture_config_t config;
+	rlTextureConfig config;
 	ZeroMemory(&config,sizeof(config));
 	config.memtype = D3D11_USAGE_DEFAULT;
 	config.useflag = D3D11_BIND_RENDER_TARGET;
@@ -879,7 +1011,7 @@ rxCreateColorTargetFromWindow()
 	config.format = sc_config_d3d.Format;
 	config.d3d11.texture_2d = texture_d3d;
 
-	result = Emu_texture_create(&config);
+	result = rlGPU_createTexture(&config);
 
 	IDXGIFactory_Release(factory_dxgi);
 	IDXGIAdapter_Release(adapter_dxgi);
@@ -889,7 +1021,7 @@ rxCreateColorTargetFromWindow()
 }
 
 void
-rxInitWindowed(const wchar_t *windowTitle) {
+rlInitWindowed(const wchar_t *windowTitle) {
 	rxsystem_init();
 
 	UINT DriverModeFlags =
@@ -921,20 +1053,20 @@ rxInitWindowed(const wchar_t *windowTitle) {
 	}
 
 
-	rxWindowInitTitled(windowTitle);
-	rxWindowPollEvents();
+	rlOS_initWindow(windowTitle);
+	rlOS_pollWindowEvents();
 
 // note: we can use the adapter to enumerate display devices,
 // this might come useful to the user!
 
-	rx.wnd.out.tar = rxCreateColorTargetFromWindow();
+	rx.wnd.out.tar = rl__createColorTargetFromWindow();
 
 	rx.pip.out.count = 1;
-	rx.pip.out.color[0] = rxCreateColorTarget(
+	rx.pip.out.color[0] = rlGPU_makeColorTarget(
 	rx.wnd.out.tar->size_x,
 	rx.wnd.out.tar->size_y, rx.wnd.out.tar->format,_RX_MSAA,0);
 
-	rx.pip.out.depth = rxCreateDepthTarget(
+	rx.pip.out.depth = rlGPU_makeDepthTarget(
 	rx.wnd.out.tar->size_x,
 	rx.wnd.out.tar->size_y, DXGI_FORMAT_D32_FLOAT);
 

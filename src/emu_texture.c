@@ -18,8 +18,8 @@
 **
 */
 
-ccfunc ccinle void *
-Emu_texture_borrow(Emu_texture_t *texture, int *stride)
+void *
+rlGPU_borrowTexture(rlTexture *texture, int *stride)
 {
   D3D11_MAPPED_SUBRESOURCE memory_d3d;
   ID3D11DeviceContext_Map(
@@ -35,14 +35,13 @@ Emu_texture_borrow(Emu_texture_t *texture, int *stride)
 	return memory_d3d.pData;
 }
 
-ccfunc ccinle void
-Emu_texture_return(Emu_texture_t *texture)
-{
+void
+rlGPU_returnTexture(rlTexture *texture) {
   ID3D11DeviceContext_Unmap(rx.d3d11.ctx,texture->d3d11.resource,0);
 }
 
-ccfunc ccinle Emu_texture_config_t
-Emu_texture_config_init(
+rlTextureConfig
+rlGPU_textureConfigInit(
           int     size_x,
           int     size_y,
   DXGI_FORMAT     format,
@@ -55,9 +54,9 @@ Emu_texture_config_init(
 
   D3D11_USAGE    memtype,
           int    useflag,
-          int    memflag )
-{
-  Emu_texture_config_t config;
+          int    memflag ) {
+
+  rlTextureConfig config;
   config.size_x     = size_x;
   config.size_y     = size_y;
   config.format     = format;
@@ -76,11 +75,10 @@ Emu_texture_config_init(
   return config;
 }
 
-ccfunc emu_error
-Emu_texture_init(
-  Emu_texture_t *texture, Emu_texture_config_t *config)
+rlError
+rlGPU_initTexture(rlTexture *texture, rlTextureConfig *config)
 {
- 	emu_error error = EMU_ERROR_NONE;
+ 	rlError error = EMU_ERROR_NONE;
 
   if(config->d3d11.texture_2d == NULL) {
 	  /* check this properly based on d3dxx's version spec #todo */
@@ -192,7 +190,7 @@ leave:
 }
 
 void
-Emu_texture_delete( Emu_texture_t *texture )
+Emu_texture_delete( rlTexture *texture )
 {
   rxunknown_delete(texture->d3d11.shader_target);
   rxunknown_delete(texture->d3d11.resource);
@@ -200,12 +198,12 @@ Emu_texture_delete( Emu_texture_t *texture )
   EMU_FREE(texture,NULL);
 }
 
-ccfunc ccinle Emu_texture_t *
-Emu_texture_create( Emu_texture_config_t *config )
+rlTexture *
+rlGPU_createTexture( rlTextureConfig *config )
 {
-	Emu_texture_t *result = EMU_MALLOC(sizeof(Emu_texture_t),NULL);
+	rlTexture *result = EMU_MALLOC(sizeof(rlTexture),NULL);
 
-	emu_error error = Emu_texture_init(result,config);
+	rlError error = rlGPU_initTexture(result,config);
 
 	if (error != EMU_ERROR_NONE) {
 
@@ -217,52 +215,43 @@ Emu_texture_create( Emu_texture_config_t *config )
 	return result;
 }
 
-ccfunc ccinle Emu_texture_t *
-rxCreateDepthTarget(
+rlTexture *
+rlGPU_makeDepthTarget(
   int size_x, int size_y, int format)
 {
-	Emu_texture_config_t config =
-		Emu_texture_config_init(size_x,size_y,format,0,NULL,1,0,
+	rlTextureConfig config =
+		rlGPU_textureConfigInit(size_x,size_y,format,0,NULL,1,0,
       D3D11_USAGE_DEFAULT,D3D11_BIND_DEPTH_STENCIL,0);
 
-  return Emu_texture_create( &config );
+  return rlGPU_createTexture( &config );
 }
 
-ccfunc ccinle Emu_texture_t *
-rxCreateColorTarget(
+rlTexture *
+rlGPU_makeColorTarget(
   int size_x, int size_y, int format, int samples, int quality)
 {
-	Emu_texture_config_t config =
-		Emu_texture_config_init(size_x,size_y,format,0,0,samples,quality,
+	rlTextureConfig config =
+		rlGPU_textureConfigInit(size_x,size_y,format,0,0,samples,quality,
       D3D11_USAGE_DEFAULT,D3D11_BIND_RENDER_TARGET,0);
 
-  return Emu_texture_create( &config );
+  return rlGPU_createTexture( &config );
 }
 
-ccfunc ccinle Emu_texture_t *
-Emu_texture_create_simple(
+rlTexture *
+rlGPU_makeTexture(
   int size_x, int size_y, int format, int stride, void *memory)
 {
-	Emu_texture_config_t config =
-		Emu_texture_config_init(size_x,size_y,format,stride,memory,1,0,
+	rlTextureConfig config =
+		rlGPU_textureConfigInit(size_x,size_y,format,stride,memory,1,0,
       D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE);
 
-  return Emu_texture_create( &config );
+  return rlGPU_createTexture( &config );
 }
 
-Emu_texture_memory_t
-Emu_texture_load(
-  const char *name)
-{
-  const char *ext = ccfileext(name);
-
-  Emu_texture_memory_t result;
+rlImage
+rlCPU_loadImage(const char *name) {
+  rlImage result;
   memset(&result,0,sizeof(result));
-
-  /* XXX this is google type stuff */
-  if(strcmp(ext,"png")&&
-     strcmp(ext,"jpg")&&
-     strcmp(ext,"bmp")) return result;
 
   /* XXX support other formats, use own memory */
   void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
@@ -273,11 +262,11 @@ Emu_texture_load(
   return result;
 }
 
-Emu_texture_t *
-Emu_texture_memory_upload(Emu_texture_memory_t local)
+rlTexture *
+rlCPU_uploadImage(rlImage local)
 {
-  Emu_texture_t *result =
-  	Emu_texture_create_simple(
+  rlTexture *result =
+  	rlGPU_makeTexture(
   		local.size_x,local.size_y,
   		local.format,
   		local.stride,local.memory);
@@ -285,10 +274,10 @@ Emu_texture_memory_upload(Emu_texture_memory_t local)
 	return result;
 }
 
-ccfunc ccinle void
+void
 Emu_texture_copy(
-  Emu_texture_t *dst,
-  Emu_texture_t *src )
+  rlTexture *dst,
+  rlTexture *src )
 {
   if( dst->d3d11.resource !=
       src->d3d11.resource )
@@ -307,8 +296,8 @@ Emu_texture_copy(
   }
 }
 
-Emu_texture_memory_t
-Emu_texture_memory_create( int size_x, int size_y, int format )
+rlImage
+rlCPU_makeImage( int size_x, int size_y, int format )
 {
 	int bpp = 0;
 	if (format == EMU_FORMAT_R8_UNORM) {
@@ -320,7 +309,7 @@ Emu_texture_memory_create( int size_x, int size_y, int format )
 
 	ccassert(bpp != 0);
 
-	Emu_texture_memory_t result;
+	rlImage result;
 	result.size_x = size_x;
 	result.size_y = size_y;
 	result.format = format;

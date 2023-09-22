@@ -120,9 +120,9 @@ typedef struct
   unsigned dual_source_blending: 1;
 
   struct
-  { Emu_texture_t *color[2];
+  { rlTexture *color[2];
     int            count;
-    Emu_texture_t *depth; } out;
+    rlTexture *depth; } out;
 
   regenv_t              reg[0x20];
 } pipenv_t;
@@ -141,7 +141,7 @@ rxpipset_sampler(
   int reg, rxsampler_t sampler, int flush);
 void
 rxpipset_texture(
-  int reg, Emu_texture_t *texture, int flush);
+  int reg, rlTexture *texture, int flush);
 void
 rxpipset_varying(
   int reg, rxuniform_buffer_t buffer, int flush);

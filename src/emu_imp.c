@@ -34,14 +34,14 @@ Emu_imp_init()
 	rx.imp.asm_idx = rxcreate_index_buffer(sizeof(Emu_imp_index_t), EMU_IMP_INDEX_BUFFER_SIZE);
 	rx.imp.asm_vtx = rxcreate_vertex_buffer(sizeof(Emu_imp_vertex_t), EMU_IMP_VERTEX_BUFFER_SIZE);
 
-	rx.imp.white_texture = Emu_texture_create_simple(512,512,EMU_FORMAT_R8G8B8A8_UNORM,0,NULL);
+	rx.imp.white_texture = rlGPU_makeTexture(512,512,EMU_FORMAT_R8G8B8A8_UNORM,0,NULL);
 
 	int stride;
-	unsigned char *memory = Emu_texture_borrow(rx.imp.white_texture,&stride);
+	unsigned char *memory = rlGPU_borrowTexture(rx.imp.white_texture,&stride);
 
 	memset(memory,0xff,stride*rx.imp.white_texture->size_y);
 
-	Emu_texture_return(rx.imp.white_texture);
+	rlGPU_returnTexture(rx.imp.white_texture);
 }
 
 ccfunc void
@@ -318,7 +318,7 @@ rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softne
 
 void
 Emu_imp_rect_uv(
-rxcolor_t color, Emu_texture_t *texture,
+rxcolor_t color, rlTexture *texture,
 rxsampler_t sampler, float x, float y, float w, float h)
 {
 	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};

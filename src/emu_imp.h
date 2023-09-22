@@ -124,7 +124,7 @@ typedef struct
            int       index_offset;
   Emu_imp_vertex_t   attr;
 
-  Emu_texture_t  *white_texture;
+  rlTexture  *white_texture;
 
 } Emu_imp_t;
 

@@ -41,7 +41,7 @@ void rxsystem_init() {
 }
 
 /* todo: */
-void rxWindowInitTitled(LPCWSTR window_title)
+void rlOS_initWindow(LPCWSTR window_title)
 {
 
 
@@ -118,7 +118,7 @@ void rxwindow_xy(int x, int y)
 }
 
 /* XXXX */
-void rxWindowPollEvents()
+void rlOS_pollWindowEvents()
 {
 /* todo: */
 	memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));
