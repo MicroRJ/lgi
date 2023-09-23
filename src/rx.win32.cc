@@ -32,7 +32,6 @@ void rxsystem_init() {
 
 	typedef BOOL (WINAPI * XXX)(HANDLE);
 
-	rx.win32.shcore_dll = LoadLibraryA("shcore.dll");
 	rx.win32.user32_dll = LoadLibraryA("user32.dll");
 	XXX SetProcessDpiAwarenessContext = (XXX) GetProcAddress(rx.win32.user32_dll, "SetProcessDpiAwarenessContext");
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -223,33 +222,21 @@ rxwndmsg_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam)
 
 		} return TRUE;
 
-/* maybe rx should provide a flag on what to do here, by default I don't
-think most people care */
 		case WM_SYSKEYUP:
 		case WM_SYSKEYDOWN:
-		{
-
-		} return FALSE;
 		case WM_KEYUP:
-		case WM_KEYDOWN:
-		{
-/* todo: there's probably a better way to do this */
+		case WM_KEYDOWN: {
+			/* todo: there's probably a better way to do this */
 			rx.wnd.in.kbrd.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
 			rx.wnd.in.kbrd.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 			rx.wnd.in.kbrd.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
 
 			int key_map = 0;
-
-			if(CCWITHIN(wParam,'a','z') ||
-			CCWITHIN(wParam,'A','Z') ||
-			CCWITHIN(wParam,'0','9'))
-			{
+			if(CCWITHIN(wParam,'a','z')||CCWITHIN(wParam,'A','Z')||CCWITHIN(wParam,'0','9')) {
 				key_map = wParam;
 			}
 
-/* what a waste of time */
-			switch(wParam)
-			{
+			switch(wParam) {
 				case VK_CONTROL:    key_map = rx_kLCTRL;     break;
 				case VK_RETURN:     key_map = rx_kRETURN;    break;
 				case VK_BACK:       key_map = rx_kBCKSPC;    break;
@@ -263,15 +250,15 @@ think most people care */
 				case VK_UP:         key_map = rx_kKEY_UP;    break;
 				case VK_DOWN:       key_map = rx_kKEY_DOWN;  break;
 
-				case VK_F1:  key_map = rx_kKEY_F1; break;
-				case VK_F2:  key_map = rx_kKEY_F2; break;
-				case VK_F3:  key_map = rx_kKEY_F3; break;
-				case VK_F4:  key_map = rx_kKEY_F4; break;
-				case VK_F5:  key_map = rx_kKEY_F5; break;
-				case VK_F6:  key_map = rx_kKEY_F6; break;
-				case VK_F7:  key_map = rx_kKEY_F7; break;
-				case VK_F8:  key_map = rx_kKEY_F8; break;
-				case VK_F9:  key_map = rx_kKEY_F9; break;
+				case VK_F1:  key_map = rx_kKEY_F1;  break;
+				case VK_F2:  key_map = rx_kKEY_F2;  break;
+				case VK_F3:  key_map = rx_kKEY_F3;  break;
+				case VK_F4:  key_map = rx_kKEY_F4;  break;
+				case VK_F5:  key_map = rx_kKEY_F5;  break;
+				case VK_F6:  key_map = rx_kKEY_F6;  break;
+				case VK_F7:  key_map = rx_kKEY_F7;  break;
+				case VK_F8:  key_map = rx_kKEY_F8;  break;
+				case VK_F9:  key_map = rx_kKEY_F9;  break;
 				case VK_F10: key_map = rx_kKEY_F10; break;
 				case VK_F11: key_map = rx_kKEY_F11; break;
 				case VK_F12: key_map = rx_kKEY_F12; break;

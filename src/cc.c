@@ -238,7 +238,7 @@ extern "C" {
  allocator so chances are sooner or later you will run into a bug, there's a slight possibility
  that in the future cc-free could take into account the allocator if all allocations have metadata
  within them but it could be a long while - rj */
-#define ccarrdel ccdlbdel
+#define rlArray_delete ccdlbdel
 
 // note: queries the maximum length (item count) of the dynamic length buffer, the bytes
 // that have been committed + reserved.
@@ -254,7 +254,7 @@ extern "C" {
 #define ccarrmax ccdlbmax
 #define ccarrmin ccdlbmin
 // note: 32-bit length of the array
-#define ccarrlen(arr) cccast(ccu32_t,ccarrmin(arr))
+#define rlArray_lengthOf(arr) cccast(ccu32_t,ccarrmin(arr))
 // note: address of one past the last reserved item in the array
 #define ccarrend_max(arr) ((arr)+ccarrmax(arr))
 // note: address of one past the last committed item in the array
@@ -284,7 +284,7 @@ extern "C" {
 // note: iterates over the committed contents of an array by pointer
 #define ccarrfor(arr,itr) for(itr=arr;itr<ccarrend(arr);++itr)
 // note: iterates over the committed contents of an array by index
-#define ccarrfori(arr,idx) for(idx=0;idx<ccarrlen(arr);++idx)
+#define ccarrfori(arr,idx) for(idx=0;idx<rlArray_lengthOf(arr);++idx)
 // note: "removes" a number of items in the array from the back, returns the previous
 // commit count
 #define ccarrpopi(arr,num) ccdlbpop_((void**)(&arr),sizeof(*(arr)),num)
@@ -329,10 +329,10 @@ extern "C" {
 #define cctblremP(tbl,ptr) ((tbl)+cctblremi((void**)(&tbl),sizeof(*tbl),ccinthsh(ptr)))
 
 // Note: string builder
-#define ccstrdel ccarrdel
+#define ccstrdel rlArray_delete
 #define ccstrmax ccarrmax
 #define ccstrmin ccarrmin
-#define ccstrlen ccarrlen
+#define ccstrlen rlArray_lengthOf
 
 #define ccstraddN(arr,res,com) ((arr)+ccdlbadd_((void**)(&arr),sizeof(*(arr)),res,com))
 
@@ -469,7 +469,7 @@ ccdlbdel_(ccdlb_t *dlb)
 				}
 			}
 
-			ccarrdel(dlb->entries);
+			rlArray_delete(dlb->entries);
 		}
 
 		ccfree(dlb);
@@ -758,7 +758,7 @@ void cctest()
 	for(int i=0; i<256; ++i)
 	rlArray_add(v,1)->s=h;
 
-ccarrdel(v);
+rlArray_delete(v);
 
 ccdbenter("test");
 

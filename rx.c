@@ -535,20 +535,11 @@ typedef struct rx_t {
 		};
 	} d3d11;
 
-	Emu_imp_t imp;
 
-/* current pipeline state, not recommended to modify directly,
-use the appropriate functions instead which will flush if necessary and if specified
-to do so */
-	pipenv_t pip;
-
-/* whether the current pipeline should be uploaded */
-	int      upl;
 
 /* window related structure, we only support one window for now but it'd be
 trivial to extend this */
-	struct
-	{
+	struct {
 		unsigned  off: 1;
 		unsigned  vis: 1;
 
@@ -604,16 +595,25 @@ trivial to extend this */
 		} in;
 	} wnd;
 
-/* basic platform specific stuff */
 	struct {
-		HMODULE shcore_dll;
 		HMODULE user32_dll;
-
 		struct {
 			HCURSOR arrow;
 		} cursor;
 	} win32;
 
+
+	Emu_imp_t imp;
+	pipenv_t  pip;
+	int       upl;
+
+	/* [[NOTE]]: not sure how well this is going to work in the long run */
+#ifdef RX_EXTENSION_SLOT_0
+	RX_EXTENSION_SLOT_0;
+#endif
+#ifdef RX_EXTENSION_SLOT_1
+	RX_EXTENSION_SLOT_1;
+#endif
 } rx_t;
 
 /* the source of all evil is here */
