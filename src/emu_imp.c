@@ -290,6 +290,13 @@ rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softne
 	Emu_imp_end();
 }
 
+/* r: roundness
+	s: edge softness */
+void
+rlIM_drawBoxSDF(float x, float y, float w, float h, float r, float s) {
+
+}
+
 void
 Emu_imp_rect_sdf(
 rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softness )
@@ -303,7 +310,6 @@ rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softne
 	Emu_imp_apply(EMU_IMP_MODE_SDF_RECT,TRUE);
 
 	Emu_imp_begin(6,4); {
-		/* set shared attributes */
 		rx.imp.attr.rect.xyxy   = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
 		rx.imp.attr.rect.rgba   = color;
 		rx.imp.attr.rect.flag.x = roundness;

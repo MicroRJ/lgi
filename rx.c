@@ -675,7 +675,7 @@ rlOS_pollWindowEvents();
 # endif
 
 #define rlIO_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
-#define rlIO_testMenuKey()  (rx.wnd.in.kbrd.is_menu != 0)
+#define rlIO_testAltKey()  (rx.wnd.in.kbrd.is_menu != 0)
 #define rlIO_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
 #define rlIO_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
 #define rlIO_testFKey(xx) (rlIO_testKey(rx_kKEY_F1 + rlI_clamp(xx,1,12)-1))

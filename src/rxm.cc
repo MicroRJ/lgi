@@ -11,24 +11,24 @@
 typedef struct rxvec2i16_t rxvec2i16_t;
 typedef struct rxvec2i16_t
 {
-  short x,y;
+	short x,y;
 } rxvec2i16_t;
 typedef struct rxvec2i_t rxvec2i_t;
 typedef struct rxvec2i_t
 {
-  int x,y;
+	int x,y;
 } rxvec2i_t;
 typedef struct rxvec3i_t rxvec3i_t;
 typedef struct rxvec3i_t
 { union
-  {
-    struct
-    {
-      int x,y,z;
-    };
+	{
+		struct
+		{
+			int x,y,z;
+		};
 
-    rxvec2i_t xy;
-  };
+		rxvec2i_t xy;
+	};
 } rxvec3i_t;
 rxvec3i_t  rxvec3i    (float xyz);
 rxvec3i_t  rxvec3i_xyz(float x, float y, float z);
@@ -40,20 +40,20 @@ rxvec3i_t  rxvec3i_z  (float z);
 typedef struct rxvec2_t rxvec2_t;
 typedef struct rxvec2_t
 {
-  float x,y;
+	float x,y;
 } rxvec2_t;
 
 typedef struct rxvec3_t rxvec3_t;
 typedef struct rxvec3_t
 { union
-  {
-    struct
-    {
-      float x,y,z;
-    };
+	{
+		struct
+		{
+			float x,y,z;
+		};
 
-    rxvec2_t xy;
-  };
+		rxvec2_t xy;
+	};
 } rxvec3_t;
 rxvec3_t   rxvec3    (float xyz);
 rxvec3_t   rxvec3_xyz(float x, float y, float z);
@@ -67,14 +67,14 @@ rxvec3_t   rxvec3_z  (float z);
 typedef struct rxvec4_t rxvec4_t;
 typedef struct rxvec4_t
 { union
-  { struct { float x,y,z,w; };
-    struct { float r,g,b,a; };
-    rxvec3_t xyz;
-    rxvec3_t rgb;
-    rxvec2_t xy;
+	{ struct { float x,y,z,w; };
+	struct { float r,g,b,a; };
+	rxvec3_t xyz;
+	rxvec3_t rgb;
+	rxvec2_t xy;
 
-    float e[4];
-  };
+	float e[4];
+};
 } rxvec4_t;
 
 rxvec4_t rxvec4_xyzw(float x, float y, float z, float w);
@@ -82,12 +82,12 @@ rxvec4_t rxvec4_xyzw(float x, float y, float z, float w);
 typedef struct rxvec4i_t rxvec4i_t;
 typedef struct rxvec4i_t
 { union
-  { struct { int x,y,z,w; };
-    struct { int r,g,b,a; };
-    rxvec3i_t xyz;
-    rxvec3i_t rgb;
-    rxvec2i_t xy;
-  };
+	{ struct { int x,y,z,w; };
+	struct { int r,g,b,a; };
+	rxvec3i_t xyz;
+	rxvec3i_t rgb;
+	rxvec2i_t xy;
+};
 } rxvec4i_t;
 
 typedef struct rxmatrix_t rxmatrix_t;
@@ -100,267 +100,265 @@ rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
 // From a value between 0 and 1, it returns a value between min and max
 double rxmix(double val, double min, double max)
 {
-  return min + (max - min) * val;
+	return min + (max - min) * val;
 }
 
 // From a value between min and max, it returns a value between 0 and 1
 double rxunmix(double val, double min, double max)
 {
-  return (val - min) / (max - min);
+	return (val - min) / (max - min);
 }
 
 // From a value between val_min and val_max, it returns a value between min and max
 double rxremix(double val, double val_min, double val_max, double min, double max)
 {
-  return rxmix(rxunmix(val,val_min,val_max),min,max);
+	return rxmix(rxunmix(val,val_min,val_max),min,max);
 }
 
-/* ++ added 'rxclamp'
-   ++ switched to 64-bit floats instead */
 double rxclamp(double val, double min, double max)
 {
-  return val < min ? min : val > max ? max : val;
+	return val < min ? min : val > max ? max : val;
 }
 
 int rxpow2i(int x)
 {
-  return x*x;
+	return x*x;
 }
 
 int rlI_clamp(int val, int min, int max)
 {
-  return val<min?min:
-         val>max?max: val;
+	return val<min?min:
+	val>max?max: val;
 }
 
 float rxmax(float x, float y)
 {
-  return x>y?x:y;
+	return x>y?x:y;
 }
 
 float rxmin(float x, float y)
 {
-  return x<y?x:y;
+	return x<y?x:y;
 }
 
-int rxmaxi(int x, int y)
+int rlI_max(int x, int y)
 {
-  return x>y?x:y;
+	return x>y?x:y;
 }
 
 int rxmini(int x, int y)
 {
-  return x<y?x:y;
+	return x<y?x:y;
 }
 
 rxvec3_t
 rxvec3_xyz(
-	float x, float y, float z)
+float x, float y, float z)
 {
-  rxvec3_t r;
-  r.x = x;
-  r.y = y;
-  r.z = z;
-  return r;
+	rxvec3_t r;
+	r.x = x;
+	r.y = y;
+	r.z = z;
+	return r;
 }
 
 rxvec4_t
 rxvec4_xyzw(
-	float x, float y, float z, float w)
+float x, float y, float z, float w)
 {
-  rxvec4_t r;
-  r.x = x;
-  r.y = y;
-  r.z = z;
-  r.w = w;
-  return r;
+	rxvec4_t r;
+	r.x = x;
+	r.y = y;
+	r.z = z;
+	r.w = w;
+	return r;
 }
 
 rxvec3_t rxvec3_xy(float x, float y)
 {
-  return rxvec3_xyz(x,y,0);
+	return rxvec3_xyz(x,y,0);
 }
 
 rxvec3_t rxvec3_x(float x)
 {
-  return rxvec3_xyz(x,0,0);
+	return rxvec3_xyz(x,0,0);
 }
 
 rxvec3_t rxvec3_y(float y)
 {
-  return rxvec3_xyz(0,y,0);
+	return rxvec3_xyz(0,y,0);
 }
 
 rxvec3_t rxvec3_z(float z)
 {
-  return rxvec3_xyz(0,0,z);
+	return rxvec3_xyz(0,0,z);
 }
 
 rxvec3_t rxvec3(float xyz)
 {
-  return rxvec3_xyz(xyz,xyz,xyz);
+	return rxvec3_xyz(xyz,xyz,xyz);
 }
 
 float rxvector_dot(rxvec3_t a, rxvec3_t b)
 {
-  return a.x*b.x + a.y*b.y + a.z*b.z;
+	return a.x*b.x + a.y*b.y + a.z*b.z;
 }
 
 rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
 {
   // note: this is how I memorize the cross product formula, think of rotations around an axis.
-  return rxvec3_xyz
+	return rxvec3_xyz
     ( a.y*b.z - a.z*b.y,    // x-axis -> z/y plane
       a.z*b.x - a.x*b.z,    // y-axis -> x/z plane
       a.x*b.y - a.y*b.x );  // z-axis -> y/x plane
-}
+ }
 
-float rxvector_length(rxvec3_t a)
-{
-  return sqrtf(rxvector_dot(a,a));
-}
+ float rxvector_length(rxvec3_t a)
+ {
+ 	return sqrtf(rxvector_dot(a,a));
+ }
 
-float rxvec2_dot(rxvec2_t a, rxvec2_t b)
-{
-  return a.x*b.x + a.y*b.y;
-}
+ float rxvec2_dot(rxvec2_t a, rxvec2_t b)
+ {
+ 	return a.x*b.x + a.y*b.y;
+ }
 
-float rxvec2_len(rxvec2_t a)
-{
-  return sqrtf(rxvec2_dot(a,a));
-}
+ float rxvec2_len(rxvec2_t a)
+ {
+ 	return sqrtf(rxvec2_dot(a,a));
+ }
 
-rxvec2_t rxvec2_add(rxvec2_t a, rxvec2_t b)
-{
-  rxvec2_t r;
-  r.x = a.x+b.x;
-  r.y = a.y+b.y;
-  return r;
-}
+ rxvec2_t rxvec2_add(rxvec2_t a, rxvec2_t b)
+ {
+ 	rxvec2_t r;
+ 	r.x = a.x+b.x;
+ 	r.y = a.y+b.y;
+ 	return r;
+ }
 
-rxvec2_t rxvec2_sub(rxvec2_t a, rxvec2_t b)
-{
-  rxvec2_t r;
-  r.x = a.x-b.x;
-  r.y = a.y-b.y;
-  return r;
-}
+ rxvec2_t rxvec2_sub(rxvec2_t a, rxvec2_t b)
+ {
+ 	rxvec2_t r;
+ 	r.x = a.x-b.x;
+ 	r.y = a.y-b.y;
+ 	return r;
+ }
 
-rxvec3_t rxvector_add(rxvec3_t a, rxvec3_t b)
-{
-  rxvec3_t r;
-  r.x = a.x+b.x;
-  r.y = a.y+b.y;
-  r.z = a.z+b.z;
-  return r;
-}
+ rxvec3_t rxvector_add(rxvec3_t a, rxvec3_t b)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x+b.x;
+ 	r.y = a.y+b.y;
+ 	r.z = a.z+b.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_sub(rxvec3_t a, rxvec3_t b)
-{
-  rxvec3_t r;
-  r.x = a.x-b.x;
-  r.y = a.y-b.y;
-  r.z = a.z-b.z;
-  return r;
-}
+ rxvec3_t rxvector_sub(rxvec3_t a, rxvec3_t b)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x-b.x;
+ 	r.y = a.y-b.y;
+ 	r.z = a.z-b.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_mul(rxvec3_t a, rxvec3_t b)
-{
-  rxvec3_t r;
-  r.x = a.x*b.x;
-  r.y = a.y*b.y;
-  r.z = a.z*b.z;
-  return r;
-}
+ rxvec3_t rxvector_mul(rxvec3_t a, rxvec3_t b)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x*b.x;
+ 	r.y = a.y*b.y;
+ 	r.z = a.z*b.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_downscale(rxvec3_t a, float b)
-{
-  rxvec3_t r;
-  r.x = a.x/b;
-  r.y = a.y/b;
-  r.z = a.z/b;
-  return r;
-}
+ rxvec3_t rxvector_downscale(rxvec3_t a, float b)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x/b;
+ 	r.y = a.y/b;
+ 	r.z = a.z/b;
+ 	return r;
+ }
 
-rxvec3_t rxvector_scale(rxvec3_t a, float b)
-{
-  rxvec3_t r;
-  r.x = a.x*b;
-  r.y = a.y*b;
-  r.z = a.z*b;
-  return r;
-}
+ rxvec3_t rxvector_scale(rxvec3_t a, float b)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x*b;
+ 	r.y = a.y*b;
+ 	r.z = a.z*b;
+ 	return r;
+ }
 
-rxvec3_t rxvector_negate(rxvec3_t a)
-{
-  rxvec3_t r;
-  r.x = - a.x;
-  r.y = - a.y;
-  r.z = - a.z;
-  return r;
-}
+ rxvec3_t rxvector_negate(rxvec3_t a)
+ {
+ 	rxvec3_t r;
+ 	r.x = - a.x;
+ 	r.y = - a.y;
+ 	r.z = - a.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_min(rxvec3_t a, float min)
-{
-  rxvec3_t r;
-  r.x = a.x > min ? min : a.x;
-  r.y = a.y > min ? min : a.y;
-  r.z = a.z > min ? min : a.z;
-  return r;
-}
+ rxvec3_t rxvector_min(rxvec3_t a, float min)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x > min ? min : a.x;
+ 	r.y = a.y > min ? min : a.y;
+ 	r.z = a.z > min ? min : a.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_max(rxvec3_t a, float max)
-{
-  rxvec3_t r;
-  r.x = a.x < max ? max : a.x;
-  r.y = a.y < max ? max : a.y;
-  r.z = a.z < max ? max : a.z;
-  return r;
-}
+ rxvec3_t rxvector_max(rxvec3_t a, float max)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x < max ? max : a.x;
+ 	r.y = a.y < max ? max : a.y;
+ 	r.z = a.z < max ? max : a.z;
+ 	return r;
+ }
 
-rxvec3_t rxvector_abs(rxvec3_t a)
-{
-  rxvec3_t r;
-  r.x = a.x < 0 ? - a.x : a.x;
-  r.y = a.y < 0 ? - a.y : a.y;
-  r.z = a.z < 0 ? - a.z : a.z;
-  return r;
-}
+ rxvec3_t rxvector_abs(rxvec3_t a)
+ {
+ 	rxvec3_t r;
+ 	r.x = a.x < 0 ? - a.x : a.x;
+ 	r.y = a.y < 0 ? - a.y : a.y;
+ 	r.z = a.z < 0 ? - a.z : a.z;
+ 	return r;
+ }
 
 
-rxvec3_t rxvector_normalize(rxvec3_t a)
-{
-  float length=rxvector_length(a);
+ rxvec3_t rxvector_normalize(rxvec3_t a)
+ {
+ 	float length=rxvector_length(a);
 
-  if(length != 0)
-    a=rxvector_scale(a,1/length);
+ 	if(length != 0)
+ 	a=rxvector_scale(a,1/length);
 
-  return a;
+ return a;
 }
 
 rxmatrix_t rxmatrix_projection(double r, double v, double zmin, double zmax)
 {
-  rxmatrix_t m = rxmatrix_identity();
+	rxmatrix_t m = rxmatrix_identity();
 
-  v = 1. / tan(v / 180 * rxPI_F * .5);
+	v = 1. / tan(v / 180 * rxPI_F * .5);
 
-  m.m[0][0] = v * r;
-  m.m[1][1] = v;
-  m.m[2][2] = zmax / (zmax - zmin);
-  m.m[3][2] = - (zmax * zmin) / (zmax - zmin);
-  m.m[3][3] = 0.;
-  m.m[2][3] = 1.;
-  return m;
+	m.m[0][0] = v * r;
+	m.m[1][1] = v;
+	m.m[2][2] = zmax / (zmax - zmin);
+	m.m[3][2] = - (zmax * zmin) / (zmax - zmin);
+	m.m[3][3] = 0.;
+	m.m[2][3] = 1.;
+	return m;
 }
 
 rxmatrix_t rxmatrix_identity()
 {
-  rxmatrix_t r;
-  r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
-  r.m[0][1]=0.f;r.m[1][1]=1.f;r.m[2][1]=0.f;r.m[3][1]=0.f;
-  r.m[0][2]=0.f;r.m[1][2]=0.f;r.m[2][2]=1.f;r.m[3][2]=0.f;
-  r.m[0][3]=0.f;r.m[1][3]=0.f;r.m[2][3]=0.f;r.m[3][3]=1.f;
-  return r;
+	rxmatrix_t r;
+	r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
+	r.m[0][1]=0.f;r.m[1][1]=1.f;r.m[2][1]=0.f;r.m[3][1]=0.f;
+	r.m[0][2]=0.f;r.m[1][2]=0.f;r.m[2][2]=1.f;r.m[3][2]=0.f;
+	r.m[0][3]=0.f;r.m[1][3]=0.f;r.m[2][3]=0.f;r.m[3][3]=1.f;
+	return r;
 }
 
 
@@ -368,114 +366,114 @@ rxmatrix_t rxmatrix_identity()
 // todo!!: remove loop
 rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
 { rxmatrix_t result;
-  for(int r=0; r<4; ++r)
-  { for(int c=0; c<4; ++c)
-    {  result.m[r][c] =
-        (a.m[r][0]*b.m[0][c]) +
-        (a.m[r][1]*b.m[1][c]) +
-        (a.m[r][2]*b.m[2][c]) +
-        (a.m[r][3]*b.m[3][c]);
-    }
-  }
-  return result;
+	for(int r=0; r<4; ++r)
+	{ for(int c=0; c<4; ++c)
+		{  result.m[r][c] =
+			(a.m[r][0]*b.m[0][c]) +
+			(a.m[r][1]*b.m[1][c]) +
+			(a.m[r][2]*b.m[2][c]) +
+			(a.m[r][3]*b.m[3][c]);
+		}
+	}
+	return result;
 }
 
 rxmatrix_t rxmatrix_rotZ(double angle)
 {
-  rxmatrix_t r = rxmatrix_identity();
-  double cosres = cos(angle);
-  double sinres = sin(angle);
-  r.m[0][0]= + cosres;
-  r.m[0][1]= + sinres;
-  r.m[1][0]= - sinres;
-  r.m[1][1]= + cosres;
-  return r;
+	rxmatrix_t r = rxmatrix_identity();
+	double cosres = cos(angle);
+	double sinres = sin(angle);
+	r.m[0][0]= + cosres;
+	r.m[0][1]= + sinres;
+	r.m[1][0]= - sinres;
+	r.m[1][1]= + cosres;
+	return r;
 }
 
 rxmatrix_t rxmatrix_rotY(double angle)
 {
-  rxmatrix_t r = rxmatrix_identity();
-  double cosres = cos(angle);
-  double sinres = sin(angle);
-  r.m[0][0] =   cosres;
-  r.m[0][2] = - sinres;
-  r.m[2][0] =   sinres;
-  r.m[2][2] =   cosres;
-  return r;
+	rxmatrix_t r = rxmatrix_identity();
+	double cosres = cos(angle);
+	double sinres = sin(angle);
+	r.m[0][0] =   cosres;
+	r.m[0][2] = - sinres;
+	r.m[2][0] =   sinres;
+	r.m[2][2] =   cosres;
+	return r;
 }
 
 rxmatrix_t rxmatrix_rotX(float angle)
 {
-  rxmatrix_t result = rxmatrix_identity();
-  float cosres = cosf(angle);
-  float sinres = sinf(angle);
-  result.m[1][1] =   cosres;
-  result.m[1][2] =   sinres;
-  result.m[2][1] = - sinres;
-  result.m[2][2] =   cosres;
-  return result;
+	rxmatrix_t result = rxmatrix_identity();
+	float cosres = cosf(angle);
+	float sinres = sinf(angle);
+	result.m[1][1] =   cosres;
+	result.m[1][2] =   sinres;
+	result.m[2][1] = - sinres;
+	result.m[2][2] =   cosres;
+	return result;
 }
 
 
 
 rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
 { rxmatrix_t result=rxmatrix_identity();
-  result.m[3][0]=x;
-  result.m[3][1]=y;
-  result.m[3][2]=z;
-  return result;
+	result.m[3][0]=x;
+	result.m[3][1]=y;
+	result.m[3][2]=z;
+	return result;
 }
 
 rxmatrix_t rxmatrix_flip_vertically()
 { rxmatrix_t result=rxmatrix_identity();
-  result.m[1][1]=-1.f;
-  return result;
+	result.m[1][1]=-1.f;
+	return result;
 }
 
 
 /* All this has to be worked out */
 rxvec4_t rxmul_matvec(rxmatrix_t m, rxvec4_t v)
 {
-  rxvec4_t r;
-  r.x = m.m[0][0] * v.x + m.m[1][0] * v.y + m.m[2][0] * v.z + m.m[3][0];
-  r.y = m.m[0][1] * v.x + m.m[1][1] * v.y + m.m[2][1] * v.z + m.m[3][1];
-  r.z = m.m[0][2] * v.x + m.m[1][2] * v.y + m.m[2][2] * v.z + m.m[3][2];
-  r.w = m.m[0][3] * v.x + m.m[1][3] * v.y + m.m[2][3] * v.z + m.m[3][3];
-  return r;
+	rxvec4_t r;
+	r.x = m.m[0][0] * v.x + m.m[1][0] * v.y + m.m[2][0] * v.z + m.m[3][0];
+	r.y = m.m[0][1] * v.x + m.m[1][1] * v.y + m.m[2][1] * v.z + m.m[3][1];
+	r.z = m.m[0][2] * v.x + m.m[1][2] * v.y + m.m[2][2] * v.z + m.m[3][2];
+	r.w = m.m[0][3] * v.x + m.m[1][3] * v.y + m.m[2][3] * v.z + m.m[3][3];
+	return r;
 }
 
 rxvec2_t rxadd_vec2(rxvec2_t v0, rxvec2_t v1)
 {
-  rxvec2_t r;
-  r.x = v0.x + v1.x;
-  r.y = v0.y + v1.y;
-  return r;
+	rxvec2_t r;
+	r.x = v0.x + v1.x;
+	r.y = v0.y + v1.y;
+	return r;
 }
 
 rxvec2_t rxmul_vec2(rxvec2_t v0, rxvec2_t v1)
 {
-  rxvec2_t r;
-  r.x = v0.x * v1.x;
-  r.y = v0.y * v1.y;
-  return r;
+	rxvec2_t r;
+	r.x = v0.x * v1.x;
+	r.y = v0.y * v1.y;
+	return r;
 }
 
 rxvec2_t rxvec2_xy(float x, float y)
 {
 
-  rxvec2_t r;
-  r.x = x;
-  r.y = y;
+	rxvec2_t r;
+	r.x = x;
+	r.y = y;
 
-  return r;
+	return r;
 }
 
 rxvec2_t rxvec2i_vec2(rxvec2i_t v)
 {
-  rxvec2_t r;
-  r.x = v.x;
-  r.y = v.y;
-  return r;
+	rxvec2_t r;
+	r.x = v.x;
+	r.y = v.y;
+	return r;
 }
 
 
