@@ -674,23 +674,17 @@ rlOS_pollWindowEvents();
 #define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
 # endif
 
-ccfunc ccinle int rlIO_testCtrlKey()
-{ return rx.wnd.in.kbrd.is_ctrl; }
-
-ccfunc ccinle int rlIO_testMenuKey()
-{ return rx.wnd.in.kbrd.is_menu; }
-
-ccfunc ccinle int rlIO_testShiftKey()
-{ return rx.wnd.in.kbrd.is_shft; }
-
-ccfunc ccinle int rxtstbtn(int x)
-{ return IS_DOWN(x); }
+#define rlIO_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
+#define rlIO_testMenuKey()  (rx.wnd.in.kbrd.is_menu != 0)
+#define rlIO_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
+#define rlIO_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
+#define rlIO_testFKey(xx) (rlIO_testKey(rx_kKEY_F1 + rlI_clamp(xx,1,12)-1))
 
 int
-rlIO_testKey(int x)
-{
-	return rx.wnd.in.kbrd.key[x] != 0;
+rxtstbtn(int x) {
+	return IS_DOWN(x);
 }
+
 
 int rxchr()
 {
@@ -879,10 +873,10 @@ void rximp_clip(int x0, int y0, int x1, int y1)
 	ccassert(y0 <= y1);
 
 /* todo: */
-	x0 = rxclampi(x0,0,rx.wnd.size_x);
-	y0 = rxclampi(y0,0,rx.wnd.size_y);
-	x1 = rxclampi(x1,0,rx.wnd.size_x);
-	y1 = rxclampi(y1,0,rx.wnd.size_y);
+	x0 = rlI_clamp(x0,0,rx.wnd.size_x);
+	y0 = rlI_clamp(y0,0,rx.wnd.size_y);
+	x1 = rlI_clamp(x1,0,rx.wnd.size_x);
+	y1 = rlI_clamp(y1,0,rx.wnd.size_y);
 
 	D3D11_RECT rect_d3d;
 	rect_d3d.left  = x0;
@@ -1021,7 +1015,7 @@ rl__createColorTargetFromWindow()
 }
 
 void
-rlInitWindowed(const wchar_t *windowTitle) {
+rl_initWindowed(const wchar_t *windowTitle) {
 	rxsystem_init();
 
 	UINT DriverModeFlags =

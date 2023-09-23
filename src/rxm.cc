@@ -127,7 +127,7 @@ int rxpow2i(int x)
   return x*x;
 }
 
-int rxclampi(int val, int min, int max)
+int rlI_clamp(int val, int min, int max)
 {
   return val<min?min:
          val>max?max: val;
