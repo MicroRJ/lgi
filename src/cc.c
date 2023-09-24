@@ -169,8 +169,6 @@ extern "C" {
 	ccfunc ccinle cccaller_t cccaller(int guid, const char *file, int line, const char *func);
 #define cccall() (cccaller(__COUNTER__,_CCFILE,_CCLINE,_CCFUNC))
 
-/* everyone know you need to always create your own allocator functions,
-  otherwise you have a small pp */
 	void *
 	ccmalloc(size_t length)
 	{

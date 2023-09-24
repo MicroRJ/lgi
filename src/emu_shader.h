@@ -136,5 +136,5 @@ typedef struct
 	int flags, char const *label, size_t length, void *memory);
 
 	rxShader
-	rlShaderLoadFromFile(
+	rx_loadShaderFromFile(
 	int flags, char const *entry, char const *fpath);

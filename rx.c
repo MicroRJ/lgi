@@ -87,40 +87,43 @@
 #include        <dxgi.h>
 #include     <dxgi1_3.h>
 
-
 #ifndef EMU_MALLOC
 #define EMU_MALLOC(size,user) ((void)(user),ccmalloc(size))
-# endif
+#endif
 #ifndef EMU_REALLOC
 #define EMU_REALLOC(size,memory,user) ((void)(user),ccrealloc(size,memory))
-# endif
+#endif
 #ifndef EMU_FREE
 #define EMU_FREE(memory,user) ((void)(user),ccfree(memory))
-# endif
+#endif
 
-#   ifdef _RX_STANDALONE
-#	include <src/cc.c>
-#	define STB_IMAGE_IMPLEMENTATION
-#	define STBI_MALLOC(size)          EMU_MALLOC(size,NULL)
-#	define STBI_REALLOC(size,memory)  EMU_REALLOC(size,memory,NULL)
-#	define STBI_FREE(memory)          EMU_FREE(memory,NULL)
-#	include <stb/stb_image.h>
-#  define STB_IMAGE_WRITE_IMPLEMENTATION
-#  define STBIW_MALLOC(size)         EMU_MALLOC(size,NULL)
-#  define STBIW_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
-#  define STBIW_FREE(memory)         EMU_FREE(memory,NULL)
-#	include <stb/stb_image_write.h>
-#	pragma warning(push)
-#		pragma warning(disable:4100)
-#		define STB_TRUETYPE_IMPLEMENTATION
-#		define STBTT_malloc(size,u) EMU_MALLOC(size,NULL)
-#		define STBTT_free(memory,u) EMU_FREE(memory,NULL)
-#		include <stb/stb_truetype.h>
-#	pragma warning(pop)
+#if defined(_RX_STANDALONE)
+
 # ifndef STB_SPRINTF_IMPLEMENTATION
 # define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
 #  endif
+
+#include <src/cc.c>
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_MALLOC(size) EMU_MALLOC(size,NULL)
+#define STBI_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
+#define STBI_FREE(memory) EMU_FREE(memory,NULL)
+#include <stb/stb_image.h>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#define STBIW_MALLOC(size) EMU_MALLOC(size,NULL)
+#define STBIW_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
+#define STBIW_FREE(memory) EMU_FREE(memory,NULL)
+#include <stb/stb_image_write.h>
+// #pragma warning(push)
+// #pragma warning(disable:4100)
+// #define STB_TRUETYPE_IMPLEMENTATION
+// #define STBTT_malloc(size,u) EMU_MALLOC(size,NULL)
+// #define STBTT_free(memory,u) EMU_FREE(memory,NULL)
+// #include <stb/stb_truetype.h>
+// #pragma warning(pop)
 #endif//_RX_STANDALONE
 
 /* todo: this is to be embedded eventually */
@@ -186,10 +189,10 @@ typedef struct rxcolor8_t
 { unsigned char r,g,b,a;
 } rxcolor8_t;
 
-typedef rxvec4_t rxcolor_t;
+typedef rxvec4_t rlColor;
 
 #ifndef RX_RGBA
-#define RX_RGBA(R,G,B,A) RX_TLIT(rxcolor_t){R,G,B,A}
+#define RX_RGBA(R,G,B,A) RX_TLIT(rlColor){R,G,B,A}
 # endif
 #ifndef RX_RGBA_UNORM
 #define RX_RGBA_UNORM(R,G,B,A) RX_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)

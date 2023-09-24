@@ -1,6 +1,8 @@
 #ifndef _RXM_HEADER
 #define _RXM_HEADER
 
+#include <math.h>
+
 #define rxPI_F 3.14159265358979323846f
 #define rxPI   3.14159265358979323846
 #define rxABS(v)   ((v)<(0)?-(v):(v))

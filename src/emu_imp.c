@@ -214,7 +214,7 @@ rxvtx_xyuv(float x, float y, float u, float v)
 }
 
 ccfunc ccinle Emu_imp_vertex_t
-rxvtx_xyuv_col(float x, float y, float u, float v, rxcolor_t rgba)
+rxvtx_xyuv_col(float x, float y, float u, float v, rlColor rgba)
 {
 	rx.imp.attr.xyzw.x =  x;
 	rx.imp.attr.xyzw.y =  y;
@@ -265,7 +265,7 @@ rxaddnvtx(int num, ...)
 
 void
 Emu_imp_circle_sdf(
-rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softness )
+rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness )
 {
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
@@ -299,7 +299,7 @@ rlIM_drawBoxSDF(float x, float y, float w, float h, float r, float s) {
 
 void
 Emu_imp_rect_sdf(
-rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softness )
+rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness )
 {
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
@@ -324,7 +324,7 @@ rxvec2_t center, rxvec2_t radius, rxcolor_t color, float roundness, float softne
 
 void
 Emu_imp_rect_uv(
-rxcolor_t color, rlTexture *texture,
+rlColor color, rlTexture *texture,
 rxsampler_t sampler, float x, float y, float w, float h)
 {
 	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};
@@ -350,7 +350,7 @@ rxsampler_t sampler, float x, float y, float w, float h)
 }
 
 void
-Emu_imp_rect(rxcolor_t color, float x, float y, float w, float h)
+Emu_imp_rect(rlColor color, float x, float y, float w, float h)
 {
 	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};
 	rxvec2_t xy1 = (rxvec2_t){x+w,y+h};
@@ -373,7 +373,7 @@ Emu_imp_rect(rxcolor_t color, float x, float y, float w, float h)
 
 ccfunc void
 Emu_imp_line(
-rxcolor_t color, float thickness, float x0, float y0, float x1, float y1)
+rlColor color, float thickness, float x0, float y0, float x1, float y1)
 {
 	float xdist=x1-x0;
 	float ydist=y1-y0;
@@ -396,7 +396,7 @@ rxcolor_t color, float thickness, float x0, float y0, float x1, float y1)
 /* todo: this has to be re-visited for sub-pixel rendering */
 void
 Emu_imp_outline(
-rxcolor_t color, float x, float y, float w, float h)
+rlColor color, float x, float y, float w, float h)
 {
 	Emu_imp_rect(color,x-.5,y+h-.5,w+.5,1.);
 	Emu_imp_rect(color,x-.5,y+0-.5,w+.5,1.);

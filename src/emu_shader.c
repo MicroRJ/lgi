@@ -36,9 +36,7 @@ rxShaderCreateFromBytecode(int flags, char const *label, size_t hlsl_length, voi
 }
 
 rxShader
-rlShaderLoadFromFile(
-int flags, char const *entry, char const *fpath)
-{
+rx_loadShaderFromFile(int flags, char const *entry, char const *fpath) {
 	rxShaderConfig config;
 	ZeroMemory(&config,sizeof(config));
 	config.flags = flags;
