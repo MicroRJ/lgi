@@ -88,13 +88,43 @@
 #include     <dxgi1_3.h>
 
 #ifndef EMU_MALLOC
-#define EMU_MALLOC(size,user) ((void)(user),ccmalloc(size))
+#define EMU_MALLOC(size,user) ((void)(user),malloc(size))
 #endif
 #ifndef EMU_REALLOC
-#define EMU_REALLOC(size,memory,user) ((void)(user),ccrealloc(size,memory))
+#define EMU_REALLOC(size,memory,user) ((void)(user),realloc(size,memory))
 #endif
 #ifndef EMU_FREE
-#define EMU_FREE(memory,user) ((void)(user),ccfree(memory))
+#define EMU_FREE(memory,user) ((void)(user),free(memory))
+#endif
+#define EMU_ALLOC_TYPE(T) ((T*)EMU_MALLOC(sizeof(T),NULL))
+
+#define rxLOG_trace(fmt,...) (0)
+#define rxLOG_error(fmt,...) (0)
+
+#define isWithin(x,l,r) (((x)>=(l))&&((x)<=(r)))
+#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
+
+#define rxAPI static
+#define rxGlobal static
+
+#define rxNull NULL
+#define rxTrue  ((__int32) 1)
+#define rxFalse ((__int32) 0)
+
+
+#define rxPI_F 3.14159265358979323846f
+#define rxPI   3.14159265358979323846
+#define rxABS(v)   ((v)<(0)?-(v):(v))
+#define rxMIN(x,y) ((x)<(y)? (x):(y))
+#define rxMAX(x,y) ((x)>(y)? (x):(y))
+
+// todo: enhance these assertions? ...
+#ifndef rxEnsure
+# ifdef _DEBUG
+#  define rxEnsure(is_true,...) do{ if(!(is_true)) { rxLOG_error("assertion triggered",0); __debugbreak(); } } while(0)
+# else
+#  define rxEnsure(is_true,...) rxNull
+# endif
 #endif
 
 #if defined(_RX_STANDALONE)
@@ -104,7 +134,7 @@
 #include <stb/stb_sprintf.h>
 #  endif
 
-#include <src/cc.c>
+#include <src/dlb.c>
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_MALLOC(size) EMU_MALLOC(size,NULL)
@@ -117,13 +147,6 @@
 #define STBIW_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
 #define STBIW_FREE(memory) EMU_FREE(memory,NULL)
 #include <stb/stb_image_write.h>
-// #pragma warning(push)
-// #pragma warning(disable:4100)
-// #define STB_TRUETYPE_IMPLEMENTATION
-// #define STBTT_malloc(size,u) EMU_MALLOC(size,NULL)
-// #define STBTT_free(memory,u) EMU_FREE(memory,NULL)
-// #include <stb/stb_truetype.h>
-// #pragma warning(pop)
 #endif//_RX_STANDALONE
 
 /* todo: this is to be embedded eventually */
@@ -182,354 +205,115 @@
 # endif//RX_DEBUGGABLE_SHADERS
 # endif//RX_SHADER_COMPILATION_FLAGS
 
-#include <src/rxm.cc>
-
-typedef struct rxcolor8_t rxcolor8_t;
-typedef struct rxcolor8_t
-{ unsigned char r,g,b,a;
-} rxcolor8_t;
-
-typedef rxvec4_t rlColor;
-
-#ifndef RX_RGBA
-#define RX_RGBA(R,G,B,A) RX_TLIT(rlColor){R,G,B,A}
-# endif
-#ifndef RX_RGBA_UNORM
-#define RX_RGBA_UNORM(R,G,B,A) RX_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
-# endif
-
-/*
-**
-**  NOLI SE TANGERE
-**
-*/
-
-/* This could be made into an enum instead - XXX - the one called rj */
-#define RX_COLOR_WHITE         RX_RGBA_UNORM(0xFF, 0xFF, 0xFF, 0xFF)
-#define RX_COLOR_BLACK         RX_RGBA_UNORM(0x00, 0x00, 0x00, 0xFF)
-#define RX_COLOR_RED           RX_RGBA_UNORM(0xFF, 0x00, 0x00, 0xFF)
-#define RX_COLOR_GREEN         RX_RGBA_UNORM(0x00, 0xFF, 0x00, 0xFF)
-#define RX_COLOR_BLUE          RX_RGBA_UNORM(0x00, 0x00, 0xFF, 0xFF)
-#define RX_COLOR_YELLOW        RX_RGBA_UNORM(0xFF, 0xFF, 0x00, 0xFF)
-#define RX_COLOR_CYAN          RX_RGBA_UNORM(0x00, 0xFF, 0xFF, 0xFF)
-#define RX_COLOR_MAGENTA       RX_RGBA_UNORM(0xFF, 0x00, 0xFF, 0xFF)
-#define RX_COLOR_ORANGE        RX_RGBA_UNORM(0xFF, 0xA5, 0x00, 0xFF)
-#define RX_COLOR_PURPLE        RX_RGBA_UNORM(0x80, 0x00, 0x80, 0xFF)
-#define RX_COLOR_PINK          RX_RGBA_UNORM(0xFF, 0xC0, 0xCB, 0xFF)
-#define RX_COLOR_LIME          RX_RGBA_UNORM(0x00, 0xFF, 0x00, 0xFF)
-#define RX_COLOR_TEAL          RX_RGBA_UNORM(0x00, 0x80, 0x80, 0xFF)
-#define RX_COLOR_SKY_BLUE      RX_RGBA_UNORM(0x87, 0xCE, 0xEB, 0xFF)
-#define RX_COLOR_GOLD          RX_RGBA_UNORM(0xFF, 0xD7, 0x00, 0xFF)
-#define RX_COLOR_INDIGO        RX_RGBA_UNORM(0x4B, 0x00, 0x82, 0xFF)
-#define RX_COLOR_SILVER        RX_RGBA_UNORM(0xC0, 0xC0, 0xC0, 0xFF)
-#define RX_COLOR_TURQUOISE     RX_RGBA_UNORM(0x40, 0xE0, 0xD0, 0xFF)
-#define RX_COLOR_CORAL         RX_RGBA_UNORM(0xFF, 0x7F, 0x50, 0xFF)
-#define RX_COLOR_ORCHID        RX_RGBA_UNORM(0xDA, 0x70, 0xD6, 0xFF)
-#define RX_COLOR_LAVENDER      RX_RGBA_UNORM(0xE6, 0xE6, 0xFA, 0xFF)
-#define RX_COLOR_MAROON        RX_RGBA_UNORM(0x80, 0x00, 0x00, 0xFF)
-#define RX_COLOR_NAVY          RX_RGBA_UNORM(0x00, 0x00, 0x80, 0xFF)
-#define RX_COLOR_OLIVE         RX_RGBA_UNORM(0x80, 0x80, 0x00, 0xFF)
-#define RX_COLOR_SALMON        RX_RGBA_UNORM(0xFA, 0x80, 0x72, 0xFF)
-#define RX_COLOR_AQUAMARINE    RX_RGBA_UNORM(0x7F, 0xFF, 0xD4, 0xFF)
-
 typedef enum {
-	EMU_ERROR_NONE = 0,
-	EMU_ERROR_CREATE_TEXTURE,
-	EMU_ERROR
-} rlError;
+	rxError_kNONE = 0,
+	rxError_kUNKNOWN,
+	rxError_kCREATE_TEXTURE,
+} rxError;
 
 enum {
 	EMU_FORMAT_R8_UNORM 		  = DXGI_FORMAT_R8_UNORM,
 	EMU_FORMAT_R8G8B8A8_UNORM = DXGI_FORMAT_R8G8B8A8_UNORM
 };
 
+#include <src/vec.c>
+
+/*
+**
+**  NOLI SE TANGERE
+**
+*/
+typedef rxvec4_t rlColor;
+
+#ifndef rxColor_RGBA
+#define rxColor_RGBA(R,G,B,A) RX_TLIT(rlColor){R,G,B,A}
+# endif
+#ifndef rxColor_RGBA_U
+#define rxColor_RGBA_U(R,G,B,A) rxColor_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
+# endif
+
+#define rxColor_WHITE         rxColor_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
+#define rxColor_BLACK         rxColor_RGBA_U(0x00, 0x00, 0x00, 0xFF)
+#define rxColor_RED           rxColor_RGBA_U(0xFF, 0x00, 0x00, 0xFF)
+#define rxColor_GREEN         rxColor_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define rxColor_BLUE          rxColor_RGBA_U(0x00, 0x00, 0xFF, 0xFF)
+#define rxColor_YELLOW        rxColor_RGBA_U(0xFF, 0xFF, 0x00, 0xFF)
+#define rxColor_CYAN          rxColor_RGBA_U(0x00, 0xFF, 0xFF, 0xFF)
+#define rxColor_MAGENTA       rxColor_RGBA_U(0xFF, 0x00, 0xFF, 0xFF)
+#define rxColor_ORANGE        rxColor_RGBA_U(0xFF, 0xA5, 0x00, 0xFF)
+#define rxColor_PURPLE        rxColor_RGBA_U(0x80, 0x00, 0x80, 0xFF)
+#define rxColor_PINK          rxColor_RGBA_U(0xFF, 0xC0, 0xCB, 0xFF)
+#define rxColor_LIME          rxColor_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define rxColor_TEAL          rxColor_RGBA_U(0x00, 0x80, 0x80, 0xFF)
+#define rxColor_SKY_BLUE      rxColor_RGBA_U(0x87, 0xCE, 0xEB, 0xFF)
+#define rxColor_GOLD          rxColor_RGBA_U(0xFF, 0xD7, 0x00, 0xFF)
+#define rxColor_INDIGO        rxColor_RGBA_U(0x4B, 0x00, 0x82, 0xFF)
+#define rxColor_SILVER        rxColor_RGBA_U(0xC0, 0xC0, 0xC0, 0xFF)
+#define rxColor_TURQUOISE     rxColor_RGBA_U(0x40, 0xE0, 0xD0, 0xFF)
+#define rxColor_CORAL         rxColor_RGBA_U(0xFF, 0x7F, 0x50, 0xFF)
+#define rxColor_ORCHID        rxColor_RGBA_U(0xDA, 0x70, 0xD6, 0xFF)
+#define rxColor_LAVENDER      rxColor_RGBA_U(0xE6, 0xE6, 0xFA, 0xFF)
+#define rxColor_MAROON        rxColor_RGBA_U(0x80, 0x00, 0x00, 0xFF)
+#define rxColor_NAVY          rxColor_RGBA_U(0x00, 0x00, 0x80, 0xFF)
+#define rxColor_OLIVE         rxColor_RGBA_U(0x80, 0x80, 0x00, 0xFF)
+#define rxColor_SALMON        rxColor_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
+#define rxColor_AQUAMARINE    rxColor_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
+
+
 enum {
-	rx_kNONE   = 0,
-
-	rx_kKEY_F1,
-	rx_kKEY_F2,
-	rx_kKEY_F3,
-	rx_kKEY_F4,
-	rx_kKEY_F5,
-	rx_kKEY_F6,
-	rx_kKEY_F7,
-	rx_kKEY_F8,
-	rx_kKEY_F9,
-	rx_kKEY_F10,
-	rx_kKEY_F11,
-	rx_kKEY_F12,
-
-	rx_kRETURN,
-
-	rx_kKEY_LEFT,
-	rx_kKEY_RIGHT,
-	rx_kKEY_UP,
-	rx_kKEY_DOWN,
-
-	rx_kLCTRL,
-	rx_kRCTRL,
-	rx_kLSFHT,
-	rx_kRSFHT,
-	rx_kBCKSPC,
-	rx_kDELETE,
-	rx_kHOME,
-	rx_kEND,
+	rx_kNONE = 0,
 	rx_kESCAPE,
-
-	rx_kKEY_SPACE = ' ',
-	rx_kKEY_A     = 'A',
-	rx_kKEY_Z     = 'Z',
-	rx_kKEY_0     = '0',
-	rx_kKEY_9     = '9',
+	rxKEY_kLEFT,rxKEY_kRIGHT,rxKEY_kUP,rxKEY_kDOWN,
+	rxKEY_kF1,rxKEY_kF2,rxKEY_kF3,rxKEY_kF4,rxKEY_kF5,
+	rxKEY_kF6,rxKEY_kF7,rxKEY_kF8,rxKEY_kF9,
+	rxKEY_kF10,rxKEY_kF11,rxKEY_kF12,
+	rxKEY_kRETURN,
+	rx_kLCTRL,rx_kRCTRL,
+	rx_kLSFHT,rx_kRSFHT,
+	rx_kBCKSPC,rx_kDELETE,
+	rx_kHOME,rx_kEND,
+	rxKEY_kSPACE = ' ',
+	rxKEY_kA     = 'A',
+	rxKEY_kZ     = 'Z',
+	rxKEY_k0     = '0',
+	rxKEY_k9     = '9',
 };
 
-// note: is this is good name?
-typedef struct rxborrowed_t rxborrowed_t;
-typedef struct rxborrowed_t
-{
-	int length;
-	int stride;
-
-	union
-	{ unsigned char *cursor;
-		void *memory;
-	};
-
-/* this will be removed possibly if we ever switch to a handle based system */
-	struct
-	{
-		ID3D11Resource * resource;
-	} d3d11;
-} rxborrowed_t;
-
-typedef ID3D11DeviceChild *rxunknown_t;
-
-/* these are stupid */
-ccfunc ccinle void
-rxunknown_delete(void *unknown);
-
-ccfunc rxborrowed_t
-rxunknown_borrow(rxunknown_t buffer);
-
-/* section: GPU buffers */
-typedef struct rxuniform_buffer_t rxuniform_buffer_t;
-typedef struct rxuniform_buffer_t
-{
-	rxunknown_t unknown;
-} rxuniform_buffer_t;
+typedef ID3D11DeviceChild *rxGPU_Handle;
 
 void
-rxuniform_buffer_delete(
-rxuniform_buffer_t buffer );
+rxGPU_closeHandle(rxGPU_Handle handle) {
 
-void
-rxuniform_buffer_update(
-rxuniform_buffer_t uniform, void *memory, size_t length );
-
-typedef struct rxstruct_buffer_t rxstruct_buffer_t;
-typedef struct rxstruct_buffer_t
-{
-	rxunknown_t unknown;
-} rxstruct_buffer_t;
-
-void
-rxstruct_buffer_delete(
-rxstruct_buffer_t);
-
-typedef struct rxindex_buffer_t rxindex_buffer_t;
-typedef struct rxindex_buffer_t
-{
-	rxunknown_t unknown;
-} rxindex_buffer_t;
-
-void
-rxindex_buffer_delete(
-rxindex_buffer_t);
-
-typedef struct rxvertex_buffer_t rxvertex_buffer_t;
-typedef struct rxvertex_buffer_t
-{
-	rxunknown_t unknown;
-} rxvertex_buffer_t;
-
-void
-rxvertex_buffer_delete(
-rxvertex_buffer_t);
-
-
-/* section: GPU sampler */
-typedef struct rxsampler_t
-{
-	struct
-	{
-
-		ID3D11SamplerState *state;
-	} d3d11;
-} rxsampler_t;
-
-typedef struct {
-	int    format;
-	int    size_x;
-	int    size_y;
-  	/* multisampling, default should be 1,0 */
-	int    samples;
-	int    quality;
-
-  	/* replace this with a single flag field instead #todo */
-	struct {
-  		/* GPU allocation flags */
-		D3D11_USAGE memtype;
-		int useflag;
-    	/* CPU access flags */
-		int memflag;
-	};
-
-	/* memory and stride are optional, if memory provided stride may not be 0 */
-	int    stride;
-	void  *memory;
-
- 	/* optional in/out */
-	struct {
-		union {
-			ID3D11Resource  *resource;
-			ID3D11Texture2D *texture_2d;
-		};
-
-		ID3D11ShaderResourceView  *shader_target;
-		ID3D11RenderTargetView     *color_target;
-		ID3D11DepthStencilView     *depth_target;
-	} d3d11;
-
-} rlTextureConfig;
-
-rlTextureConfig
-rlGPU_textureConfigInit(
-/* +- */int size_x,
-/* +- */int size_y,
-/* +- */DXGI_FORMAT format,
-/* +- */int     stride,
-/* +- */void  * memory,
-/* +- */int    samples,
-/* +- */int    quality,
-/* +- */D3D11_USAGE    memtype,
-/* +- */int    			useflag,
-/* +- */int    			memflag );
-
-/* base texture object for all other textures */
-typedef struct
-{
-	int format;
-	int size_x;
-	int size_y;
-	int samples;
-	int quality;
-
-  /* feeling this out, do not use directly just in case #pending #important */
-	struct
-	{
-		int   stride;
-		void *memory;
-	} mapped;
-
-  /* doing too much? #pending
-  struct
-  {
-	  void    *memory;
-	  int      stride;
-	  unsigned dirty: 1;
-  } hosted; */
-
-	struct
-	{ union
-		{ ID3D11Resource  *resource;
-			ID3D11Texture2D *texture_2d;
-		};
-
-    /* views are optional  */
-		ID3D11ShaderResourceView *shader_target;
-		ID3D11RenderTargetView   *color_target;
-		ID3D11DepthStencilView   *depth_target;
-	} d3d11;
-
-} rlTexture;
-
-typedef struct {
-	int   size_x, size_y;
-	int   format;
-	int   stride;
-	void * memory;
-} rlImage;
-
-rlImage
-rlCPU_loadImage(const char *name);
-
-rlTexture *
-rlCPU_uploadImage(rlImage texture);
-
-rlImage
-rlCPU_makeImage(int size_x, int size_y, int format);
-
-rlError
-rlGPU_initTexture(rlTexture *texture, rlTextureConfig *config);
-
-rlTexture *
-rlGPU_createTexture(rlTextureConfig *config);
-
-rlTexture *
-rlGPU_makeTexture(int size_x, int size_y, DXGI_FORMAT format, int stride, void *memory);
-
-rlTexture *
-rlGPU_makeDepthTarget(int size_x, int size_y, int format);
-
-rlTexture *
-rlGPU_makeColorTarget(int size_x, int size_y, int format, int samples, int quality);
-
-void *
-rlGPU_borrowTexture(rlTexture *texture, int *stride);
-
-void
-rlGPU_returnTexture(rlTexture *texture);
-
-/* pass in the region to update #todo */
-void
-rlGPU_updateTexture(rlTexture *texture, rlImage memory_ ) {
-
-	ccassert(memory_.format == texture->format);
-
-	int   stride;
-	void *memory = rlGPU_borrowTexture(texture,&stride);
-
-	memcpy(memory,memory_.memory,memory_.size_y*memory_.stride);
-
-	rlGPU_returnTexture(texture);
+	if (handle != 0) {
+		IUnknown_Release(handle);
+	}
 }
 
+typedef struct rx_Image rx_Image;
 
-#include <src/emu_shader.h>
-#include <src/rx.program.c>
-#include <src/emu_imp.h>
-
-/* todo */
-typedef unsigned __int64 rxclocktick_t;
+#include <src/rxgpu.h>
+#include <src/rximp.h>
 
 typedef struct rx_t rx_t;
 typedef struct rx_t {
-/* timing stuff */
-	int   tick_count;
-	rxclocktick_t   start_ticks;
-	rxclocktick_t   frame_ticks;
-	rxclocktick_t   total_ticks;
-	rxclocktick_t   delta_ticks;
-/* todo!: there are more correct and robust ways to store time long term, @TomForsyth */
+
+	/* timing stuff */
+	__int64 frame_count;
+	unsigned __int64   start_ticks;
+	unsigned __int64   frame_ticks;
+	unsigned __int64   total_ticks;
+	unsigned __int64   delta_ticks;
+
+	/* [[TODO]]: there are more correct and robust ways to store time long term, @TomForsyth */
 	double          total_seconds;
 	double          delta_seconds;
 
-/* todo: constants, should be upper case */
-	rxsampler_t          linear_sampler;
-	rxsampler_t          point_sampler;
-	rxsampler_t          anisotropic_sampler;
+	/* todo: constants, should be upper case */
+	rxGPU_Sampler linear_sampler;
+	rxGPU_Sampler point_sampler;
+	rxGPU_Sampler anisotropic_sampler;
 
-/* main stuff */
+
 	struct {
 		struct {
 			ID3D11InfoQueue        *inf;
@@ -538,15 +322,12 @@ typedef struct rx_t {
 		};
 	} d3d11;
 
-
-
-/* window related structure, we only support one window for now but it'd be
-trivial to extend this */
+	/* window related structure, we only support one window for now but it'd be
+		trivial to extend this */
 	struct {
 		unsigned  off: 1;
 		unsigned  vis: 1;
 
-/* window dimensions */
 		struct {
 			int size_x;
 			int size_y;
@@ -554,14 +335,13 @@ trivial to extend this */
 			int center_y;
 		};
 
-/* native window objects */
 		struct {
-			HWND obj;
+			HWND handle;
 		} win32;
 
-/* output media */
+		/* output media */
 		struct {
-			rlTexture *tar;
+			rxGPU_Texture *tar;
 
 			struct {
 				IDXGISwapChain2 *swap_chain;
@@ -569,11 +349,11 @@ trivial to extend this */
 			} d3d11;
 		} out;
 
-/* input handling members, these get updated once every tick */
+		/* input handling members, these get updated once every tick */
 		struct {
 			struct {
 /* todo: store this better - rj */
-				short    chr;
+				int chr;
 
 /* todo: store this better */
 				char     key_lst[0x100];
@@ -606,9 +386,7 @@ trivial to extend this */
 	} win32;
 
 
-	Emu_imp_t imp;
-	pipenv_t  pip;
-	int       upl;
+	rxIMP_Context   imp;
 
 	/* [[NOTE]]: not sure how well this is going to work in the long run */
 #ifdef RX_EXTENSION_SLOT_0
@@ -620,48 +398,132 @@ trivial to extend this */
 } rx_t;
 
 /* the source of all evil is here */
-ccglobal rx_t rx;
+rxGlobal rx_t rx;
 
+#include <src/rxgpu.c>
+#include <src/rximp.c>
 
-ccfunc ccinle rxclocktick_t
-rxclockfreq()
-{
+/* [[TODO]]:
+	This is temporary */
+void
+rx_unloadFileContents(LPVOID fileContents) {
+	VirtualFree(fileContents,0,MEM_RELEASE);
+}
+
+/* [[TODO]]:
+	This is temporary */
+void *
+rx_loadFileContents(char const *fileName, __int32 *lpSize) {
+	*lpSize = 0;
+	char *lpBuffer = rxNull;
+	HANDLE hFile = CreateFileA(fileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
+	if (hFile != INVALID_HANDLE_VALUE) {
+		DWORD highFileSize;
+		DWORD lowFileSize = GetFileSize(hFile,&highFileSize);
+		lpBuffer = VirtualAlloc(NULL,lowFileSize,MEM_COMMIT|MEM_RESERVE,0);
+		DWORD bytesRead;
+		if (ReadFile(hFile,lpBuffer,lowFileSize,&bytesRead,NULL) != FALSE) {
+			*lpSize = bytesRead;
+		} else {
+			rx_unloadFileContents(lpBuffer);
+			lpBuffer = rxNull;
+		}
+		CloseHandle(hFile);
+	}
+	return lpBuffer;
+}
+
+rxGPU_Shader
+rx_loadShaderFromFile(int flags, char const *label, char const *entry, char const *fileName) {
+	rxGPU_SHADER config;
+	ZeroMemory(&config,sizeof(config));
+	config.flags = flags;
+	config.label = label;
+	__int32 length = 0;
+	void *memory = rx_loadFileContents(fileName,&length);
+	config.source.compile.memory = memory;
+	config.source.compile.length = length;
+	config.source.compile.entry = entry;
+	rxGPU_Shader shader;
+	rxGPU_initShader(&shader,&config);
+	rx_unloadFileContents(memory);
+	return shader;
+}
+
+rxGPU_Texture *
+rx_loadImageFromFile(rx_Image image) {
+	return rxGPU_makeTexture(image.size_x,image.size_y,image.format,image.stride,image.memory);
+}
+
+rx_Image
+rx_makeImage(int size_x, int size_y, int format) {
+	int bpp = 0;
+	if (format == EMU_FORMAT_R8_UNORM) {
+		bpp = 1;
+	} else
+	if (format == EMU_FORMAT_R8G8B8A8_UNORM) {
+		bpp = 4;
+	}
+
+	rxEnsure(bpp != 0);
+
+	rx_Image result;
+	result.size_x = size_x;
+	result.size_y = size_y;
+	result.format = format;
+	result.stride = size_x * bpp;
+	result.memory = EMU_MALLOC(size_y * size_x * bpp, NULL);
+
+	return result;
+}
+
+rx_Image
+rx_loadImage(const char *name) {
+
+	rx_Image result;
+	ZeroMemory(&result,sizeof(result));
+
+  	/* XXX use own memory */
+	void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
+
+	result.format=EMU_FORMAT_R8G8B8A8_UNORM;
+	result.memory=memory;
+	result.stride=result.size_x*4;
+	return result;
+}
+
+unsigned __int64
+rx_getClockFrequency() {
+
 	LARGE_INTEGER l;
 	QueryPerformanceFrequency(&l);
 	return l.QuadPart;
 }
 
-ccfunc ccinle rxclocktick_t
-rxticktally()
-{
+unsigned __int64
+rx_getClockTicks() {
 	LARGE_INTEGER l;
 	QueryPerformanceCounter(&l);
 	return l.QuadPart;
 }
 
+void rx_pollClock() {
 
-
-/* section: basic system functions */
-
-void
-Emu_system_set_cursor(/*todo*/HCURSOR cursor)
-{
-	SetCursor(cursor);
+	/* todo: */
+	unsigned __int64 freq = rx_getClockFrequency();
+	unsigned __int64 ticks = rx_getClockTicks();
+	rx.total_ticks = ticks-rx.start_ticks;
+	rx.total_seconds = rx.total_ticks / (double) freq;
+	rx.delta_ticks=ticks-rx.frame_ticks;
+	rx.delta_seconds = rx.delta_ticks / (double) freq;
+	rx.frame_ticks=ticks;
 }
 
-#include <src/rx.program.cc>
-
-
-/* section: windowing functions */
 int
-rxwndmsg_handler_win32(UINT,WPARAM,LPARAM);
+rx_window_message_handler_win32(UINT,WPARAM,LPARAM);
 
 LRESULT CALLBACK
-rxwndmsg_callback_win32(HWND,UINT,WPARAM,LPARAM);
-
-ccfunc void
-rlOS_pollWindowEvents();
-
+rx_window_message_callback_win32(HWND,UINT,WPARAM,LPARAM);
 
 /* todo: rename */
 #ifndef       WAS_DOWN
@@ -677,209 +539,27 @@ rlOS_pollWindowEvents();
 #define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
 # endif
 
-#define rlIO_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
-#define rlIO_testAltKey()  (rx.wnd.in.kbrd.is_menu != 0)
-#define rlIO_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
-#define rlIO_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
-#define rlIO_testFKey(xx) (rlIO_testKey(rx_kKEY_F1 + rlI_clamp(xx,1,12)-1))
+#define rx_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
+#define rx_testAltKey() (rx.wnd.in.kbrd.is_menu != 0)
+#define rx_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
+#define rx_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
+#define rx_testFKey(xx) (rx_testKey(rxKEY_kF1 + iclamp(xx,1,12)-1))
 
 int
-rxtstbtn(int x) {
-	return IS_DOWN(x);
-}
-
-
-int rxchr()
-{
+rx_testChar() {
 	return rx.wnd.in.kbrd.chr;
 }
 
-void rxunknown_delete(void *unknown)
-{
-	if(unknown != 0)
-	{
-		IUnknown_Release((rxunknown_t)(unknown));
-	}
-}
-
-void rxvertex_buffer_delete(rxvertex_buffer_t buffer)
-{
-	rxunknown_delete(buffer.unknown);
-}
-
-void rxindex_buffer_delete(rxindex_buffer_t buffer)
-{
-	rxunknown_delete(buffer.unknown);
-}
-
-/* section: pipeline config */
 void
-rxpipset_program(rxShader vs, rxShader ps, int flush)
-{
-	if( rx.pip.d3d11.vs != vs.d3d11.vertex_shader )
-	{
-		if(flush) {
-			Emu_imp_flush();
-		}
+rxGPU_setClip(int x0, int y0, int x1, int y1) {
+	rxEnsure(x0 <= x1);
+	rxEnsure(y0 <= y1);
 
-		rx.pip.d3d11.vs = vs.d3d11.vertex_shader;
-		rx.pip.d3d11.in = vs.d3d11.layout;
-		rx.upl = TRUE;
-
-		ccassert(rx.pip.d3d11.in != NULL);
-	}
-
-	if( rx.pip.d3d11.ps != ps.d3d11.pixel_shader )
-	{
-		if(flush) {
-			Emu_imp_flush();
-		}
-
-		rx.pip.ps_ = ps;
-
-		rx.pip.d3d11.ps = ps.d3d11.pixel_shader;
-		rx.upl = TRUE;
-
-		rx.pip.dual_source_blending =
-		(ps.flags & EMU_kSOURCE_BLENDING_BIT) != 0;
-	}
-}
-
-void
-regset(
-int reg, void *val, int flush)
-{
-	if(rx.pip.reg[reg].val != val)
-	{
-		if(flush) {
-			Emu_imp_flush();
-		}
-
-		rx.pip.reg[reg].val  = val;
-		rx.upl = TRUE;
-	}
-}
-
-/* todo: this should take the id of the resource */
-void
-rxpipset_sampler(
-int reg, rxsampler_t sampler, int flush)
-{
-	regset(reg,sampler.d3d11.state,flush);
-}
-
-void
-rxpipset_texture(
-int reg, rlTexture *texture, int flush)
-{
-	regset(reg,texture->d3d11.shader_target,flush);
-
-/* we should have a vtable type thing here? this way we can set these things?
-or in the flush function instead? idk #todo */
-	rx.imp.var.xysource.x = texture->size_x;
-	rx.imp.var.xysource.y = texture->size_y;
-}
-
-
-/* todo: this should take the id of the resource */
-void
-rxpipset_varying(
-int reg, rxuniform_buffer_t buffer, int flush)
-{
-	regset(reg,buffer.unknown,flush);
-}
-
-void
-pipupl()
-{
-	if(rx.upl != TRUE)
-	{
-		return;
-	}
-
-	rx.upl = FALSE;
-
-/* #todo */
-	ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,rx.pip.d3d11.ds,1);
-
-	if(rx.pip.dual_source_blending != FALSE) {
-		ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,
-		rx.imp.d3d11.subpixel_dual_blending_blend_state,0x00,0xFFFFFFFu);
-	} else {
-		ID3D11DeviceContext_OMSetBlendState(rx.d3d11.ctx,
-		rx.imp.d3d11.default_blend_state,0x00,0xFFFFFFFu);
-	}
-
-
-	ID3D11DeviceContext_VSSetShader(rx.d3d11.ctx,rx.pip.d3d11.vs,0x00,0);
-	ID3D11DeviceContext_PSSetShader(rx.d3d11.ctx,rx.pip.d3d11.ps,0x00,0);
-	ID3D11DeviceContext_CSSetShader(rx.d3d11.ctx,rx.pip.d3d11.cs,0x00,0);
-
-	for(int i=0;i<2;i+=1)
-	{ ID3D11DeviceContext_VSSetConstantBuffers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_BLC_0+i].d3d11.buffer);
-		ID3D11DeviceContext_PSSetConstantBuffers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_BLC_0+i].d3d11.buffer);
-
-		ID3D11DeviceContext_VSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_TEX_0+i].d3d11.resource_view);
-		ID3D11DeviceContext_PSSetShaderResources(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_TEX_0+i].d3d11.resource_view);
-
-		ID3D11DeviceContext_VSSetSamplers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_VS_SAM_0+i].d3d11.sampler);
-		ID3D11DeviceContext_PSSetSamplers(rx.d3d11.ctx,i,1,&rx.pip.reg[REG_PS_SAM_0+i].d3d11.sampler);
-	}
-
-/* pending: this a good placement? */
-	ID3D11DeviceContext_IASetInputLayout(rx.d3d11.ctx,rx.pip.d3d11.in);
-
-/* todo */
-	ID3D11RenderTargetView *render_targets[2] = { 0 };
-
-	if(rx.pip.out.color[0] != NULL) {
-		render_targets[0] = rx.pip.out.color[0]->d3d11.color_target;
-	}
-	if(rx.pip.out.color[1] != NULL) {
-		render_targets[1] = rx.pip.out.color[1]->d3d11.color_target;
-	}
-
-	ID3D11DeviceContext_OMSetRenderTargets(rx.d3d11.ctx,
-	rx.pip.out.count,render_targets,rx.pip.out.depth->d3d11.depth_target);
-
-	unsigned int Stride=sizeof(Emu_imp_vertex_t);
-	unsigned int Offset=0;
-
-	ID3D11DeviceContext_IASetVertexBuffers(rx.d3d11.ctx,0,1,
-	(ID3D11Buffer**)&rx.imp.asm_vtx.unknown,&Stride,&Offset);
-	ID3D11DeviceContext_IASetIndexBuffer(rx.d3d11.ctx,
-	(ID3D11Buffer *) rx.imp.asm_idx.unknown,DXGI_FORMAT_R32_UINT,0);
-/* get this from the right place */
-// D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP
-	ID3D11DeviceContext_IASetPrimitiveTopology(rx.d3d11.ctx,
-	D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-}
-
-#include <src/rx.buffer.cc>
-
-/* todo: deprecated, should use the appropiate pipenv function */
-void rxpipset_viewport(float w, float h)
-{ D3D11_VIEWPORT viewport_d3d;
-	viewport_d3d.TopLeftX=0;
-	viewport_d3d.TopLeftY=0;
-	viewport_d3d.   Width=w;
-	viewport_d3d.  Height=h;
-	viewport_d3d.MinDepth=0;
-	viewport_d3d.MaxDepth=1;
-	ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
-}
-
-
-void rximp_clip(int x0, int y0, int x1, int y1)
-{
-	ccassert(x0 <= x1);
-	ccassert(y0 <= y1);
-
-/* todo: */
-	x0 = rlI_clamp(x0,0,rx.wnd.size_x);
-	y0 = rlI_clamp(y0,0,rx.wnd.size_y);
-	x1 = rlI_clamp(x1,0,rx.wnd.size_x);
-	y1 = rlI_clamp(y1,0,rx.wnd.size_y);
+	/* todo: */
+	x0 = iclamp(x0,0,rx.wnd.size_x);
+	y0 = iclamp(y0,0,rx.wnd.size_y);
+	x1 = iclamp(x1,0,rx.wnd.size_x);
+	y1 = iclamp(y1,0,rx.wnd.size_y);
 
 	D3D11_RECT rect_d3d;
 	rect_d3d.left  = x0;
@@ -889,75 +569,164 @@ void rximp_clip(int x0, int y0, int x1, int y1)
 	ID3D11DeviceContext_RSSetScissorRects(rx.d3d11.ctx,1,&rect_d3d);
 }
 
-#include <src/emu_texture.c>
-#include <src/emu_shader.c>
-#include <src/emu_imp.c>
+/* XXXX */
+void
+rxpoll() {
+	/* todo: */
+	memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));
+	memset(rx.wnd.in.kbrd.key,                     0,sizeof(rx.wnd.in.kbrd.key));
+	rx.wnd.in.kbrd.chr = 0;
 
-ccfunc ccinle void
-Emu_window_clear()
-{
-/* should be the window stuff here instead dude #todo */
-	float clear_color[]={.0f,.0f,.0f,1.f};
+	rx.wnd.in.mice.yscroll = 0;
+	rx.wnd.in.mice.xscroll = 0;
+	rx.wnd.in.mice.btn_old = rx.wnd.in.mice.btn_cur;
+	rx.wnd.in.mice.btn_cur = 0;
 
-	ID3D11DeviceContext_ClearDepthStencilView(rx.d3d11.ctx,
-	rx.pip.out.depth->d3d11.depth_target,
-	D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
+	MSG message;
+	while (PeekMessage(&message,NULL,0,0,PM_REMOVE)) {
+		TranslateMessage(&message);
+		DispatchMessageW(&message);
+	}
 
-	for(int i=0; i<rx.pip.out.count; i+=1)
-	{
-		ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,
-		rx.pip.out.color[i]->d3d11.color_target,clear_color);
+	RECT client;
+	if (GetClientRect(rx.wnd.win32.handle,&client)) {
+		rx.wnd.size_x = client. right - client.left;
+		rx.wnd.size_y = client.bottom - client. top;
+		rx.wnd.center_x=rx.wnd.size_x>>1;
+		rx.wnd.center_y=rx.wnd.size_y>>1;
 	}
 }
 
-#include <src/rx.win32.cc>
+rxAPI int
+rxtick() {
 
-void rlTickClock() {
+	rx.frame_count += 1;
 
-	/* todo: */
-	rxclocktick_t freq = rxclockfreq();
+	rxpoll();
 
-	rxclocktick_t ticks = rxticktally();
-	rx.total_ticks = ticks-rx.start_ticks;
-	rx.total_seconds = rx.total_ticks / (double) freq;
-	rx.delta_ticks=ticks-rx.frame_ticks;
-	rx.delta_seconds = rx.delta_ticks / (double) freq;
-	rx.frame_ticks=ticks;
-}
+	/* todo */
+	SetCursor(rx.win32.cursor.arrow);
 
-int rlTick() {
+	rxIMP_flush();
 
-	rx.tick_count += 1;
+	/* this has to be formalized #todo */
+	rxGPU_copyTexture(rx.wnd.out.tar,rx.imp.pip.out.color[0]);
 
-	rlOS_pollWindowEvents();
+	if (rx.wnd.vis != TRUE) {
+		ShowWindow(rx.wnd.win32.handle,SW_SHOW);
+		rx.wnd.vis = TRUE;
+	}
 
-/* todo */
-	Emu_system_set_cursor(rx.win32.cursor.arrow);
+	if (rx.wnd.vis != FALSE) {
 
-	Emu_imp_flush();
+		HRESULT error = IDXGISwapChain_Present(rx.wnd.out.d3d11.swap_chain,1u,0);
 
-/* this has to be formalized #todo */
-	Emu_texture_copy(
-	rx.wnd.out.tar,rx.pip.out.color[0]);
+		if FAILED(error) {
+			return FALSE;
+		}
 
-	IDXGISwapChain_Present(rx.wnd.out.d3d11.swap_chain,1u,0);
+		/* this does not serve any purpose in full screen mode */
+		WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
+	}
 
-/* this does not serve any purpose in full screen mode */
-	WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
 
-	Emu_window_show();
+	float clear_color[] = {.0f,.0f,.0f,1.f};
+	ID3D11DeviceContext_ClearDepthStencilView(rx.d3d11.ctx,rx.imp.pip.out.depth->d3d11.depth_target,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
+	for(int i=0; i<rx.imp.pip.out.count; i+=1) {
+		ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,rx.imp.pip.out.color[i]->d3d11.color_target,clear_color);
+	}
 
-	Emu_window_clear();
 
-	rlTickClock();
+	rx_pollClock();
 
 	return !rx.wnd.off;
 }
 
-rlTexture *
-rl__createColorTargetFromWindow()
-{
-	rlTexture *result = NULL;
+rxAPI void
+rxinit(char const *window_title) {
+
+	typedef BOOL (WINAPI * XXX)(HANDLE);
+
+	rx.win32.user32_dll = LoadLibraryA("user32.dll");
+
+	XXX SetProcessDpiAwarenessContext = (XXX) GetProcAddress(rx.win32.user32_dll, "SetProcessDpiAwarenessContext");
+	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
+	rx.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
+
+	UINT DriverModeFlags =
+#ifdef RX_DEBUG_DEVICE
+/* note: comment this out to use intel's graphic analyzer utility (user RenderDoc instead) */
+	D3D11_CREATE_DEVICE_DEBUG|
+	D3D11_CREATE_DEVICE_SINGLETHREADED|
+#endif
+	D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+
+	D3D_FEATURE_LEVEL feature_menu[2][2]= {
+		{D3D_FEATURE_LEVEL_11_1,D3D_FEATURE_LEVEL_11_0},
+		{D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0},
+	};
+
+	D3D_FEATURE_LEVEL feature_level;
+
+	HRESULT error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,DriverModeFlags,feature_menu[0],
+	ARRAYSIZE(feature_menu[0]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
+
+	if FAILED(error) {
+		error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,DriverModeFlags,feature_menu[1],
+		ARRAYSIZE(feature_menu[1]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
+	}
+
+	if SUCCEEDED(error) {
+#if defined(RX_DEBUG_DEVICE)
+		error = IProvideClassInfo_QueryInterface(rx.d3d11.dev,&IID_ID3D11InfoQueue,(void**)&rx.d3d11.inf);
+		if SUCCEEDED(error) {
+			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_ERROR,      TRUE);
+			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_WARNING,    TRUE);
+		}
+#endif
+	}
+
+
+	wchar_t unicode_window_title[MAX_PATH];
+	MultiByteToWideChar(CP_ACP,0,window_title,-1,unicode_window_title,MAX_PATH);
+
+
+	WNDCLASSW wnd_class;
+	ZeroMemory(&wnd_class,sizeof(wnd_class));
+	wnd_class.lpfnWndProc=rx_window_message_callback_win32;
+	wnd_class.hInstance=GetModuleHandleW(NULL);
+	wnd_class.lpszClassName=unicode_window_title;
+	if (RegisterClassW(&wnd_class)) {
+		int wnd_size_x = _RX_DEFAULT_WINDOW_SIZE_X;
+		int wnd_size_y = _RX_DEFAULT_WINDOW_SIZE_Y;
+		if(wnd_size_x == CW_USEDEFAULT) {
+			wnd_size_x = 720;
+		}
+		if(wnd_size_y == CW_USEDEFAULT) {
+			wnd_size_y = 720;
+		}
+		RECT wnd_rect;
+		wnd_rect.  left=0;
+		wnd_rect.   top=0;
+		wnd_rect. right=wnd_size_x;
+		wnd_rect.bottom=wnd_size_y;
+		AdjustWindowRect(&wnd_rect,WS_OVERLAPPEDWINDOW,FALSE);
+
+		wnd_size_x = wnd_rect. right - wnd_rect.left;
+		wnd_size_y = wnd_rect.bottom - wnd_rect. top;
+
+		/* This makes the window not resizable */
+		rx.wnd.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,wnd_class.lpszClassName,unicode_window_title,
+		WS_OVERLAPPEDWINDOW&~WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wnd_size_x,wnd_size_y,
+		NULL,NULL,wnd_class.hInstance,NULL);
+	}
+
+	/* [[!]]:
+		Poll here to get the window dimensions, which are needed to create some
+		window dependent resources */
+	rxpoll();
 
 	IDXGIDevice * device_dxgi = NULL;
 	IDXGIAdapter * adapter_dxgi = NULL;
@@ -988,18 +757,16 @@ rl__createColorTargetFromWindow()
 	sc_fs_config.RefreshRate.Denominator=1;
 	sc_fs_config.Windowed=TRUE;
 
-	IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,
-	(IUnknown *)rx.d3d11.dev,rx.wnd.win32.obj,
-	&sc_config_d3d,&sc_fs_config,NULL,
-	(IDXGISwapChain1 **)&rx.wnd.out.d3d11.swap_chain);
+	error = IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,(IUnknown *)rx.d3d11.dev,rx.wnd.win32.handle,&sc_config_d3d,&sc_fs_config,NULL,(IDXGISwapChain1 **)&rx.wnd.out.d3d11.swap_chain);
+	rxEnsure(SUCCEEDED(error));
+
+	ID3D11Texture2D *texture_d3d;
+	error = IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
+	rxEnsure(SUCCEEDED(error));
 
 	rx.wnd.out.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(rx.wnd.out.d3d11.swap_chain);
 
-
-	ID3D11Texture2D *texture_d3d;
-	IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
-
-	rlTextureConfig config;
+	rxGPU_TEXTURE config;
 	ZeroMemory(&config,sizeof(config));
 	config.memtype = D3D11_USAGE_DEFAULT;
 	config.useflag = D3D11_BIND_RENDER_TARGET;
@@ -1008,157 +775,131 @@ rl__createColorTargetFromWindow()
 	config.format = sc_config_d3d.Format;
 	config.d3d11.texture_2d = texture_d3d;
 
-	result = rlGPU_createTexture(&config);
+	rx.wnd.out.tar = rxGPU_createTexture(&config);
 
 	IDXGIFactory_Release(factory_dxgi);
 	IDXGIAdapter_Release(adapter_dxgi);
 	IDXGIDevice_Release(device_dxgi);
 
+	rxIMP_init();
+
+	rxGPU_setClip(0,0,rx.wnd.size_x,rx.wnd.size_y);
+
+	D3D11_VIEWPORT viewport_d3d;
+	viewport_d3d.TopLeftX=0;
+	viewport_d3d.TopLeftY=0;
+	viewport_d3d.   Width=rx.wnd.size_x;
+	viewport_d3d.  Height=rx.wnd.size_y;
+	viewport_d3d.MinDepth=0;
+	viewport_d3d.MaxDepth=1;
+	ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
+
+	rx.start_ticks=rx_getClockTicks();
+	rx.frame_ticks=rx.start_ticks;
+
+	rxpoll();
+}
+
+LRESULT CALLBACK
+rx_window_message_callback_win32(HWND Window,UINT Message,WPARAM wParam,LPARAM lParam) {
+	LRESULT result = rx_window_message_handler_win32(Message,wParam,lParam);
+	if(result != TRUE) {
+		result = DefWindowProcW(Window,Message,wParam,lParam);
+	}
 	return result;
 }
 
-void
-rl_initWindowed(const wchar_t *windowTitle) {
-	rxsystem_init();
+int
+rx_window_message_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
+	switch(Message) {
+		case WM_CLOSE:
+		case WM_QUIT: {
+			PostQuitMessage(0);
+			rx.wnd.off = TRUE;
+		} break;
+		case WM_MOUSEMOVE: {
+			int xcursor=GET_X_LPARAM(lParam);
+			int ycursor=GET_Y_LPARAM(lParam);
+			rx.wnd.in.mice.xcursor=xcursor;
+			rx.wnd.in.mice.ycursor=rx.wnd.size_y-ycursor;
+		} break;
+		case WM_MOUSEWHEEL: {
+			rx.wnd.in.mice.yscroll = GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA;
+		} break;
+// SetCapture((HWND)rx.wnd.win32.handle);
+		case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP: {
+			rx.wnd.in.mice.btn_cur |= (Message!=WM_LBUTTONUP) << 0;
+		} break;
+		case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP: {
+			rx.wnd.in.mice.btn_cur |= (Message!=WM_RBUTTONUP) << 1;
+		} break;
+// ReleaseCapture();
+		case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP: {
+			rx.wnd.in.mice.btn_cur |= (Message!=WM_MBUTTONUP) << 2;
+		} break;
+		case WM_CHAR: {
+			rx.wnd.in.kbrd.chr = wParam;
+		} break;
+		case WM_SYSKEYUP: case WM_SYSKEYDOWN: case WM_KEYUP: case WM_KEYDOWN: {
+			/* todo: there's probably a better way to do this */
+			rx.wnd.in.kbrd.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+			rx.wnd.in.kbrd.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+			rx.wnd.in.kbrd.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
 
-	UINT DriverModeFlags =
-#ifdef RX_DEBUG_DEVICE
-/* note: comment this out to use intel's graphic analyzer utility (user RenderDoc instead) */
-	D3D11_CREATE_DEVICE_DEBUG|
-	D3D11_CREATE_DEVICE_SINGLETHREADED|
-#endif
-	D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-
-	D3D_FEATURE_LEVEL DriverFeatureMenu[2][2]= {
-		{D3D_FEATURE_LEVEL_11_1,D3D_FEATURE_LEVEL_11_0},
-		{D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0},
-	};
-
-	D3D_FEATURE_LEVEL DriverSelectedFeatureLevel;
-	if(SUCCEEDED(D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,DriverModeFlags,DriverFeatureMenu[0],
-	ARRAYSIZE(DriverFeatureMenu[0]),D3D11_SDK_VERSION,&rx.d3d11.dev,&DriverSelectedFeatureLevel,&rx.d3d11.ctx))||
-	SUCCEEDED(D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,DriverModeFlags,DriverFeatureMenu[1],
-	ARRAYSIZE(DriverFeatureMenu[1]),D3D11_SDK_VERSION,&rx.d3d11.dev,&DriverSelectedFeatureLevel,&rx.d3d11.ctx)))
-	{ if((DriverModeFlags&D3D11_CREATE_DEVICE_DEBUG))
-		{ if(SUCCEEDED(IProvideClassInfo_QueryInterface(rx.d3d11.dev,&IID_ID3D11InfoQueue,(void**)&rx.d3d11.inf)))
-			{
-				ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-				ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_ERROR,      TRUE);
-				ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_WARNING,    TRUE);
+			int key_map = 0;
+			if isWithin3(wParam,'a','z','A','Z','0','9') {
+				key_map = wParam;
 			}
+
+			switch(wParam) {
+				case VK_CONTROL:    key_map = rx_kLCTRL;     break;
+				case VK_RETURN:     key_map = rxKEY_kRETURN;    break;
+				case VK_BACK:       key_map = rx_kBCKSPC;    break;
+				case VK_DELETE:     key_map = rx_kDELETE;    break;
+				case VK_HOME:       key_map = rx_kHOME;      break;
+				case VK_END:        key_map = rx_kEND;       break;
+				case VK_ESCAPE:     key_map = rx_kESCAPE;    break;
+
+				case VK_LEFT:       key_map = rxKEY_kLEFT;  break;
+				case VK_RIGHT:      key_map = rxKEY_kRIGHT; break;
+				case VK_UP:         key_map = rxKEY_kUP;    break;
+				case VK_DOWN:       key_map = rxKEY_kDOWN;  break;
+
+				case VK_F1:  key_map = rxKEY_kF1;  break;
+				case VK_F2:  key_map = rxKEY_kF2;  break;
+				case VK_F3:  key_map = rxKEY_kF3;  break;
+				case VK_F4:  key_map = rxKEY_kF4;  break;
+				case VK_F5:  key_map = rxKEY_kF5;  break;
+				case VK_F6:  key_map = rxKEY_kF6;  break;
+				case VK_F7:  key_map = rxKEY_kF7;  break;
+				case VK_F8:  key_map = rxKEY_kF8;  break;
+				case VK_F9:  key_map = rxKEY_kF9;  break;
+				case VK_F10: key_map = rxKEY_kF10; break;
+				case VK_F11: key_map = rxKEY_kF11; break;
+				case VK_F12: key_map = rxKEY_kF12; break;
+				/* waste of time */
+				case VK_SPACE:      key_map =  ' '; break;
+				case VK_OEM_PLUS:   key_map =  '='; break;
+				case VK_OEM_PERIOD: key_map =  '.'; break;
+				case VK_OEM_COMMA:  key_map =  ','; break;
+				case VK_OEM_1:      key_map =  ';'; break;
+				case VK_OEM_2:      key_map =  '/'; break;
+				case VK_OEM_3:      key_map =  '~'; break;
+				case VK_OEM_4:      key_map =  '['; break;
+				case VK_OEM_5:      key_map = '\\'; break;
+				case VK_OEM_6:      key_map =  ']'; break;
+				case VK_OEM_7:      key_map = '\''; break;
+			}
+
+			rx.wnd.in.kbrd.key[key_map] = (Message == WM_KEYDOWN) || (Message == WM_SYSKEYDOWN);
+		} break;
+		default: {
+			return FALSE;
 		}
 	}
-
-
-	rlOS_initWindow(windowTitle);
-	rlOS_pollWindowEvents();
-
-// note: we can use the adapter to enumerate display devices,
-// this might come useful to the user!
-
-	rx.wnd.out.tar = rl__createColorTargetFromWindow();
-
-	rx.pip.out.count = 1;
-	rx.pip.out.color[0] = rlGPU_makeColorTarget(
-	rx.wnd.out.tar->size_x,
-	rx.wnd.out.tar->size_y, rx.wnd.out.tar->format,_RX_MSAA,0);
-
-	rx.pip.out.depth = rlGPU_makeDepthTarget(
-	rx.wnd.out.tar->size_x,
-	rx.wnd.out.tar->size_y, DXGI_FORMAT_D32_FLOAT);
-
-	D3D11_DEPTH_STENCIL_DESC stencil_config_d3d;
-	stencil_config_d3d.     DepthEnable=FALSE;
-	stencil_config_d3d.   StencilEnable=FALSE;
-	stencil_config_d3d.  DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;
-	stencil_config_d3d.       DepthFunc=D3D11_COMPARISON_LESS;
-	stencil_config_d3d. StencilReadMask=D3D11_DEFAULT_STENCIL_READ_MASK;
-	stencil_config_d3d.StencilWriteMask=D3D11_DEFAULT_STENCIL_WRITE_MASK;
-	stencil_config_d3d.FrontFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
-	stencil_config_d3d.FrontFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
-	stencil_config_d3d.FrontFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
-	stencil_config_d3d.FrontFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
-	stencil_config_d3d. BackFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
-	stencil_config_d3d. BackFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
-	stencil_config_d3d. BackFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
-	stencil_config_d3d. BackFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
-
-	ID3D11Device_CreateDepthStencilState(rx.d3d11.dev,&stencil_config_d3d,
-	&rx.pip.d3d11.ds);
-
-	Emu_imp_init();
-
-/* todo */
-	D3D11_RASTERIZER_DESC raster_config_d3d;
-	ZeroMemory(&raster_config_d3d,sizeof(raster_config_d3d));
-	raster_config_d3d.             FillMode=D3D11_FILL_SOLID;
-	raster_config_d3d.             CullMode=D3D11_CULL_NONE;
-	raster_config_d3d.FrontCounterClockwise=FALSE;
-	raster_config_d3d.            DepthBias=D3D11_DEFAULT_DEPTH_BIAS;
-	raster_config_d3d.       DepthBiasClamp=D3D11_DEFAULT_DEPTH_BIAS_CLAMP;
-	raster_config_d3d. SlopeScaledDepthBias=D3D11_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-	raster_config_d3d.      DepthClipEnable= FALSE;
-	raster_config_d3d.        ScissorEnable= TRUE;
-	raster_config_d3d.    MultisampleEnable= _RX_MSAA >= 2;
-	raster_config_d3d.AntialiasedLineEnable= FALSE;
-	ID3D11Device_CreateRasterizerState(rx.d3d11.dev,&raster_config_d3d,&rx.pip.d3d11.rastr_state);
-
-	D3D11_BLEND_DESC blender_config_d3d;
-	ZeroMemory(&blender_config_d3d,sizeof(blender_config_d3d));
-
-	blender_config_d3d.RenderTarget[0].          BlendEnable=TRUE;
-	blender_config_d3d.RenderTarget[0].             SrcBlend=D3D11_BLEND_SRC_ALPHA;
-	blender_config_d3d.RenderTarget[0].            DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
-	blender_config_d3d.RenderTarget[0].              BlendOp=D3D11_BLEND_OP_ADD;
-	blender_config_d3d.RenderTarget[0].        SrcBlendAlpha=D3D11_BLEND_ZERO;
-	blender_config_d3d.RenderTarget[0].       DestBlendAlpha=D3D11_BLEND_ZERO;
-	blender_config_d3d.RenderTarget[0].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
-	blender_config_d3d.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
-
-	ID3D11Device_CreateBlendState(rx.d3d11.dev,
-	&blender_config_d3d,&rx.imp.d3d11.default_blend_state);
-
-	blender_config_d3d.RenderTarget[0].BlendEnable = TRUE;
-	blender_config_d3d.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
-	blender_config_d3d.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
-	blender_config_d3d.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
-	blender_config_d3d.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
-	blender_config_d3d.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
-	blender_config_d3d.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
-	blender_config_d3d.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-	ID3D11Device_CreateBlendState(rx.d3d11.dev,
-	&blender_config_d3d,&rx.imp.d3d11.subpixel_dual_blending_blend_state);
-
-/* create some default samplers */
-	D3D11_SAMPLER_DESC SamplerInfo;
-	ZeroMemory(&SamplerInfo,sizeof(SamplerInfo));
-	SamplerInfo.AddressU=D3D11_TEXTURE_ADDRESS_WRAP;
-	SamplerInfo.AddressV=D3D11_TEXTURE_ADDRESS_WRAP;
-	SamplerInfo.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
-	SamplerInfo.MaxAnisotropy  = 0;
-	SamplerInfo.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
-	SamplerInfo.MinLOD         = 0;
-	SamplerInfo.MaxLOD         = D3D11_FLOAT32_MAX;
-
-	SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-	ID3D11Device_CreateSamplerState(rx.d3d11.dev,&SamplerInfo,&rx.linear_sampler.d3d11.state);
-
-	SamplerInfo.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
-	ID3D11Device_CreateSamplerState(rx.d3d11.dev,&SamplerInfo,&rx.point_sampler.d3d11.state);
-
-	SamplerInfo.Filter=D3D11_FILTER_ANISOTROPIC;
-	ID3D11Device_CreateSamplerState(rx.d3d11.dev,&SamplerInfo,&rx.anisotropic_sampler.d3d11.state);
-
-	rximp_clip(0,0,rx.wnd.size_x,rx.wnd.size_y);
-
-	rxpipset_viewport(rx.wnd.size_x,rx.wnd.size_y);
-
-	ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.pip.d3d11.rastr_state);
-
-	rx.start_ticks=rxticktally();
-	rx.frame_ticks=rx.start_ticks;
-	rlTickClock();
+	return TRUE;
 }
 
 #pragma warning(pop)
 #endif
+

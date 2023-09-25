@@ -1,37 +1,79 @@
-#ifndef _RXM_HEADER
-#define _RXM_HEADER
+/*
+**
+** Copyright(c) 2023 - Dayan Rodriguez - Dyr
+**
+** -+- vec -+-
+**
+*/
 
-#include <math.h>
+// From a value between 0 and 1, it returns a value between min and max
+double mix(double val, double min, double max) {
+	return min + (max - min) * val;
+}
 
-#define rxPI_F 3.14159265358979323846f
-#define rxPI   3.14159265358979323846
-#define rxABS(v)   ((v)<(0)?-(v):(v))
-#define rxMIN(x,y) ((x)<(y)? (x):(y))
-#define rxMAX(x,y) ((x)>(y)? (x):(y))
+// From a value between min and max, it returns a value between 0 and 1
+double unmix(double val, double min, double max) {
+	return (val - min) / (max - min);
+}
+
+// From a value between val_min and val_max, it returns a value between min and max
+double remix(double val, double val_min, double val_max, double min, double max) {
+	return mix(unmix(val,val_min,val_max),min,max);
+}
+
+double clamp(double val, double min, double max) {
+	return val < min ? min : val > max ? max : val;
+}
+
+int iclamp(int val, int min, int max) {
+	return val<min?min: val>max?max: val;
+}
+
+#ifndef max
+float max(float x, float y) {
+	return x>y?x:y;
+}
+float fmin(float x, float y) {
+	return x<y?x:y;
+}
+#endif
+#ifndef min
+float min(float x, float y) {
+	return x<y?x:y;
+}
+float fmax(float x, float y) {
+	return x>y?x:y;
+}
+#endif
 
 
-typedef struct rxvec2i16_t rxvec2i16_t;
-typedef struct rxvec2i16_t
-{
+int imax(int x, int y) {
+	return x>y?x:y;
+}
+
+int imin(int x, int y) {
+	return x<y?x:y;
+}
+
+
+
+typedef struct {
 	short x,y;
 } rxvec2i16_t;
-typedef struct rxvec2i_t rxvec2i_t;
-typedef struct rxvec2i_t
-{
+
+typedef struct {
 	int x,y;
 } rxvec2i_t;
-typedef struct rxvec3i_t rxvec3i_t;
-typedef struct rxvec3i_t
-{ union
-	{
-		struct
-		{
+
+typedef struct {
+	union {
+		struct {
 			int x,y,z;
 		};
-
 		rxvec2i_t xy;
 	};
 } rxvec3i_t;
+
 rxvec3i_t  rxvec3i    (float xyz);
 rxvec3i_t  rxvec3i_xyz(float x, float y, float z);
 rxvec3i_t  rxvec3i_xy (float x, float y);
@@ -39,24 +81,19 @@ rxvec3i_t  rxvec3i_x  (float x);
 rxvec3i_t  rxvec3i_y  (float y);
 rxvec3i_t  rxvec3i_z  (float z);
 
-typedef struct rxvec2_t rxvec2_t;
-typedef struct rxvec2_t
-{
+typedef struct {
 	float x,y;
 } rxvec2_t;
 
-typedef struct rxvec3_t rxvec3_t;
-typedef struct rxvec3_t
-{ union
-	{
-		struct
-		{
+typedef struct {
+	union {
+		struct {
 			float x,y,z;
 		};
-
 		rxvec2_t xy;
 	};
 } rxvec3_t;
+
 rxvec3_t   rxvec3    (float xyz);
 rxvec3_t   rxvec3_xyz(float x, float y, float z);
 rxvec3_t   rxvec3_xy (float x, float y);
@@ -64,94 +101,44 @@ rxvec3_t   rxvec3_x  (float x);
 rxvec3_t   rxvec3_y  (float y);
 rxvec3_t   rxvec3_z  (float z);
 
-/* this will have to be renamed to float4 instead, usually vec3 has the w component implicitly, oops,
-   - XXX - the one called rj */
-typedef struct rxvec4_t rxvec4_t;
-typedef struct rxvec4_t
-{ union
-	{ struct { float x,y,z,w; };
-	struct { float r,g,b,a; };
-	rxvec3_t xyz;
-	rxvec3_t rgb;
-	rxvec2_t xy;
-
-	float e[4];
-};
+typedef struct {
+	union {
+		float e[4];
+		struct {
+			float x,y,z,w;
+		};
+		struct {
+			float r,g,b,a;
+		};
+		rxvec3_t xyz;
+		rxvec3_t rgb;
+		rxvec2_t xy;
+	};
 } rxvec4_t;
 
 rxvec4_t rxvec4_xyzw(float x, float y, float z, float w);
 
-typedef struct rxvec4i_t rxvec4i_t;
-typedef struct rxvec4i_t
-{ union
-	{ struct { int x,y,z,w; };
-	struct { int r,g,b,a; };
-	rxvec3i_t xyz;
-	rxvec3i_t rgb;
-	rxvec2i_t xy;
-};
+typedef struct {
+	union {
+		struct {
+			int x,y,z,w;
+		};
+		struct {
+			int r,g,b,a;
+		};
+		rxvec3i_t xyz;
+		rxvec3i_t rgb;
+		rxvec2i_t xy;
+	};
 } rxvec4i_t;
 
-typedef struct rxmatrix_t rxmatrix_t;
-typedef struct rxmatrix_t
-{ float m[4][4];
+typedef struct {
+	float m[4][4];
 } rxmatrix_t;
+
 rxmatrix_t rxmatrix_identity();
 rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
 
-// From a value between 0 and 1, it returns a value between min and max
-double rxmix(double val, double min, double max)
-{
-	return min + (max - min) * val;
-}
-
-// From a value between min and max, it returns a value between 0 and 1
-double rxunmix(double val, double min, double max)
-{
-	return (val - min) / (max - min);
-}
-
-// From a value between val_min and val_max, it returns a value between min and max
-double rxremix(double val, double val_min, double val_max, double min, double max)
-{
-	return rxmix(rxunmix(val,val_min,val_max),min,max);
-}
-
-double rxclamp(double val, double min, double max)
-{
-	return val < min ? min : val > max ? max : val;
-}
-
-int rxpow2i(int x)
-{
-	return x*x;
-}
-
-int rlI_clamp(int val, int min, int max)
-{
-	return val<min?min:
-	val>max?max: val;
-}
-
-float rxmax(float x, float y)
-{
-	return x>y?x:y;
-}
-
-float rxmin(float x, float y)
-{
-	return x<y?x:y;
-}
-
-int rlI_max(int x, int y)
-{
-	return x>y?x:y;
-}
-
-int rxmini(int x, int y)
-{
-	return x<y?x:y;
-}
 
 rxvec3_t
 rxvec3_xyz(
@@ -477,6 +464,3 @@ rxvec2_t rxvec2i_vec2(rxvec2i_t v)
 	r.y = v.y;
 	return r;
 }
-
-
-#endif
