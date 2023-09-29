@@ -21,6 +21,17 @@
 #ifndef _rxGPU_H
 #define _rxGPU_H
 
+
+typedef ID3D11DeviceChild *rxGPU_Handle;
+
+void
+rxGPU_closeHandle(rxGPU_Handle handle) {
+
+	if (handle != 0) {
+		IUnknown_Release(handle);
+	}
+}
+
 typedef struct rxGPU_Sampler rxGPU_Sampler;
 typedef struct rxGPU_Texture rxGPU_Texture;
 typedef struct rxGPU_TEXTURE rxGPU_TEXTURE;
@@ -76,8 +87,6 @@ enum {
 	EMU_USAGE_STAGING_BIT     = EMU_GPU_WRITE_BIT|EMU_CPU_READ_BIT,
 };
 #endif
-
-
 
 typedef struct rxGPU_Buffer {
 	struct {

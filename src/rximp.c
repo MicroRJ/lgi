@@ -69,21 +69,6 @@ rxIMP_init() {
 	stencil_config_d3d. BackFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
 	ID3D11Device_CreateDepthStencilState(rx.d3d11.dev,&stencil_config_d3d,&rx.imp.pip.d3d11.ds);
 
-	/* todo */
-	D3D11_RASTERIZER_DESC raster_config_d3d;
-	ZeroMemory(&raster_config_d3d,sizeof(raster_config_d3d));
-	raster_config_d3d.             FillMode=D3D11_FILL_SOLID;
-	raster_config_d3d.             CullMode=D3D11_CULL_NONE;
-	raster_config_d3d.FrontCounterClockwise=FALSE;
-	raster_config_d3d.            DepthBias=D3D11_DEFAULT_DEPTH_BIAS;
-	raster_config_d3d.       DepthBiasClamp=D3D11_DEFAULT_DEPTH_BIAS_CLAMP;
-	raster_config_d3d. SlopeScaledDepthBias=D3D11_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
-	raster_config_d3d.      DepthClipEnable= FALSE;
-	raster_config_d3d.        ScissorEnable= TRUE;
-	raster_config_d3d.    MultisampleEnable= _RX_MSAA >= 2;
-	raster_config_d3d.AntialiasedLineEnable= FALSE;
-	ID3D11Device_CreateRasterizerState(rx.d3d11.dev,&raster_config_d3d,&rx.imp.pip.d3d11.rastr_state);
-
 	D3D11_BLEND_DESC blender_config_d3d;
 	ZeroMemory(&blender_config_d3d,sizeof(blender_config_d3d));
 	blender_config_d3d.RenderTarget[0].          BlendEnable=TRUE;
@@ -94,9 +79,8 @@ rxIMP_init() {
 	blender_config_d3d.RenderTarget[0].       DestBlendAlpha=D3D11_BLEND_ZERO;
 	blender_config_d3d.RenderTarget[0].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
 	blender_config_d3d.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
-
-	ID3D11Device_CreateBlendState(rx.d3d11.dev,
-	&blender_config_d3d,&rx.imp.d3d11.default_blend_state);
+	ID3D11Device_CreateBlendState(rx.d3d11.dev
+	, &blender_config_d3d,&rx.imp.d3d11.default_blend_state);
 
 	blender_config_d3d.RenderTarget[0].BlendEnable = TRUE;
 	blender_config_d3d.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
@@ -106,8 +90,8 @@ rxIMP_init() {
 	blender_config_d3d.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
 	blender_config_d3d.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
 	blender_config_d3d.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-	ID3D11Device_CreateBlendState(rx.d3d11.dev,
-	&blender_config_d3d,&rx.imp.d3d11.subpixel_dual_blending_blend_state);
+	ID3D11Device_CreateBlendState(rx.d3d11.dev
+	, &blender_config_d3d,&rx.imp.d3d11.subpixel_dual_blending_blend_state);
 
 	/* create some default samplers */
 	D3D11_SAMPLER_DESC SamplerInfo;
@@ -126,7 +110,36 @@ rxIMP_init() {
 	SamplerInfo.Filter=D3D11_FILTER_ANISOTROPIC;
 	ID3D11Device_CreateSamplerState(rx.d3d11.dev,&SamplerInfo,&rx.anisotropic_sampler.d3d11.state);
 
+
+	D3D11_RASTERIZER_DESC2 raster_config_d3d;
+	ZeroMemory(&raster_config_d3d,sizeof(raster_config_d3d));
+	raster_config_d3d.             FillMode=D3D11_FILL_SOLID;
+	raster_config_d3d.             CullMode=D3D11_CULL_NONE;
+	raster_config_d3d.FrontCounterClockwise=FALSE;
+	raster_config_d3d.            DepthBias=D3D11_DEFAULT_DEPTH_BIAS;
+	raster_config_d3d.       DepthBiasClamp=D3D11_DEFAULT_DEPTH_BIAS_CLAMP;
+	raster_config_d3d. SlopeScaledDepthBias=D3D11_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+	raster_config_d3d.      DepthClipEnable= FALSE;
+	raster_config_d3d.        ScissorEnable= TRUE;
+	raster_config_d3d.    MultisampleEnable=_RX_MSAA >= 2;
+	raster_config_d3d.AntialiasedLineEnable=FALSE;
+	raster_config_d3d.ConservativeRaster=D3D11_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+	ID3D11Device3 *lpDevice3;
+	HRESULT error = IUnknown_QueryInterface(rx.d3d11.dev,&IID_ID3D11Device3,(void**)&lpDevice3);
+	rx_assert(SUCCEEDED(error));
+
+	ID3D11RasterizerState2 *rasterizer_d3d;
+	error = lpDevice3->lpVtbl->CreateRasterizerState2(lpDevice3,&raster_config_d3d,&rasterizer_d3d);
+	rx_assert(SUCCEEDED(error));
+
+	error = IUnknown_QueryInterface(rasterizer_d3d,&IID_ID3D11RasterizerState,(void**)&rx.imp.pip.d3d11.rastr_state);
+	rx_assert(SUCCEEDED(error));
+
 	ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.imp.pip.d3d11.rastr_state);
+
+	IUnknown_Release(lpDevice3);
+	IUnknown_Release(rasterizer_d3d);
 }
 
 void
@@ -138,7 +151,7 @@ rxIMP_setShaders(rxGPU_Shader vs, rxGPU_Shader ps, int flush) {
 		rx.imp.pip.d3d11.vs = vs.d3d11.vertex_shader;
 		rx.imp.pip.d3d11.in = vs.d3d11.layout;
 		rx.imp.pip.changed = TRUE;
-		rxEnsure(rx.imp.pip.d3d11.in != NULL);
+		rx_assert(rx.imp.pip.d3d11.in != NULL);
 	}
 	if (rx.imp.pip.d3d11.ps != ps.d3d11.pixel_shader) {
 		if (flush) {
@@ -225,7 +238,7 @@ rxIMP_applyMode(int mode, int flush) {
 				rx.imp.view_matrix.m[3][1]=- 1.;
 			} break;
 			case rxIMP_MODE_3D: {
-				rxEnsure(FALSE /* not implemented */);
+				rx_assert(FALSE /* not implemented */);
 				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
 				rx.imp.world_matrix = rxmatrix_identity();
 				rx.imp. view_matrix = rxmatrix_identity();
@@ -347,8 +360,8 @@ Emu_imp_begin(int index_count, int vertex_count)
 		rx.imp.index_offset = 0;
 	}
 
-	rxEnsure(rx.imp.vertex_array != 0);
-	rxEnsure(rx.imp. index_array != 0);
+	rx_assert(rx.imp.vertex_array != 0);
+	rx_assert(rx.imp. index_array != 0);
 
 /* #pending is this something that we want to do? */
 	rx.imp.attr.xyzw.x = .0;
@@ -402,7 +415,7 @@ rxvtx_xyuv_col(float x, float y, float u, float v, rlColor rgba)
 rxAPI inline void
 rxaddnidx(int num, ...)
 {
-	rxEnsure(rx.imp.index_tally + num < rxIMP_INDEX_BUFFER_SIZE);
+	rx_assert(rx.imp.index_tally + num < rxIMP_INDEX_BUFFER_SIZE);
 
 	va_list vli;
 	va_start(vli,num);
@@ -420,7 +433,7 @@ rxaddnidx(int num, ...)
 rxAPI inline void
 rxaddnvtx(int num, ...)
 {
-	rxEnsure(rx.imp.vertex_tally + num < rxIMP_VERTEX_BUFFER_SIZE);
+	rx_assert(rx.imp.vertex_tally + num < rxIMP_VERTEX_BUFFER_SIZE);
 
 	va_list vli;
 	va_start(vli,num);
@@ -461,13 +474,6 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 	rxvtx_xy(x1,y1),rxvtx_xy(x1,y0));
 
 	Emu_imp_end();
-}
-
-/* r: roundness
-	s: edge softness */
-void
-rlIM_drawBoxSDF(float x, float y, float w, float h, float r, float s) {
-
 }
 
 void

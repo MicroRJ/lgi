@@ -20,7 +20,7 @@
 
 rxAPI void
 rxGPU_returnBuffer(rxGPU_Buffer *lpBuffer) {
-	rxEnsure(lpBuffer->mapped.memory != NULL);
+	rx_assert(lpBuffer->mapped.memory != NULL);
 	if (lpBuffer->mapped.memory != NULL) {
 		ID3D11DeviceContext_Unmap(rx.d3d11.ctx,lpBuffer->d3d11.resource,0);
 		lpBuffer->mapped.memory = NULL;
@@ -29,11 +29,23 @@ rxGPU_returnBuffer(rxGPU_Buffer *lpBuffer) {
 
 void *
 rxGPU_borrowBuffer(rxGPU_Buffer *lpBuffer, int *lpStride) {
-	rxEnsure(lpBuffer->mapped.memory == NULL);
+	rx_assert(lpBuffer->mapped.memory == NULL);
 
 	if (lpBuffer->mapped.memory == NULL) {
+
+		ID3D11Resource *lpResource = lpBuffer->d3d11.resource;
+
+#if defined(_DEBUG)
+		{
+			HRESULT error = IUnknown_QueryInterface(lpResource,&IID_ID3D11Resource,(void**)&lpResource);
+			if FAILED(error) {
+				__debugbreak();
+			}
+		}
+#endif
+
 		D3D11_MAPPED_SUBRESOURCE memory_d3d;
-		HRESULT error = ID3D11DeviceContext_Map(rx.d3d11.ctx,lpBuffer->d3d11.resource,0,D3D11_MAP_WRITE_DISCARD,0,&memory_d3d);
+		HRESULT error = ID3D11DeviceContext_Map(rx.d3d11.ctx,lpResource,0,D3D11_MAP_WRITE_DISCARD,0,&memory_d3d);
 		if SUCCEEDED(error) {
 			lpBuffer->mapped.stride = memory_d3d.RowPitch;
 			lpBuffer->mapped.memory = memory_d3d.pData;
@@ -183,7 +195,7 @@ rxcreate_struct_buffer(int struct_size, int struct_count) {
 void
 rxGPU_updateTexture(rxGPU_Texture *texture, rx_Image image) {
 
-	rxEnsure(image.format == texture->format);
+	rx_assert(image.format == texture->format);
 
 	int   stride;
 	void *memory = rxGPU_borrowTexture(texture,&stride);
@@ -195,7 +207,7 @@ rxGPU_updateTexture(rxGPU_Texture *texture, rx_Image image) {
 
 void
 rxGPU_returnTexture(rxGPU_Texture *lpTexture) {
-	rxEnsure(lpTexture->mapped.memory != NULL);
+	rx_assert(lpTexture->mapped.memory != NULL);
 	if (lpTexture->mapped.memory != NULL) {
 		ID3D11DeviceContext_Unmap(rx.d3d11.ctx,lpTexture->d3d11.resource,0);
 		lpTexture->mapped.memory = NULL;
@@ -204,7 +216,7 @@ rxGPU_returnTexture(rxGPU_Texture *lpTexture) {
 
 void *
 rxGPU_borrowTexture(rxGPU_Texture *texture, int *stride) {
-	rxEnsure(texture->mapped.memory == NULL);
+	rx_assert(texture->mapped.memory == NULL);
 	if (texture->mapped.memory == NULL) {
 		D3D11_MAPPED_SUBRESOURCE memory_d3d;
 		HRESULT error = ID3D11DeviceContext_Map(rx.d3d11.ctx,texture->d3d11.resource,0,D3D11_MAP_WRITE_DISCARD,0,&memory_d3d);
@@ -254,10 +266,10 @@ rxGPU_initTexture(rxGPU_Texture *texture, rxGPU_TEXTURE *config) {
 
 	if(config->d3d11.texture_2d == NULL) {
 	  /* check this properly based on d3dxx's version spec #todo */
-		rxEnsure((config->size_x >= 1 &&
+		rx_assert((config->size_x >= 1 &&
 		config->size_x <= 16384)
 		|| rxLOG_error("invalid size x %i", config->size_x));
-		rxEnsure((config->size_y >= 1 &&
+		rx_assert((config->size_y >= 1 &&
 		config->size_y <= 16384)
 		|| rxLOG_error("invalid size y %i", config->size_y));
 
@@ -492,10 +504,10 @@ rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config) {
 		char const *debug_label = config->source.compile.debug_label;
 		HRESULT error = D3DCompile(memory,length,debug_label,0,0,entry,model,RX_SHADER_COMPILATION_FLAGS,0,&bytecode_blob_d3d,&messages_blob_d3d);
 
-		rxEnsure(entry != 0);
-		rxEnsure(model != 0);
-		rxEnsure(memory != NULL);
-		rxEnsure(length != 0);
+		rx_assert(entry != 0);
+		rx_assert(model != 0);
+		rx_assert(memory != NULL);
+		rx_assert(length != 0);
 
 		if FAILED(error) {
 			rxLOG_error("\n>>> shader compilation error\n%s\n>>> end",(char*)(messages_blob_d3d->lpVtbl->GetBufferPointer(messages_blob_d3d)));
@@ -550,7 +562,7 @@ rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config) {
 
 			D3D11_SHADER_DESC shader_info_d3d;
 			error = reflect_d3d->lpVtbl->GetDesc(reflect_d3d,&shader_info_d3d);
-			rxEnsure(SUCCEEDED(error));
+			rx_assert(SUCCEEDED(error));
 
 			config->layout.attr_count = shader_info_d3d.InputParameters;
 
@@ -559,7 +571,7 @@ rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config) {
 			{
 				D3D11_SIGNATURE_PARAMETER_DESC param_info_d3d;
 				error = reflect_d3d->lpVtbl->GetInputParameterDesc(reflect_d3d,index,&param_info_d3d);
-				rxEnsure(SUCCEEDED(error));
+				rx_assert(SUCCEEDED(error));
 
 				DXGI_FORMAT Format = 0;
 	        	/* [[TODO]]:  */
@@ -574,10 +586,10 @@ rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config) {
 						case 0b0111: Format=0;                              break;
 						case 0b1111: Format=DXGI_FORMAT_R32G32B32A32_FLOAT; break;
 						default:
-						rxEnsure(!"not implemented");
+						rx_assert(!"not implemented");
 					}
 				} else {
-					rxEnsure(!"not implemented");
+					rx_assert(!"not implemented");
 				}
 
 				D3D11_INPUT_ELEMENT_DESC *elem_config_d3d=&config->layout.attr_array[index];
@@ -622,7 +634,7 @@ rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config) {
 			goto L_leave;
 		}
 	} else {
-		rxEnsure(!"error");
+		rx_assert(!"error");
 	}
 
 	L_leave:

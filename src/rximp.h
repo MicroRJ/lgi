@@ -21,6 +21,10 @@
 #ifndef _rxIMP_H
 #define _rxIMP_H
 
+// todo: pretty sure subpixel rendering is wrong
+// todo: pretty sure blending is wrong for subpixel rendering
+// todo: pretty sure everything is absolutely wrong
+
 #ifndef rxIMP_INDEX_BUFFER_SIZE
 #define rxIMP_INDEX_BUFFER_SIZE  0x1000
 # endif//rxIMP_INDEX_BUFFER_SIZE
@@ -126,7 +130,7 @@ typedef struct {
 		double     delta_seconds;
 	} var;
 	struct {
-		ID3D11InputLayout *in;
+	ID3D11InputLayout *in;
 		ID3D11DepthStencilState *ds;
 		ID3D11VertexShader *vs;
 		ID3D11PixelShader *ps;
