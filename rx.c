@@ -437,7 +437,7 @@ rx_loadShaderFromFile(int flags, char const *label, char const *entry, char cons
 }
 
 rxGPU_Texture *
-rx_loadImageFromFile(rx_Image image) {
+rx_uploadimage(rx_Image image) {
 	return rxGPU_makeTexture(image.size_x,image.size_y,image.format,image.stride,image.memory);
 }
 
@@ -464,7 +464,7 @@ rx_makeImage(int size_x, int size_y, int format) {
 }
 
 rx_Image
-rx_loadImage(const char *name) {
+rx_loadimage(const char *name) {
 
 	rx_Image result;
 	ZeroMemory(&result,sizeof(result));
