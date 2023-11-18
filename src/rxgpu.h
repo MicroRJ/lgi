@@ -25,8 +25,7 @@
 typedef ID3D11DeviceChild *rxGPU_Handle;
 
 void
-rxGPU_closeHandle(rxGPU_Handle handle) {
-
+rxGPU_close_handle(rxGPU_Handle handle) {
 	if (handle != 0) {
 		IUnknown_Release(handle);
 	}
@@ -50,18 +49,22 @@ rxAPI void rxGPU_returnBuffer(rxGPU_Buffer *lpBuffer);
 rxAPI void rxGPU_updateUniformBuffer(rxGPU_Uniform_Buffer buffer, void *source, size_t length);
 rxAPI void rxGPU_deleteVertexBuffer(rxGPU_Vertex_Buffer buffer);
 rxAPI void rxGPU_deleteIndexBuffer(rxGPU_Index_Buffer buffer);
-rxAPI rxGPU_TEXTURE rxGPU_textureConfigInit(int size_x, int size_y, DXGI_FORMAT format, int stride, void  *memory, int samples, int quality, D3D11_USAGE memtype, int useflag, int memflag);
-rxAPI rxError rxGPU_initTexture(rxGPU_Texture *texture, rxGPU_TEXTURE *config);
-rxAPI rxGPU_Texture *rxGPU_createTexture(rxGPU_TEXTURE *config);
-rxAPI rxGPU_Texture *rxGPU_makeTexture(int size_x, int size_y, DXGI_FORMAT format, int stride, void *memory);
-rxAPI void *rxGPU_borrowTexture(rxGPU_Texture *texture, int *stride);
-rxAPI void rxGPU_returnTexture(rxGPU_Texture *texture);
-rxAPI void rxGPU_updateTexture(rxGPU_Texture *texture, rx_Image image);
-rxAPI rxGPU_Texture *rxGPU_makeDepthTarget(int size_x, int size_y, int format);
-rxAPI rxGPU_Texture *rxGPU_makeColorTarget(int size_x, int size_y, int format, int samples, int quality);
+
+rxAPI rxGPU_TEXTURE rxGPU_make_texture_config(int size_x, int size_y, DXGI_FORMAT format, int stride, void  *memory, int samples, int quality, D3D11_USAGE memtype, int useflag, int memflag);
+rxAPI rxError rxGPU_init_texture(rxGPU_Texture *texture, rxGPU_TEXTURE *config);
+rxAPI void rxGPU_close_texture(rxGPU_Texture *texture);
+rxAPI void rxGPU_delete_texture(rxGPU_Texture *texture);
+rxAPI rxGPU_Texture *rxGPU_create_texture_ex(rxGPU_TEXTURE *config);
+rxAPI rxGPU_Texture *rxGPU_create_texture(int size_x, int size_y, DXGI_FORMAT format, int stride, void *memory);
+rxAPI void *rxGPU_borrow_texture(rxGPU_Texture *texture, int *stride);
+rxAPI void rxGPU_return_texture(rxGPU_Texture *texture);
+rxAPI void rxGPU_update_texture(rxGPU_Texture *texture, rx_Image image);
+rxAPI rxGPU_Texture *rxGPU_create_depth_target(int size_x, int size_y, int format);
+rxAPI rxGPU_Texture *rxGPU_create_color_target(int size_x, int size_y, int format, int samples, int quality);
+
 /* [[BEWARE]]:
-	May not handle padding very well should you choose to let the
-	API create the input layout for you automatically using the reflection API.
+	May not handle padding very well should you choose to let the API create the input layout for you
+	automatically using the reflection API.
 	Try to pack things into bigger units if you run into alignment issues, or try
 	re-ordering the structure. */
 rxAPI void rxGPU_initShader(rxGPU_Shader *shader, rxGPU_SHADER *config);

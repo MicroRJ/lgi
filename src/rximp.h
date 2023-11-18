@@ -44,7 +44,8 @@ rxAPI void rxIMP_flush();
 rxAPI void rxIMP_applyMode();
 
 enum {
-	rxIMP_MODE_2D            = 0,
+	rxIMP_MODE_NONE = 0,
+	rxIMP_MODE_2D,
 	rxIMP_MODE_3D,
 	rxIMP_MODE_QUAD,
 	rxIMP_MODE_SDF_RECT,

@@ -69,13 +69,13 @@ rxGPU_updateUniformBuffer(rxGPU_Uniform_Buffer buffer, void *source, size_t leng
 
 rxAPI void
 rxGPU_deleteVertexBuffer(rxGPU_Vertex_Buffer buffer) {
-	rxGPU_closeHandle((rxGPU_Handle)buffer.lpBuffer->d3d11.buffer);
+	rxGPU_close_handle((rxGPU_Handle)buffer.lpBuffer->d3d11.buffer);
 	EMU_FREE(buffer.lpBuffer,NULL);
 }
 
 rxAPI void
 rxGPU_deleteIndexBuffer(rxGPU_Index_Buffer buffer) {
-	rxGPU_closeHandle((rxGPU_Handle)buffer.lpBuffer->d3d11.buffer);
+	rxGPU_close_handle((rxGPU_Handle)buffer.lpBuffer->d3d11.buffer);
 	EMU_FREE(buffer.lpBuffer,NULL);
 }
 
@@ -193,20 +193,20 @@ rxcreate_struct_buffer(int struct_size, int struct_count) {
 /* [[TEXTURE]] */
 /* pass in the region to update #todo */
 void
-rxGPU_updateTexture(rxGPU_Texture *texture, rx_Image image) {
+rxGPU_update_texture(rxGPU_Texture *texture, rx_Image image) {
 
 	rx_assert(image.format == texture->format);
 
 	int   stride;
-	void *memory = rxGPU_borrowTexture(texture,&stride);
+	void *memory = rxGPU_borrow_texture(texture,&stride);
 
 	memcpy(memory,image.memory,image.size_y*image.stride);
 
-	rxGPU_returnTexture(texture);
+	rxGPU_return_texture(texture);
 }
 
 void
-rxGPU_returnTexture(rxGPU_Texture *lpTexture) {
+rxGPU_return_texture(rxGPU_Texture *lpTexture) {
 	rx_assert(lpTexture->mapped.memory != NULL);
 	if (lpTexture->mapped.memory != NULL) {
 		ID3D11DeviceContext_Unmap(rx.d3d11.ctx,lpTexture->d3d11.resource,0);
@@ -215,7 +215,7 @@ rxGPU_returnTexture(rxGPU_Texture *lpTexture) {
 }
 
 void *
-rxGPU_borrowTexture(rxGPU_Texture *texture, int *stride) {
+rxGPU_borrow_texture(rxGPU_Texture *texture, int *stride) {
 	rx_assert(texture->mapped.memory == NULL);
 	if (texture->mapped.memory == NULL) {
 		D3D11_MAPPED_SUBRESOURCE memory_d3d;
@@ -236,7 +236,7 @@ rxGPU_borrowTexture(rxGPU_Texture *texture, int *stride) {
 }
 
 rxGPU_TEXTURE
-rxGPU_textureConfigInit(int size_x, int size_y, DXGI_FORMAT format
+rxGPU_make_texture_config(int size_x, int size_y, DXGI_FORMAT format
 , int stride, void  *memory, int samples, int quality
 , D3D11_USAGE memtype, int useflag, int memflag) {
 
@@ -260,7 +260,7 @@ rxGPU_textureConfigInit(int size_x, int size_y, DXGI_FORMAT format
 }
 
 rxError
-rxGPU_initTexture(rxGPU_Texture *texture, rxGPU_TEXTURE *config) {
+rxGPU_init_texture(rxGPU_Texture *texture, rxGPU_TEXTURE *config) {
 	rxError error = rxError_kNONE;
 
 
@@ -376,23 +376,23 @@ rxGPU_initTexture(rxGPU_Texture *texture, rxGPU_TEXTURE *config) {
 }
 
 void
-rxGPU_closeTexture(rxGPU_Texture *texture) {
-	rxGPU_closeHandle((rxGPU_Handle) texture->d3d11.shader_target);
-	rxGPU_closeHandle((rxGPU_Handle) texture->d3d11.resource);
+rxGPU_close_texture(rxGPU_Texture *texture) {
+	rxGPU_close_handle((rxGPU_Handle) texture->d3d11.shader_target);
+	rxGPU_close_handle((rxGPU_Handle) texture->d3d11.resource);
 }
 
 void
-rxGPU_deleteTexture(rxGPU_Texture *texture) {
-	rxGPU_closeTexture(texture);
+rxGPU_delete_texture(rxGPU_Texture *texture) {
+	rxGPU_close_texture(texture);
 	EMU_FREE(texture,NULL);
 }
 
 rxGPU_Texture *
-rxGPU_createTexture( rxGPU_TEXTURE *config ) {
+rxGPU_create_texture_ex( rxGPU_TEXTURE *config ) {
 	rxGPU_Texture *result = EMU_MALLOC(sizeof(rxGPU_Texture),NULL);
-	rxError error = rxGPU_initTexture(result,config);
+	rxError error = rxGPU_init_texture(result,config);
 	if (error != rxError_kNONE) {
-		rxGPU_deleteTexture(result);
+		rxGPU_delete_texture(result);
 		EMU_FREE(result,NULL);
 		result = NULL;
 	}
@@ -400,15 +400,15 @@ rxGPU_createTexture( rxGPU_TEXTURE *config ) {
 }
 
 rxGPU_Texture *
-rxGPU_makeDepthTarget(int size_x, int size_y, int format) {
-	rxGPU_TEXTURE config = rxGPU_textureConfigInit(size_x,size_y,format,0,NULL,1,0,D3D11_USAGE_DEFAULT,D3D11_BIND_DEPTH_STENCIL,0);
-	return rxGPU_createTexture( &config );
+rxGPU_create_depth_target(int size_x, int size_y, int format) {
+	rxGPU_TEXTURE config = rxGPU_make_texture_config(size_x,size_y,format,0,NULL,1,0,D3D11_USAGE_DEFAULT,D3D11_BIND_DEPTH_STENCIL,0);
+	return rxGPU_create_texture_ex(&config);
 }
 
 rxGPU_Texture *
-rxGPU_makeColorTarget(int size_x, int size_y, int format, int samples, int quality) {
-	rxGPU_TEXTURE config = rxGPU_textureConfigInit(size_x,size_y,format,0,0,samples,quality,D3D11_USAGE_DEFAULT,D3D11_BIND_RENDER_TARGET,0);
-	return rxGPU_createTexture(&config);
+rxGPU_create_color_target(int size_x, int size_y, int format, int samples, int quality) {
+	rxGPU_TEXTURE config = rxGPU_make_texture_config(size_x,size_y,format,0,0,samples,quality,D3D11_USAGE_DEFAULT,D3D11_BIND_RENDER_TARGET,0);
+	return rxGPU_create_texture_ex(&config);
 }
 
 void
@@ -423,9 +423,9 @@ rxGPU_copyTexture(rxGPU_Texture *dst, rxGPU_Texture *src) {
 }
 
 rxGPU_Texture *
-rxGPU_makeTexture(int size_x, int size_y, int format, int stride, void *memory) {
-	rxGPU_TEXTURE config = rxGPU_textureConfigInit(size_x,size_y,format,stride,memory,1,0,D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE);
-	return rxGPU_createTexture( &config );
+rxGPU_create_texture(int size_x, int size_y, int format, int stride, void *memory) {
+	rxGPU_TEXTURE config = rxGPU_make_texture_config(size_x,size_y,format,stride,memory,1,0,D3D11_USAGE_DYNAMIC,D3D11_BIND_SHADER_RESOURCE,D3D11_CPU_ACCESS_WRITE);
+	return rxGPU_create_texture_ex( &config );
 }
 
 

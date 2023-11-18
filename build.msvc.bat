@@ -2,9 +2,9 @@
 	@CALL vcvars64
 )
 @SETLOCAL
-@REM /Qstrip_reflect /Qstrip_priv
-@SET myOptions=/Qstrip_debug rx.hlsl
-@SET compilerOptions=/O3 /WX
+@REM /Qstrip_reflect /Qstrip_priv /Qstrip_debug
+@SET myOptions=rx.hlsl
+@REM @SET compilerOptions=/O3 /WX
 @SET compilerOptions=/Od
 @CALL fxc /nologo /T vs_5_0 /E MainVS %compilerOptions% /Fh rxvs.hlsl /Vn rx_vs_shader_bytecode %myOptions%
 @CALL fxc /nologo /T ps_5_0 /E MainPS %compilerOptions% /Fh rxps.hlsl /Vn rx_ps_shader_bytecode %myOptions%

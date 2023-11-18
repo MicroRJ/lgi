@@ -33,24 +33,17 @@ rxIMP_init() {
 	rx.imp.asm_idx = rxGPU_makeIndexBuffer(sizeof(rxIMP_Index), rxIMP_INDEX_BUFFER_SIZE);
 	rx.imp.asm_vtx = rxGPU_makeVertexBuffer(sizeof(rxIMP_Vertex), rxIMP_VERTEX_BUFFER_SIZE);
 
-	rx.imp.white_texture = rxGPU_makeTexture(512,512,EMU_FORMAT_R8G8B8A8_UNORM,0,NULL);
+	rx.imp.white_texture = rxGPU_create_texture(512,512,EMU_FORMAT_R8G8B8A8_UNORM,0,NULL);
 
 	int stride;
-	unsigned char *memory = rxGPU_borrowTexture(rx.imp.white_texture,&stride);
-
+	unsigned char *memory = rxGPU_borrow_texture(rx.imp.white_texture,&stride);
 	memset(memory,0xff,stride*rx.imp.white_texture->size_y);
+	rxGPU_return_texture(rx.imp.white_texture);
 
-	rxGPU_returnTexture(rx.imp.white_texture);
-
+	/* TODO: */
 	rx.imp.pip.out.count = 1;
-	rx.imp.pip.out.color[0] = rxGPU_makeColorTarget(
-	rx.wnd.out.tar->size_x,
-	rx.wnd.out.tar->size_y, rx.wnd.out.tar->format,_RX_MSAA,0);
-
-	/* [[TODO]] */
-	rx.imp.pip.out.depth = rxGPU_makeDepthTarget(
-	rx.wnd.out.tar->size_x,
-	rx.wnd.out.tar->size_y, DXGI_FORMAT_D32_FLOAT);
+	rx.imp.pip.out.color[0] = rxGPU_create_color_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,rx.wnd.out.tar->format,_RX_MSAA,0);
+	rx.imp.pip.out.depth    = rxGPU_create_depth_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,DXGI_FORMAT_D32_FLOAT);
 
 	D3D11_DEPTH_STENCIL_DESC stencil_config_d3d;
 	stencil_config_d3d.     DepthEnable=FALSE;
@@ -238,7 +231,7 @@ rxIMP_applyMode(int mode, int flush) {
 				rx.imp.view_matrix.m[3][1]=- 1.;
 			} break;
 			case rxIMP_MODE_3D: {
-				rx_assert(FALSE /* not implemented */);
+				// rx_assert(FALSE /* not implemented */);
 				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
 				rx.imp.world_matrix = rxmatrix_identity();
 				rx.imp. view_matrix = rxmatrix_identity();
@@ -249,7 +242,7 @@ rxIMP_applyMode(int mode, int flush) {
 }
 
 void
-rxIMP_applyPipeline() {
+rxIMP_apply_pipeline() {
 
 	/* #todo */
 	ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,rx.imp.pip.d3d11.ds,1);
@@ -320,7 +313,7 @@ rxIMP_flush() {
 
 		/* upload pipeline changes if necessary */
 		if (rx.imp.pip.changed != FALSE) {
-			rxIMP_applyPipeline();
+			rxIMP_apply_pipeline();
 			rx.imp.pip.changed = FALSE;
 		}
 
@@ -453,12 +446,18 @@ void
 Emu_imp_circle_sdf(
 rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness )
 {
+	if (softness == 0) {
+		softness = 1.;
+	}
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
 	y0 = (int) (center.y - (1. + radius.y + softness));
 	x1 = (int) (center.x + (1. + radius.x + softness));
 	y1 = (int) (center.y + (1. + radius.y + softness));
-
+	// __debugbreak();
+	// TODO:
+	// this apply mode is silly AF
+	rxIMP_applyMode(rxIMP_MODE_2D,FALSE);
 	rxIMP_applyMode(rxIMP_MODE_SDF_CIRCLE,TRUE);
 
 	Emu_imp_begin(6,4);
@@ -486,6 +485,9 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 	x1 = (int) (center.x + (1. + radius.x + softness));
 	y1 = (int) (center.y + (1. + radius.y + softness));
 
+	// TODO:
+	// this apply mode is silly AF
+	rxIMP_applyMode(rxIMP_MODE_2D,FALSE);
 	rxIMP_applyMode(rxIMP_MODE_SDF_RECT,TRUE);
 
 	Emu_imp_begin(6,4); {

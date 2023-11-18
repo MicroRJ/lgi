@@ -438,7 +438,7 @@ rx_loadShaderFromFile(int flags, char const *label, char const *entry, char cons
 
 rxGPU_Texture *
 rx_uploadimage(rx_Image image) {
-	return rxGPU_makeTexture(image.size_x,image.size_y,image.format,image.stride,image.memory);
+	return rxGPU_create_texture(image.size_x,image.size_y,image.format,image.stride,image.memory);
 }
 
 rx_Image
@@ -469,7 +469,7 @@ rx_loadimage(const char *name) {
 	rx_Image result;
 	ZeroMemory(&result,sizeof(result));
 
-  	/* XXX use own memory */
+	/* XXX use own memory */
 	void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
 
 	result.format=EMU_FORMAT_R8G8B8A8_UNORM;
@@ -538,7 +538,7 @@ rx_testChar() {
 
 /* todo: this is provisional */
 void
-rxGPU_setClip(int x0, int y0, int x1, int y1) {
+rxGPU_set_clip(int x0, int y0, int x1, int y1) {
 	rx_assert(x0 <= x1);
 	rx_assert(y0 <= y1);
 
@@ -613,7 +613,7 @@ rxtick() {
 		}
 
 		/* this does not serve any purpose in full screen mode */
-		WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
+		// WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
 	}
 
 
@@ -630,7 +630,7 @@ rxtick() {
 }
 
 rxAPI void
-rxinit(char const *window_title) {
+init_windowed(int window_width, int window_height, char const *window_title) {
 
 	typedef BOOL (WINAPI * XXX)(HANDLE);
 
@@ -641,9 +641,9 @@ rxinit(char const *window_title) {
 
 	rx.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
 
-	UINT DriverModeFlags =
+	UINT flags =
 #ifdef RX_DEBUG_DEVICE
-/* note: comment this out to use intel's graphic analyzer utility (user RenderDoc instead) */
+/* note: comment this out to use intel's graphic analyzer utility (I'd rather use RenderDoc instead) */
 	D3D11_CREATE_DEVICE_DEBUG|
 	D3D11_CREATE_DEVICE_SINGLETHREADED|
 #endif
@@ -656,11 +656,11 @@ rxinit(char const *window_title) {
 
 	D3D_FEATURE_LEVEL feature_level;
 
-	HRESULT error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,DriverModeFlags,feature_menu[0],
+	HRESULT error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,flags,feature_menu[0],
 	ARRAYSIZE(feature_menu[0]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
 
 	if FAILED(error) {
-		error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,DriverModeFlags,feature_menu[1],
+		error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,flags,feature_menu[1],
 		ARRAYSIZE(feature_menu[1]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
 	}
 
@@ -685,8 +685,8 @@ rxinit(char const *window_title) {
 	wnd_class.hInstance=GetModuleHandleW(NULL);
 	wnd_class.lpszClassName=unicode_window_title;
 	if (RegisterClassW(&wnd_class)) {
-		int wnd_size_x = _RX_DEFAULT_WINDOW_SIZE_X;
-		int wnd_size_y = _RX_DEFAULT_WINDOW_SIZE_Y;
+		int wnd_size_x = window_width  != 0 ? window_width  : _RX_DEFAULT_WINDOW_SIZE_X;
+		int wnd_size_y = window_height != 0 ? window_height : _RX_DEFAULT_WINDOW_SIZE_Y;
 		if(wnd_size_x == CW_USEDEFAULT) {
 			wnd_size_x = 720;
 		}
@@ -704,8 +704,9 @@ rxinit(char const *window_title) {
 		wnd_size_y = wnd_rect.bottom - wnd_rect. top;
 
 		/* This makes the window not resizable */
+		// &~WS_THICKFRAME
 		rx.wnd.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,wnd_class.lpszClassName,unicode_window_title,
-		WS_OVERLAPPEDWINDOW&~WS_THICKFRAME,CW_USEDEFAULT,CW_USEDEFAULT,wnd_size_x,wnd_size_y,
+		WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,wnd_size_x,wnd_size_y,
 		NULL,NULL,wnd_class.hInstance,NULL);
 	}
 
@@ -731,8 +732,9 @@ rxinit(char const *window_title) {
 	sc_config_d3d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sc_config_d3d.BufferCount=2;
 	sc_config_d3d.SwapEffect=DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-	sc_config_d3d.Flags=DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH|
-	DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+	// ResizeBuffers conflicts with this flag :(
+	// |DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
+	sc_config_d3d.Flags=DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 	/* todo: allow the user to specify this */
 	sc_config_d3d.SampleDesc.  Count=1;
 	sc_config_d3d.SampleDesc.Quality=0;
@@ -749,8 +751,15 @@ rxinit(char const *window_title) {
 	ID3D11Texture2D *texture_d3d;
 	error = IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
 	rx_assert(SUCCEEDED(error));
+	// rxGPU_delete_texture(rx.imp.pip.out.color[0]);
+	// rxGPU_delete_texture(rx.imp.pip.out.depth);
+	// rxGPU_delete_texture(rx.wnd.out.tar);
+	// __debugbreak();
+	// ID3D11DeviceContext_ClearState(rx.d3d11.ctx);
+	// error = IDXGISwapChain_ResizeBuffers(rx.wnd.out.d3d11.swap_chain,sc_config_d3d.BufferCount,512,512,sc_config_d3d.Format,0);
 
-	rx.wnd.out.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(rx.wnd.out.d3d11.swap_chain);
+
+	// rx.wnd.out.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(rx.wnd.out.d3d11.swap_chain);
 
 	rxGPU_TEXTURE config;
 	ZeroMemory(&config,sizeof(config));
@@ -761,7 +770,7 @@ rxinit(char const *window_title) {
 	config.format = sc_config_d3d.Format;
 	config.d3d11.texture_2d = texture_d3d;
 
-	rx.wnd.out.tar = rxGPU_createTexture(&config);
+	rx.wnd.out.tar = rxGPU_create_texture_ex(&config);
 
 	IDXGIFactory_Release(factory_dxgi);
 	IDXGIAdapter_Release(adapter_dxgi);
@@ -769,7 +778,7 @@ rxinit(char const *window_title) {
 
 	rxIMP_init();
 
-	rxGPU_setClip(0,0,rx.wnd.size_x,rx.wnd.size_y);
+	rxGPU_set_clip(0,0,rx.wnd.size_x,rx.wnd.size_y);
 
 	D3D11_VIEWPORT viewport_d3d;
 	viewport_d3d.TopLeftX=0;
@@ -802,6 +811,61 @@ rx_window_message_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 		case WM_QUIT: {
 			PostQuitMessage(0);
 			rx.wnd.off = TRUE;
+		} break;
+		case WM_SIZE: {
+			RECT client;
+			if (GetClientRect(rx.wnd.win32.handle,&client)) {
+				int size_x = client. right - client.left;
+				int size_y = client.bottom - client. top;
+
+				if (rx.wnd.size_x != size_x || rx.wnd.size_y != size_y) {
+					rx.wnd.size_x = size_x;
+					rx.wnd.size_y = size_y;
+					rx.wnd.center_x=size_x>>1;
+					rx.wnd.center_y=size_y>>1;
+
+					D3D11_VIEWPORT viewport_d3d;
+					viewport_d3d.TopLeftX=0;
+					viewport_d3d.TopLeftY=0;
+					viewport_d3d.   Width=size_x;
+					viewport_d3d.  Height=size_y;
+					viewport_d3d.MinDepth=0;
+					viewport_d3d.MaxDepth=1;
+					ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
+
+					// rxGPU_delete_texture(rx.imp.pip.out.color[0]);
+					// rxGPU_delete_texture(rx.imp.pip.out.depth);
+					// rxGPU_delete_texture(rx.wnd.out.tar);
+					// HRESULT error = IDXGISwapChain_ResizeBuffers(rx.wnd.out.d3d11.swap_chain,0,size_x,size_y,DXGI_FORMAT_UNKNOWN,0);
+					// if SUCCEEDED(error) {
+					// 	// __debugbreak();
+					// } else {
+					// 	__debugbreak();
+					// }
+					rxGPU_set_clip(0,0,size_x,size_y);
+				}
+
+				/* [[TODO]] */
+				// rx.imp.pip.out.count = 1;
+				// rx.imp.pip.out.color[0] = rxGPU_create_color_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,rx.wnd.out.tar->format,_RX_MSAA,0);
+				// rx.imp.pip.out.depth    = rxGPU_create_depth_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,DXGI_FORMAT_D32_FLOAT);
+
+
+
+
+				#if 0
+				rxGPU_TEXTURE config;
+				ZeroMemory(&config,sizeof(config));
+				config.memtype = D3D11_USAGE_DEFAULT;
+				config.useflag = D3D11_BIND_RENDER_TARGET;
+				config.size_x = sc_config_d3d. Width;
+				config.size_y = sc_config_d3d.Height;
+				config.format = sc_config_d3d.Format;
+				config.d3d11.texture_2d = texture_d3d;
+
+				rx.wnd.out.tar = rxGPU_create_texture_ex(&config);
+				#endif
+			}
 		} break;
 		case WM_MOUSEMOVE: {
 			int xcursor=GET_X_LPARAM(lParam);
