@@ -22,18 +22,18 @@ void
 rxIMP_init() {
 	rx.imp.varying = rxGPU_makeUniformBuffer(sizeof(rx.imp.pip.var),NULL);
 
-	rx.imp.sha_vtx = rxGPU_makeShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "default_vs", sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
-	rx.imp.sha_pxl = rxGPU_makeShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "default_ps", sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
-	rx.imp.sha_pxl_txt = rxGPU_makeShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT|rxGPU_kDUAL_SOURCE_BLENDING_BIT, "ps_txt", sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
-	rx.imp.sha_pxl_txt_sdf = rxGPU_makeShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_txt_sdf", sizeof(rx_ps_txt_sdf_sb),(void*)rx_ps_txt_sdf_sb);
-	rx.imp.sha_vtx_sdf = rxGPU_makeShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "vs_sdf", sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
-	rx.imp.sha_pxl_sdf_cir = rxGPU_makeShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_cir", sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
-	rx.imp.sha_pxl_sdf_box = rxGPU_makeShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_box", sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
+	rx.imp.sha_vtx = lgi_GPU__loadShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "default_vs", sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
+	rx.imp.sha_pxl = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "default_ps", sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
+	rx.imp.sha_pxl_txt = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT|rxGPU_kDUAL_SOURCE_BLENDING_BIT, "ps_txt", sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
+	rx.imp.sha_pxl_txt_sdf = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_txt_sdf", sizeof(rx_ps_txt_sdf_sb),(void*)rx_ps_txt_sdf_sb);
+	rx.imp.sha_vtx_sdf = lgi_GPU__loadShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "vs_sdf", sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
+	rx.imp.sha_pxl_sdf_cir = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_cir", sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
+	rx.imp.sha_pxl_sdf_box = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_box", sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
 
 	rx.imp.asm_idx = rxGPU_makeIndexBuffer(sizeof(rxIMP_Index), rxIMP_INDEX_BUFFER_SIZE);
-	rx.imp.asm_vtx = rxGPU_makeVertexBuffer(sizeof(rxIMP_Vertex), rxIMP_VERTEX_BUFFER_SIZE);
+	rx.imp.asm_vtx = rxGPU_makeVertexBuffer(sizeof(lgi_Vertex), rxIMP_VERTEX_BUFFER_SIZE);
 
-	rx.imp.white_texture = rxGPU_create_texture(512,512,EMU_FORMAT_R8G8B8A8_UNORM,0,NULL);
+	rx.imp.white_texture = lgi_GPU__createTextureSimply(512,512,lgi_Format_R8G8B8A8_UNORM,0,NULL);
 
 	int stride;
 	unsigned char *memory = rxGPU_borrow_texture(rx.imp.white_texture,&stride);
@@ -120,14 +120,14 @@ rxIMP_init() {
 
 	ID3D11Device3 *lpDevice3;
 	HRESULT error = IUnknown_QueryInterface(rx.d3d11.dev,&IID_ID3D11Device3,(void**)&lpDevice3);
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 
 	ID3D11RasterizerState2 *rasterizer_d3d;
 	error = lpDevice3->lpVtbl->CreateRasterizerState2(lpDevice3,&raster_config_d3d,&rasterizer_d3d);
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 
 	error = IUnknown_QueryInterface(rasterizer_d3d,&IID_ID3D11RasterizerState,(void**)&rx.imp.pip.d3d11.rastr_state);
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 
 	ID3D11DeviceContext_RSSetState(rx.d3d11.ctx,rx.imp.pip.d3d11.rastr_state);
 
@@ -135,20 +135,21 @@ rxIMP_init() {
 	IUnknown_Release(rasterizer_d3d);
 }
 
+// TODO: remove flush parameter!
 void
-rxIMP_setShaders(rxGPU_Shader vs, rxGPU_Shader ps, int flush) {
+lgi_flushAndBindShaders(lgi_Shader vs, lgi_Shader ps, int flush) {
 	if (rx.imp.pip.d3d11.vs != vs.d3d11.vertex_shader) {
 		if (flush) {
-			rxIMP_flush();
+			lgi_flushImmediatly();
 		}
 		rx.imp.pip.d3d11.vs = vs.d3d11.vertex_shader;
 		rx.imp.pip.d3d11.in = vs.d3d11.layout;
 		rx.imp.pip.changed = TRUE;
-		rx_assert(rx.imp.pip.d3d11.in != NULL);
+		lgi_ensure(rx.imp.pip.d3d11.in != NULL);
 	}
 	if (rx.imp.pip.d3d11.ps != ps.d3d11.pixel_shader) {
 		if (flush) {
-			rxIMP_flush();
+			lgi_flushImmediatly();
 		}
 		rx.imp.pip.ps_ = ps;
 		rx.imp.pip.d3d11.ps = ps.d3d11.pixel_shader;
@@ -158,10 +159,10 @@ rxIMP_setShaders(rxGPU_Shader vs, rxGPU_Shader ps, int flush) {
 }
 
 void
-rxIMP_setRegister(int reg, rxGPU_Handle handle, int flush) {
+rxIMP_setRegister(int reg, lgi_GPU_Handle handle, int flush) {
 	if (rx.imp.pip.reg[reg].handle != handle) {
 		if (flush) {
-			rxIMP_flush();
+			lgi_flushImmediatly();
 		}
 		rx.imp.pip.reg[reg].handle = handle;
 		rx.imp.pip.changed = TRUE;
@@ -170,79 +171,72 @@ rxIMP_setRegister(int reg, rxGPU_Handle handle, int flush) {
 
 /* todo: this should take the id of the resource */
 void
-rxIMP_setSampler(int reg, rxGPU_Sampler sampler, int flush) {
-	rxIMP_setRegister(reg,(rxGPU_Handle)sampler.d3d11.state,flush);
+lgi_flushAndBindSampler(int reg, lgi_Sampler sampler, int flush) {
+	rxIMP_setRegister(reg,(lgi_GPU_Handle)sampler.d3d11.state,flush);
 }
 
 void
-rxIMP_setTexture(int reg, rxGPU_Texture *texture, int flush) {
-	rxIMP_setRegister(reg,(rxGPU_Handle)texture->d3d11.shader_target,flush);
+lgi_flushAndBindTexture(int reg, lgi_Texture *texture, int flush) {
+	rxIMP_setRegister(reg,(lgi_GPU_Handle)texture->d3d11.shader_target,flush);
 	rx.imp.pip.var.xysource.x = texture->size_x;
 	rx.imp.pip.var.xysource.y = texture->size_y;
 }
 
 void
-rxIMP_setVarying(int reg, rxGPU_Uniform_Buffer buffer, int flush) {
-	rxIMP_setRegister(reg,(rxGPU_Handle)buffer.lpBuffer->d3d11.buffer,flush);
+lgi_flushAndBindUniformBuffer(int reg, rxGPU_Uniform_Buffer buffer, int flush) {
+	rxIMP_setRegister(reg,(lgi_GPU_Handle)buffer.lpBuffer->d3d11.buffer,flush);
 }
 
 void
-rxIMP_applyMode(int mode, int flush) {
-	rxIMP_setVarying(rxPIPREG_kVS_BLC_0,rx.imp.varying,flush);
-	rxIMP_setVarying(rxPIPREG_kPS_BLC_0,rx.imp.varying,flush);
-	if (rx.imp.mode != mode) {
-		rxIMP_flush();
-		switch (mode) {
-			case rxIMP_MODE_LCD_TEXT: {
-				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl_txt,flush);
-				rxIMP_setSampler(rxPIPREG_kPS_SAM_0,rx.point_sampler,flush);
-			} break;
-			case rxIMP_MODE_SDF_TEXT: {
-				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl_txt_sdf,flush);
-				rxIMP_setSampler(rxPIPREG_kPS_SAM_0,rx.linear_sampler,flush);
-			} break;
-			case rxIMP_MODE_SDF_RECT: {
-				rxIMP_setShaders(rx.imp.sha_vtx_sdf,rx.imp.sha_pxl_sdf_box,flush);
-			} break;
-			case rxIMP_MODE_SDF_CIRCLE: {
-				rxIMP_setShaders(rx.imp.sha_vtx_sdf,rx.imp.sha_pxl_sdf_cir,flush);
-			} break;
-			case rxIMP_MODE_QUAD: {
-				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
-				rxIMP_setTexture(rxPIPREG_kPS_TEX_0,rx.imp.white_texture,flush);
-				rxIMP_setSampler(rxPIPREG_kPS_SAM_0,rx.point_sampler,flush);
-				rx.imp.world_matrix = rxmatrix_identity();
-				rx.imp. view_matrix = rxmatrix_identity();
-				rx.imp.view_matrix.m[0][0]=  2. / rx.wnd.size_x;
-				rx.imp.view_matrix.m[1][1]=  2. / rx.wnd.size_y;
-				rx.imp.view_matrix.m[2][2]= .5;
-				rx.imp.view_matrix.m[3][0]=- 1.;
-				rx.imp.view_matrix.m[3][1]=- 1.;
-			} break;
-			case rxIMP_MODE_2D: {
-				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
+lgi_IM__applyPipelinePreset(int mode, int flush) {
+	lgi_flushAndBindUniformBuffer(rxPIPREG_kVS_BLC_0,rx.imp.varying,flush);
+	lgi_flushAndBindUniformBuffer(rxPIPREG_kPS_BLC_0,rx.imp.varying,flush);
 
-				rx.imp.world_matrix = rxmatrix_identity();
-				rx.imp. view_matrix = rxmatrix_identity();
+	if (rx.imp.mode != mode) {
+		lgi_flushImmediatly();
+
+		switch (mode) {
+			case lgi_IM__PRESET_LCD_TEXT: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx,rx.imp.sha_pxl_txt,flush);
+				lgi_flushAndBindSampler(rxPIPREG_kPS_SAM_0,rx.point_sampler,flush);
+			} break;
+			case lgi_IM__PRESET_SDF_TEXT: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx,rx.imp.sha_pxl_txt_sdf,flush);
+				lgi_flushAndBindSampler(rxPIPREG_kPS_SAM_0,rx.linear_sampler,flush);
+			} break;
+			case lgi_IM__PRESET_SDF_RECT: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx_sdf,rx.imp.sha_pxl_sdf_box,flush);
+			} break;
+			case lgi_IM__PRESET_SDF_CIRCLE: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx_sdf,rx.imp.sha_pxl_sdf_cir,flush);
+			} break;
+			case lgi_IM__PRESET_2D: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
+				lgi_flushAndBindTexture(rxPIPREG_kPS_TEX_0,rx.imp.white_texture,flush);
+				lgi_flushAndBindSampler(rxPIPREG_kPS_SAM_0,rx.point_sampler,flush);
+
+				rx.imp.world_matrix = lgi_Matrix__identity();
+				rx.imp. view_matrix = lgi_Matrix__identity();
 				rx.imp.view_matrix.m[0][0]=  2. / rx.wnd.size_x;
 				rx.imp.view_matrix.m[1][1]=  2. / rx.wnd.size_y;
 				rx.imp.view_matrix.m[2][2]= .5;
 				rx.imp.view_matrix.m[3][0]=- 1.;
 				rx.imp.view_matrix.m[3][1]=- 1.;
 			} break;
-			case rxIMP_MODE_3D: {
-				// rx_assert(FALSE /* not implemented */);
-				rxIMP_setShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
-				rx.imp.world_matrix = rxmatrix_identity();
-				rx.imp. view_matrix = rxmatrix_identity();
-				rx.imp. view_matrix = rxmatrix_projection((double)(rx.wnd.size_y)/(double)(rx.wnd.size_x),90,0.01,1000);
+			case lgi_IM__PRESET_3D: {
+				lgi_flushAndBindShaders(rx.imp.sha_vtx,rx.imp.sha_pxl,flush);
+				rx.imp.world_matrix = lgi_Matrix__identity();
+				rx.imp. view_matrix = lgi_Matrix__identity();
+				rx.imp. view_matrix = lgi_Matrix__projection((double)(rx.wnd.size_y)/(double)(rx.wnd.size_x),90,0.01,1000);
 			} break;
 		}
 	}
 }
 
+// TODO:
+// this isn't specific to IM
 void
-rxIMP_apply_pipeline() {
+lgi_IM__uploadPipeline() {
 
 	/* #todo */
 	ID3D11DeviceContext_OMSetDepthStencilState(rx.d3d11.ctx,rx.imp.pip.d3d11.ds,1);
@@ -277,7 +271,7 @@ rxIMP_apply_pipeline() {
 
 	ID3D11DeviceContext_OMSetRenderTargets(rx.d3d11.ctx,rx.imp.pip.out.count,render_targets,rx.imp.pip.out.depth->d3d11.depth_target);
 
-	unsigned int Stride=sizeof(rxIMP_Vertex);
+	unsigned int Stride=sizeof(lgi_Vertex);
 	unsigned int Offset=0;
 
 	ID3D11DeviceContext_IASetVertexBuffers(rx.d3d11.ctx,0,1,&rx.imp.asm_vtx.lpBuffer->d3d11.buffer,&Stride,&Offset);
@@ -290,18 +284,18 @@ rxIMP_apply_pipeline() {
 }
 
 void
-rxIMP_flush() {
+lgi_flushImmediatly() {
 
-	if(rx.imp.index_tally != 0) {
+	if (rx.imp.index_tally != 0) {
 		/* return resources */
-		rxGPU_returnBuffer(rx.imp.asm_vtx.lpBuffer);
-		rxGPU_returnBuffer(rx.imp.asm_idx.lpBuffer);
-		rx.imp.vertex_array=rxNull;
-		rx.imp. index_array=rxNull;
+		lgi_Buffer__returnMemory(rx.imp.asm_vtx.lpBuffer);
+		lgi_Buffer__returnMemory(rx.imp.asm_idx.lpBuffer);
+		rx.imp.vertex_array=lgi_Null;
+		rx.imp. index_array=lgi_Null;
 
 		/* rx won't update the actual environment contents, you need to do that yourself */
 
-		rxmatrix_t matrix = rxmatrix_multiply(rx.imp.world_matrix,rx.imp.view_matrix);
+		rxmatrix_t matrix = lgi_Matrix__multiply(rx.imp.world_matrix,rx.imp.view_matrix);
 		rx.imp.pip.var.matrix = matrix;
 		rx.imp.pip.var.xyscreen.x = (float)(rx.wnd.size_x);
 		rx.imp.pip.var.xyscreen.y = (float)(rx.wnd.size_y);
@@ -309,15 +303,15 @@ rxIMP_flush() {
 		rx.imp.pip.var.xycursor.y = (float)(rx.wnd.in.mice.ycursor) / rx.wnd.size_y;
 		rx.imp.pip.var.total_seconds = rx.total_seconds;
 		rx.imp.pip.var.delta_seconds = rx.delta_seconds;
-		rxGPU_updateUniformBuffer(rx.imp.varying,&rx.imp.pip.var,sizeof(rx.imp.pip.var));
+		lgi_Buffer__updateContents(rx.imp.varying.lpBuffer,&rx.imp.pip.var,sizeof(rx.imp.pip.var));
 
 		/* upload pipeline changes if necessary */
 		if (rx.imp.pip.changed != FALSE) {
-			rxIMP_apply_pipeline();
+			lgi_IM__uploadPipeline();
 			rx.imp.pip.changed = FALSE;
 		}
 
-		ID3D11DeviceContext_DrawIndexed(rx.d3d11.ctx,rx.imp.index_tally,0,0);
+		lgi_GPU__drawIndexed(rx.imp.index_tally);
 	}
 
 	rx.imp.index_tally  = 0;
@@ -327,7 +321,7 @@ rxIMP_flush() {
 
 /* YOU MUST CALL THIS FUNCTION, CAN'T YOU SEE
 IT IS FUNDAMENTAL */
-rxAPI inline void
+lgi_API inline void
 Emu_imp_end()
 {
 
@@ -337,26 +331,26 @@ void
 Emu_imp_begin(int index_count, int vertex_count)
 {
 	if (rx.imp.index_tally + index_count > rxIMP_INDEX_BUFFER_SIZE) {
-		rxIMP_flush();
+		lgi_flushImmediatly();
 	}
 
 	if (rx.imp.vertex_tally + vertex_count > rxIMP_VERTEX_BUFFER_SIZE) {
-		rxIMP_flush();
+		lgi_flushImmediatly();
 	}
 
 	if (rx.imp.vertex_array == NULL) {
-		rx.imp.vertex_array = rxGPU_borrowVertexBuffer(rx.imp.asm_vtx,rxNull);
-		rx.imp.index_array = rxGPU_borrowIndexBuffer(rx.imp.asm_idx,rxNull);
+		rx.imp.vertex_array = lgi_Buffer__borrowVertexMemory(rx.imp.asm_vtx,lgi_Null);
+		rx.imp.index_array = lgi_Buffer__borrowIndexMemory(rx.imp.asm_idx,lgi_Null);
 		rx.imp.vertex_tally = 0;
 		rx.imp.index_tally = 0;
 
 		rx.imp.index_offset = 0;
 	}
 
-	rx_assert(rx.imp.vertex_array != 0);
-	rx_assert(rx.imp. index_array != 0);
+	lgi_ensure(rx.imp.vertex_array != 0);
+	lgi_ensure(rx.imp. index_array != 0);
 
-/* #pending is this something that we want to do? */
+	/* #pending is this something that we want to do? */
 	rx.imp.attr.xyzw.x = .0;
 	rx.imp.attr.xyzw.y = .0;
 	rx.imp.attr.xyzw.z = .5;
@@ -372,7 +366,7 @@ Emu_imp_begin(int index_count, int vertex_count)
 }
 
 
-rxAPI inline rxIMP_Vertex
+lgi_API inline lgi_Vertex
 rxvtx_xy(float x, float y)
 {
 	rx.imp.attr.xyzw.x =  x;
@@ -380,7 +374,7 @@ rxvtx_xy(float x, float y)
 	return rx.imp.attr;
 }
 
-rxAPI inline rxIMP_Vertex
+lgi_API inline lgi_Vertex
 rxvtx_xyuv(float x, float y, float u, float v)
 {
 	rx.imp.attr.xyzw.x =  x;
@@ -392,8 +386,8 @@ rxvtx_xyuv(float x, float y, float u, float v)
 	return rx.imp.attr;
 }
 
-rxAPI inline rxIMP_Vertex
-rxvtx_xyuv_col(float x, float y, float u, float v, rlColor rgba)
+lgi_API inline lgi_Vertex
+rxvtx_xyuv_col(float x, float y, float u, float v, lgi_Color rgba)
 {
 	rx.imp.attr.xyzw.x =  x;
 	rx.imp.attr.xyzw.y =  y;
@@ -405,10 +399,10 @@ rxvtx_xyuv_col(float x, float y, float u, float v, rlColor rgba)
 	return rx.imp.attr;
 }
 
-rxAPI inline void
+lgi_API inline void
 rxaddnidx(int num, ...)
 {
-	rx_assert(rx.imp.index_tally + num < rxIMP_INDEX_BUFFER_SIZE);
+	lgi_ensure(rx.imp.index_tally + num < rxIMP_INDEX_BUFFER_SIZE);
 
 	va_list vli;
 	va_start(vli,num);
@@ -423,10 +417,10 @@ rxaddnidx(int num, ...)
 	va_end(vli);
 }
 
-rxAPI inline void
+lgi_API inline void
 rxaddnvtx(int num, ...)
 {
-	rx_assert(rx.imp.vertex_tally + num < rxIMP_VERTEX_BUFFER_SIZE);
+	lgi_ensure(rx.imp.vertex_tally + num < rxIMP_VERTEX_BUFFER_SIZE);
 
 	va_list vli;
 	va_start(vli,num);
@@ -434,7 +428,7 @@ rxaddnvtx(int num, ...)
 	for(int i=0;i<num;i+=1)
 	{
 		rx.imp.vertex_array[
-		rx.imp.vertex_tally] = va_arg(vli,rxIMP_Vertex);
+		rx.imp.vertex_tally] = va_arg(vli,lgi_Vertex);
 		rx.imp.vertex_tally += 1;
 	}
 
@@ -444,7 +438,7 @@ rxaddnvtx(int num, ...)
 
 void
 Emu_imp_circle_sdf(
-rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness )
+rxvec2_t center, rxvec2_t radius, lgi_Color color, float roundness, float softness )
 {
 	if (softness == 0) {
 		softness = 1.;
@@ -457,8 +451,8 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 	// __debugbreak();
 	// TODO:
 	// this apply mode is silly AF
-	rxIMP_applyMode(rxIMP_MODE_2D,FALSE);
-	rxIMP_applyMode(rxIMP_MODE_SDF_CIRCLE,TRUE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_2D,FALSE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_SDF_CIRCLE,TRUE);
 
 	Emu_imp_begin(6,4);
 
@@ -477,7 +471,7 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 
 void
 Emu_imp_rect_sdf(
-rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness )
+rxvec2_t center, rxvec2_t radius, lgi_Color color, float roundness, float softness )
 {
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
@@ -487,8 +481,8 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 
 	// TODO:
 	// this apply mode is silly AF
-	rxIMP_applyMode(rxIMP_MODE_2D,FALSE);
-	rxIMP_applyMode(rxIMP_MODE_SDF_RECT,TRUE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_2D,FALSE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_SDF_RECT,TRUE);
 
 	Emu_imp_begin(6,4); {
 		rx.imp.attr.rect.xyxy   = rxvec4_xyzw(center.x,center.y,radius.x,radius.y);
@@ -504,21 +498,35 @@ rxvec2_t center, rxvec2_t radius, rlColor color, float roundness, float softness
 }
 
 void
-Emu_imp_rect_uv(
-rlColor color, rxGPU_Texture *texture,
-rxGPU_Sampler sampler, float x, float y, float w, float h)
-{
+Emu_imp_rect_uv(lgi_Color color, lgi_Texture *texture, lgi_Sampler sampler, float x, float y, float w, float h) {
 	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};
 	rxvec2_t xy1 = (rxvec2_t){x+w,y+h};
 
 	rxvec2_t uv0 = (rxvec2_t){0,0};
 	rxvec2_t uv1 = (rxvec2_t){1,1};
 
-	rxIMP_applyMode(rxIMP_MODE_QUAD,TRUE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_2D,TRUE);
+	lgi_flushAndBindTexture(rxPIPREG_kPS_TEX_0,texture,TRUE);
+	lgi_flushAndBindSampler(rxPIPREG_kPS_SAM_0,sampler,TRUE);
 
-	rxIMP_setTexture(rxPIPREG_kPS_TEX_0,texture,TRUE);
-	rxIMP_setSampler(rxPIPREG_kPS_SAM_0,sampler,TRUE);
+	Emu_imp_begin(6,4);
+	rx.imp.attr.rgba = color;
+	rxaddnvtx(4
+	, rxvtx_xyuv(xy0.x,xy0.y, uv0.x,uv1.y)
+	, rxvtx_xyuv(xy0.x,xy1.y, uv0.x,uv0.y)
+	, rxvtx_xyuv(xy1.x,xy1.y, uv1.x,uv0.y)
+	, rxvtx_xyuv(xy1.x,xy0.y, uv1.x,uv1.y));
+	rxaddnidx(6, 0,1,2, 0,2,3);
+	Emu_imp_end();
+}
 
+void
+lgi_drawQuad(lgi_Color color, float x, float y, float w, float h) {
+	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};
+	rxvec2_t xy1 = (rxvec2_t){x+w,y+h};
+	rxvec2_t uv0 = (rxvec2_t){0,0};
+	rxvec2_t uv1 = (rxvec2_t){1,1};
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_2D,TRUE);
 	Emu_imp_begin(6,4);
 	rx.imp.attr.rgba = color;
 	rxaddnvtx(4,
@@ -531,38 +539,14 @@ rxGPU_Sampler sampler, float x, float y, float w, float h)
 }
 
 void
-Emu_imp_rect(rlColor color, float x, float y, float w, float h)
-{
-	rxvec2_t xy0 = (rxvec2_t){x+0,y+0};
-	rxvec2_t xy1 = (rxvec2_t){x+w,y+h};
-
-	rxvec2_t uv0 = (rxvec2_t){0,0};
-	rxvec2_t uv1 = (rxvec2_t){1,1};
-
-
-	rxIMP_applyMode(rxIMP_MODE_QUAD,TRUE);
-	Emu_imp_begin(6,4);
-	rx.imp.attr.rgba = color;
-	rxaddnvtx(4,
-	rxvtx_xyuv(xy0.x,xy0.y, uv0.x,uv1.y),
-	rxvtx_xyuv(xy0.x,xy1.y, uv0.x,uv0.y),
-	rxvtx_xyuv(xy1.x,xy1.y, uv1.x,uv0.y),
-	rxvtx_xyuv(xy1.x,xy0.y, uv1.x,uv1.y));
-	rxaddnidx(6, 0,1,2, 0,2,3);
-	Emu_imp_end();
-}
-
-void
-Emu_imp_line(
-rlColor color, float thickness, float x0, float y0, float x1, float y1)
-{
+lgi_drawLine(lgi_Color color, float thickness, float x0, float y0, float x1, float y1) {
 	float xdist=x1-x0;
 	float ydist=y1-y0;
 	float length=sqrtf(xdist*xdist + ydist*ydist);
 	float xnormal=.5f * thickness * -ydist/length;
 	float ynormal=.5f * thickness * +xdist/length;
 
-	rxIMP_applyMode(rxIMP_MODE_QUAD,TRUE);
+	lgi_IM__applyPipelinePreset(lgi_IM__PRESET_2D,TRUE);
 	Emu_imp_begin(6,4);
 	rx.imp.attr.rgba = color;
 	rxaddnvtx(4,
@@ -577,10 +561,10 @@ rlColor color, float thickness, float x0, float y0, float x1, float y1)
 /* todo: this has to be re-visited for sub-pixel rendering */
 void
 Emu_imp_outline(
-rlColor color, float x, float y, float w, float h)
+lgi_Color color, float x, float y, float w, float h)
 {
-	Emu_imp_rect(color,x-.5,y+h-.5,w+.5,1.);
-	Emu_imp_rect(color,x-.5,y+0-.5,w+.5,1.);
-	Emu_imp_rect(color,x+0-.5,y-.5,1.,h+.5);
-	Emu_imp_rect(color,x+w-.5,y-.5,1.,h+.5);
+	lgi_drawQuad(color,x-.5,y+h-.5,w+.5,1.);
+	lgi_drawQuad(color,x-.5,y+0-.5,w+.5,1.);
+	lgi_drawQuad(color,x+0-.5,y-.5,1.,h+.5);
+	lgi_drawQuad(color,x+w-.5,y-.5,1.,h+.5);
 }

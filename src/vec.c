@@ -136,8 +136,8 @@ typedef struct {
 	float m[4][4];
 } rxmatrix_t;
 
-rxmatrix_t rxmatrix_identity();
-rxmatrix_t rxmatrix_multiply(rxmatrix_t, rxmatrix_t);
+rxmatrix_t lgi_Matrix__identity();
+rxmatrix_t lgi_Matrix__multiply(rxmatrix_t, rxmatrix_t);
 
 
 rxvec3_t
@@ -325,11 +325,11 @@ rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
  return a;
 }
 
-rxmatrix_t rxmatrix_projection(double r, double v, double zmin, double zmax)
+rxmatrix_t lgi_Matrix__projection(double r, double v, double zmin, double zmax)
 {
-	rxmatrix_t m = rxmatrix_identity();
+	rxmatrix_t m = lgi_Matrix__identity();
 
-	v = 1. / tan(v / 180 * rxPI_F * .5);
+	v = 1. / tan(v / 180 * lgi_PI * .5);
 
 	m.m[0][0] = v * r;
 	m.m[1][1] = v;
@@ -340,7 +340,7 @@ rxmatrix_t rxmatrix_projection(double r, double v, double zmin, double zmax)
 	return m;
 }
 
-rxmatrix_t rxmatrix_identity()
+rxmatrix_t lgi_Matrix__identity()
 {
 	rxmatrix_t r;
 	r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
@@ -353,7 +353,7 @@ rxmatrix_t rxmatrix_identity()
 
 
 // todo!!: remove loop
-rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
+rxmatrix_t lgi_Matrix__multiply(rxmatrix_t a, rxmatrix_t b)
 { rxmatrix_t result;
 	for(int r=0; r<4; ++r)
 	{ for(int c=0; c<4; ++c)
@@ -369,7 +369,7 @@ rxmatrix_t rxmatrix_multiply(rxmatrix_t a, rxmatrix_t b)
 
 rxmatrix_t rxmatrix_rotZ(double angle)
 {
-	rxmatrix_t r = rxmatrix_identity();
+	rxmatrix_t r = lgi_Matrix__identity();
 	double cosres = cos(angle);
 	double sinres = sin(angle);
 	r.m[0][0]= + cosres;
@@ -381,7 +381,7 @@ rxmatrix_t rxmatrix_rotZ(double angle)
 
 rxmatrix_t rxmatrix_rotY(double angle)
 {
-	rxmatrix_t r = rxmatrix_identity();
+	rxmatrix_t r = lgi_Matrix__identity();
 	double cosres = cos(angle);
 	double sinres = sin(angle);
 	r.m[0][0] =   cosres;
@@ -393,7 +393,7 @@ rxmatrix_t rxmatrix_rotY(double angle)
 
 rxmatrix_t rxmatrix_rotX(float angle)
 {
-	rxmatrix_t result = rxmatrix_identity();
+	rxmatrix_t result = lgi_Matrix__identity();
 	float cosres = cosf(angle);
 	float sinres = sinf(angle);
 	result.m[1][1] =   cosres;
@@ -406,7 +406,7 @@ rxmatrix_t rxmatrix_rotX(float angle)
 
 
 rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
-{ rxmatrix_t result=rxmatrix_identity();
+{ rxmatrix_t result=lgi_Matrix__identity();
 	result.m[3][0]=x;
 	result.m[3][1]=y;
 	result.m[3][2]=z;
@@ -414,7 +414,7 @@ rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
 }
 
 rxmatrix_t rxmatrix_flip_vertically()
-{ rxmatrix_t result=rxmatrix_identity();
+{ rxmatrix_t result=lgi_Matrix__identity();
 	result.m[1][1]=-1.f;
 	return result;
 }

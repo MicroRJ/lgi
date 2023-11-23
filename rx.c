@@ -88,67 +88,75 @@
 #include        <dxgi.h>
 #include     <dxgi1_3.h>
 
-#ifndef EMU_MALLOC
-#define EMU_MALLOC(size,user) ((void)(user),malloc(size))
+#ifndef lgi__deallocate_memory
+#define lgi__deallocate_memory(memory,user) ((void)(user),free(memory))
 #endif
-#ifndef EMU_REALLOC
-#define EMU_REALLOC(size,memory,user) ((void)(user),realloc(size,memory))
+#ifndef lgi__allocate_memory
+#define lgi__allocate_memory(size,user) ((void)(user),malloc(size))
 #endif
-#ifndef EMU_FREE
-#define EMU_FREE(memory,user) ((void)(user),free(memory))
+#ifndef lgi__reallocate_memory
+#define lgi__reallocate_memory(size,memory,user) ((void)(user),realloc(size,memory))
 #endif
-#define EMU_ALLOC_TYPE(T) ((T*)EMU_MALLOC(sizeof(T),NULL))
 
-#define rxLOG_trace(fmt,...) (0)
-#define rxLOG_error(fmt,...) (0)
+#define lgi__allocate_typeof(T) ((T*)lgi__allocate_memory(sizeof(T),NULL))
 
-#define isWithin(x,l,r) (((x)>=(l))&&((x)<=(r)))
-#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
+#define lgi_logTrace(fmt,...) printf("lgi trace: " fmt "\n", __VA_ARGS__)
+#define lgi_logError(fmt,...) printf("lgi error: " fmt "\n", __VA_ARGS__)
 
-#define rxAPI static
-#define rxGlobal static
+#define lgi_API static
+#define lgi_Global static
 
-#define rxNull NULL
-#define rxTrue  ((__int32) 1)
-#define rxFalse ((__int32) 0)
+typedef int lgi_Bool;
+#define lgi_Null NULL
+#define lgi_True  ((lgi_Bool) 1)
+#define lgi_False ((lgi_Bool) 0)
 
-
-#define rxPI_F 3.14159265358979323846f
-#define rxPI   3.14159265358979323846
-#define rxABS(v)   ((v)<(0)?-(v):(v))
-#define rxMIN(x,y) ((x)<(y)? (x):(y))
-#define rxMAX(x,y) ((x)>(y)? (x):(y))
+#define lgi_PI  3.14159
+#define lgi_TAU 6.28318
 
 // todo: enhance these assertions? ...
-#ifndef rx_assert
+#ifndef lgi_ensure
 # ifdef _DEBUG
-#  define rx_assert(is_true,...) do{ if(!(is_true)) { rxLOG_error("assertion triggered",0); __debugbreak(); } } while(0)
+#  define lgi_ensure(is_true,...) do{ if(!(is_true)) { lgi_logError("assertion triggered"); __debugbreak(); } } while(0)
 # else
-#  define rx_assert(is_true,...) rxNull
+#  define lgi_ensure(is_true,...) lgi_Null
 # endif
 #endif
 
-#if defined(_RX_STANDALONE)
+
+// TODO: rid of this!
+#ifndef isWithin
+#define isWithin(x,l,r) (((x)>=(l))&&((x)<=(r)))
+#endif
+#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
+
+// #if defined(_RX_STANDALONE)
+// #error "this option is deprecated!"
+// #endif
 
 # ifndef STB_SPRINTF_IMPLEMENTATION
 # define STB_SPRINTF_IMPLEMENTATION
 #include <stb/stb_sprintf.h>
 #  endif
 
+#include <src/win32.c>
 #include <src/dlb.c>
 
+#ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
-#define STBI_MALLOC(size) EMU_MALLOC(size,NULL)
-#define STBI_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
-#define STBI_FREE(memory) EMU_FREE(memory,NULL)
+#define STBI_MALLOC(size) lgi__allocate_memory(size,NULL)
+#define STBI_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
+#define STBI_FREE(memory) lgi__deallocate_memory(memory,NULL)
 #include <stb/stb_image.h>
+#endif//STB_IMAGE_IMPLEMENTATION
 
+#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBIW_MALLOC(size) EMU_MALLOC(size,NULL)
-#define STBIW_REALLOC(size,memory) EMU_REALLOC(size,memory,NULL)
-#define STBIW_FREE(memory) EMU_FREE(memory,NULL)
+#define STBIW_MALLOC(size) lgi__allocate_memory(size,NULL)
+#define STBIW_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
+#define STBIW_FREE(memory) lgi__deallocate_memory(memory,NULL)
 #include <stb/stb_image_write.h>
-#endif//_RX_STANDALONE
+#endif//STB_IMAGE_WRITE_IMPLEMENTATION
 
 /* todo: this is to be embedded eventually */
 #include  "rxps.hlsl"
@@ -170,20 +178,37 @@
 #pragma warning(disable:4305)
 
 /* delicacies of programming */
-#ifndef RX_TLIT
+#ifndef lgi_T
 #ifndef __cplusplus
-#define RX_TLIT(T) (T)
+#define lgi_T(T) (T)
 #  else
-#define RX_TLIT(T)
+#define lgi_T(T)
 # endif//__cplusplus
-# endif//RX_TLIT
+# endif//lgi_T
 
-#ifndef _RX_DEFAULT_WINDOW_SIZE_X
-#define _RX_DEFAULT_WINDOW_SIZE_X CW_USEDEFAULT
-# endif//_RX_DEFAULT_WINDOW_SIZE_X
-#ifndef _RX_DEFAULT_WINDOW_SIZE_Y
-#define _RX_DEFAULT_WINDOW_SIZE_Y CW_USEDEFAULT
-# endif//_RX_DEFAULT_WINDOW_SIZE_Y
+#ifndef lgi_DEFAULT_WINDOW_WIDTH
+#define lgi_DEFAULT_WINDOW_WIDTH CW_USEDEFAULT
+# endif//lgi_DEFAULT_WINDOW_WIDTH
+
+#ifndef lgi_DEFAULT_WINDOW_HEIGHT
+#define lgi_DEFAULT_WINDOW_HEIGHT CW_USEDEFAULT
+# endif//lgi_DEFAULT_WINDOW_HEIGHT
+
+
+#ifndef lgi_COMMON_SHADER_BUILD_FLAGS
+#define lgi_COMMON_SHADER_BUILD_FLAGS D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|D3DCOMPILE_WARNINGS_ARE_ERRORS|D3DCOMPILE_ENABLE_STRICTNESS
+#endif//lgi_COMMON_SHADER_BUILD_FLAGS
+
+#ifndef lgi_DEFAULT_SHADER_BUILD_FLAGS
+# ifdef lgi_DEBUGGABLE_SHADERS
+#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_DEBUG|D3DCOMPILE_SKIP_OPTIMIZATION
+#  else
+#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_OPTIMIZATION_LEVEL3
+# endif//lgi_DEBUGGABLE_SHADERS
+# endif//lgi_DEFAULT_SHADER_BUILD_FLAGS
+
+
+// TODO:
 #ifndef _RX_MSAA
 #define _RX_MSAA 1
 # endif//_RX_MSAA
@@ -191,24 +216,16 @@
 #define _RX_REFRESH_RATE 60
 # endif//_RX_REFRESH_RATE
 
-#ifndef RX_SHADER_COMPILATION_FLAGS
-# ifdef RX_DEBUGGABLE_SHADERS
-#define RX_SHADER_COMPILATION_FLAGS D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|D3DCOMPILE_DEBUG|D3DCOMPILE_SKIP_OPTIMIZATION|D3DCOMPILE_WARNINGS_ARE_ERRORS
-#else
-#define RX_SHADER_COMPILATION_FLAGS D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|D3DCOMPILE_ENABLE_STRICTNESS|D3DCOMPILE_OPTIMIZATION_LEVEL3
-# endif//RX_DEBUGGABLE_SHADERS
-# endif//RX_SHADER_COMPILATION_FLAGS
+typedef enum {
+	lgi_Error_NONE = 0,
+	lgi_Error_UNKNOWN,
+	lgi_Error_CREATE_TEXTURE,
+} lgi_Error;
 
 typedef enum {
-	rxError_kNONE = 0,
-	rxError_kUNKNOWN,
-	rxError_kCREATE_TEXTURE,
-} rxError;
-
-enum {
-	EMU_FORMAT_R8_UNORM 		  = DXGI_FORMAT_R8_UNORM,
-	EMU_FORMAT_R8G8B8A8_UNORM = DXGI_FORMAT_R8G8B8A8_UNORM
-};
+	lgi_Format_R8_UNORM 		  = DXGI_FORMAT_R8_UNORM,
+	lgi_Format_R8G8B8A8_UNORM = DXGI_FORMAT_R8G8B8A8_UNORM
+} lgi_Format;
 
 #include <src/vec.c>
 
@@ -217,41 +234,41 @@ enum {
 **  NOLI SE TANGERE
 **
 */
-typedef rxvec4_t rlColor;
+typedef rxvec4_t lgi_Color;
 
-#ifndef rxColor_RGBA
-#define rxColor_RGBA(R,G,B,A) RX_TLIT(rlColor){R,G,B,A}
+#ifndef lgi_RGBA
+#define lgi_RGBA(R,G,B,A) lgi_T(lgi_Color){R,G,B,A}
 # endif
-#ifndef rxColor_RGBA_U
-#define rxColor_RGBA_U(R,G,B,A) rxColor_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
+#ifndef lgi_RGBA_U
+#define lgi_RGBA_U(R,G,B,A) lgi_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
 # endif
 
-#define rxColor_WHITE         rxColor_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
-#define rxColor_BLACK         rxColor_RGBA_U(0x00, 0x00, 0x00, 0xFF)
-#define rxColor_RED           rxColor_RGBA_U(0xFF, 0x00, 0x00, 0xFF)
-#define rxColor_GREEN         rxColor_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
-#define rxColor_BLUE          rxColor_RGBA_U(0x00, 0x00, 0xFF, 0xFF)
-#define rxColor_YELLOW        rxColor_RGBA_U(0xFF, 0xFF, 0x00, 0xFF)
-#define rxColor_CYAN          rxColor_RGBA_U(0x00, 0xFF, 0xFF, 0xFF)
-#define rxColor_MAGENTA       rxColor_RGBA_U(0xFF, 0x00, 0xFF, 0xFF)
-#define rxColor_ORANGE        rxColor_RGBA_U(0xFF, 0xA5, 0x00, 0xFF)
-#define rxColor_PURPLE        rxColor_RGBA_U(0x80, 0x00, 0x80, 0xFF)
-#define rxColor_PINK          rxColor_RGBA_U(0xFF, 0xC0, 0xCB, 0xFF)
-#define rxColor_LIME          rxColor_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
-#define rxColor_TEAL          rxColor_RGBA_U(0x00, 0x80, 0x80, 0xFF)
-#define rxColor_SKY_BLUE      rxColor_RGBA_U(0x87, 0xCE, 0xEB, 0xFF)
-#define rxColor_GOLD          rxColor_RGBA_U(0xFF, 0xD7, 0x00, 0xFF)
-#define rxColor_INDIGO        rxColor_RGBA_U(0x4B, 0x00, 0x82, 0xFF)
-#define rxColor_SILVER        rxColor_RGBA_U(0xC0, 0xC0, 0xC0, 0xFF)
-#define rxColor_TURQUOISE     rxColor_RGBA_U(0x40, 0xE0, 0xD0, 0xFF)
-#define rxColor_CORAL         rxColor_RGBA_U(0xFF, 0x7F, 0x50, 0xFF)
-#define rxColor_ORCHID        rxColor_RGBA_U(0xDA, 0x70, 0xD6, 0xFF)
-#define rxColor_LAVENDER      rxColor_RGBA_U(0xE6, 0xE6, 0xFA, 0xFF)
-#define rxColor_MAROON        rxColor_RGBA_U(0x80, 0x00, 0x00, 0xFF)
-#define rxColor_NAVY          rxColor_RGBA_U(0x00, 0x00, 0x80, 0xFF)
-#define rxColor_OLIVE         rxColor_RGBA_U(0x80, 0x80, 0x00, 0xFF)
-#define rxColor_SALMON        rxColor_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
-#define rxColor_AQUAMARINE    rxColor_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
+#define lgi_Color__WHITE       lgi_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
+#define lgi_Color__BLACK       lgi_RGBA_U(0x00, 0x00, 0x00, 0xFF)
+#define lgi_Color__RED         lgi_RGBA_U(0xFF, 0x00, 0x00, 0xFF)
+#define lgi_Color__GREEN       lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define lgi_Color__BLUE        lgi_RGBA_U(0x00, 0x00, 0xFF, 0xFF)
+#define lgi_Color__YELLOW      lgi_RGBA_U(0xFF, 0xFF, 0x00, 0xFF)
+#define lgi_Color__CYAN        lgi_RGBA_U(0x00, 0xFF, 0xFF, 0xFF)
+#define lgi_Color__MAGENTA     lgi_RGBA_U(0xFF, 0x00, 0xFF, 0xFF)
+#define lgi_Color__ORANGE      lgi_RGBA_U(0xFF, 0xA5, 0x00, 0xFF)
+#define lgi_Color__PURPLE      lgi_RGBA_U(0x80, 0x00, 0x80, 0xFF)
+#define lgi_Color__PINK        lgi_RGBA_U(0xFF, 0xC0, 0xCB, 0xFF)
+#define lgi_Color__LIME        lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define lgi_Color__TEAL        lgi_RGBA_U(0x00, 0x80, 0x80, 0xFF)
+#define lgi_Color__SKY_BLUE    lgi_RGBA_U(0x87, 0xCE, 0xEB, 0xFF)
+#define lgi_Color__GOLD        lgi_RGBA_U(0xFF, 0xD7, 0x00, 0xFF)
+#define lgi_Color__INDIGO      lgi_RGBA_U(0x4B, 0x00, 0x82, 0xFF)
+#define lgi_Color__SILVER      lgi_RGBA_U(0xC0, 0xC0, 0xC0, 0xFF)
+#define lgi_Color__TURQUOISE   lgi_RGBA_U(0x40, 0xE0, 0xD0, 0xFF)
+#define lgi_Color__CORAL       lgi_RGBA_U(0xFF, 0x7F, 0x50, 0xFF)
+#define lgi_Color__ORCHID      lgi_RGBA_U(0xDA, 0x70, 0xD6, 0xFF)
+#define lgi_Color__LAVENDER    lgi_RGBA_U(0xE6, 0xE6, 0xFA, 0xFF)
+#define lgi_Color__MAROON      lgi_RGBA_U(0x80, 0x00, 0x00, 0xFF)
+#define lgi_Color__NAVY        lgi_RGBA_U(0x00, 0x00, 0x80, 0xFF)
+#define lgi_Color__OLIVE       lgi_RGBA_U(0x80, 0x80, 0x00, 0xFF)
+#define lgi_Color__SALMON      lgi_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
+#define lgi_Color__AQUAMARINE  lgi_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
 
 
 enum {
@@ -274,13 +291,13 @@ enum {
 };
 
 
-typedef struct rx_Image rx_Image;
+typedef struct lgi_Bitmap lgi_Bitmap;
 
 #include <src/rxgpu.h>
 #include <src/rximp.h>
 
-typedef struct rx_t rx_t;
-typedef struct rx_t {
+typedef struct lgi_Core lgi_Core;
+typedef struct lgi_Core {
 
 	/* timing stuff */
 	__int64 frame_count;
@@ -294,9 +311,9 @@ typedef struct rx_t {
 	double          delta_seconds;
 
 	/* todo: constants, should be upper case */
-	rxGPU_Sampler linear_sampler;
-	rxGPU_Sampler point_sampler;
-	rxGPU_Sampler anisotropic_sampler;
+	lgi_Sampler linear_sampler;
+	lgi_Sampler point_sampler;
+	lgi_Sampler anisotropic_sampler;
 
 
 	struct {
@@ -327,7 +344,7 @@ typedef struct rx_t {
 
 		/* output media */
 		struct {
-			rxGPU_Texture *tar;
+			lgi_Texture *tar;
 
 			struct {
 				IDXGISwapChain2 *swap_chain;
@@ -381,10 +398,10 @@ typedef struct rx_t {
 #ifdef RX_EXTENSION_SLOT_1
 	RX_EXTENSION_SLOT_1;
 #endif
-} rx_t;
+} lgi_Core;
 
 /* the source of all evil is here */
-rxGlobal rx_t rx;
+lgi_Global lgi_Core rx;
 
 #include <src/rxgpu.c>
 #include <src/rximp.c>
@@ -392,16 +409,16 @@ rxGlobal rx_t rx;
 /* [[TODO]]:
 	This is temporary */
 void
-rx_unloadFileContents(LPVOID fileContents) {
+lgi_OS__unloadFileContents(LPVOID fileContents) {
 	VirtualFree(fileContents,0,MEM_RELEASE);
 }
 
 /* [[TODO]]:
 	This is temporary */
 void *
-rx_loadFileContents(char const *fileName, __int32 *lpSize) {
+lgi_OS__loadFileContents(char const *fileName, __int32 *lpSize) {
 	*lpSize = 0;
-	char *lpBuffer = rxNull;
+	char *lpBuffer = lgi_Null;
 	HANDLE hFile = CreateFileA(fileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
 	if (hFile != INVALID_HANDLE_VALUE) {
 		DWORD highFileSize;
@@ -411,83 +428,88 @@ rx_loadFileContents(char const *fileName, __int32 *lpSize) {
 		if (ReadFile(hFile,lpBuffer,lowFileSize,&bytesRead,NULL) != FALSE) {
 			*lpSize = bytesRead;
 		} else {
-			rx_unloadFileContents(lpBuffer);
-			lpBuffer = rxNull;
+			lgi_OS__unloadFileContents(lpBuffer);
+			lpBuffer = lgi_Null;
 		}
 		CloseHandle(hFile);
 	}
 	return lpBuffer;
 }
 
-rxGPU_Shader
-rx_loadShaderFromFile(int flags, char const *label, char const *entry, char const *fileName) {
-	rxGPU_SHADER config;
+lgi_Shader
+lgi_loadShader(int flags, char const *label, char const *entry, char const *fileName) {
+
+	__int32 length = 0;
+	void *memory = lgi_OS__loadFileContents(fileName,&length);
+
+	lgi_Shader_Config config;
 	ZeroMemory(&config,sizeof(config));
 	config.flags = flags;
 	config.label = label;
-	__int32 length = 0;
-	void *memory = rx_loadFileContents(fileName,&length);
 	config.source.compile.memory = memory;
 	config.source.compile.length = length;
 	config.source.compile.entry = entry;
-	rxGPU_Shader shader;
-	rxGPU_initShader(&shader,&config);
-	rx_unloadFileContents(memory);
+
+	lgi_Shader shader;
+	lgi_GPU__createShader(&shader,&config);
+
+	lgi_OS__unloadFileContents(memory);
 	return shader;
 }
 
-rxGPU_Texture *
-rx_uploadimage(rx_Image image) {
-	return rxGPU_create_texture(image.size_x,image.size_y,image.format,image.stride,image.memory);
+lgi_Texture *
+lgi_uploadTextureContents(lgi_Bitmap image) {
+	return lgi_GPU__createTextureSimply(image.size_x,image.size_y,image.format,image.stride,image.memory);
 }
 
-rx_Image
-rx_makeImage(int size_x, int size_y, int format) {
+lgi_Bitmap
+lgi_allocateTextureContents(int size_x, int size_y, int format) {
 	int bpp = 0;
-	if (format == EMU_FORMAT_R8_UNORM) {
+	if (format == lgi_Format_R8_UNORM) {
 		bpp = 1;
 	} else
-	if (format == EMU_FORMAT_R8G8B8A8_UNORM) {
+	if (format == lgi_Format_R8G8B8A8_UNORM) {
 		bpp = 4;
 	}
+	size_t size = size_y * size_x * bpp;
 
-	rx_assert(bpp != 0);
+	lgi_ensure(bpp != 0);
 
-	rx_Image result;
+	lgi_Bitmap result;
 	result.size_x = size_x;
 	result.size_y = size_y;
 	result.format = format;
 	result.stride = size_x * bpp;
-	result.memory = EMU_MALLOC(size_y * size_x * bpp, NULL);
+	result.memory = lgi__allocate_memory(size, NULL);
+	memset(result.memory,0,size);
 
 	return result;
 }
 
-rx_Image
-rx_loadimage(const char *name) {
+lgi_Bitmap
+lgi_loadTextureContents(const char *name) {
 
-	rx_Image result;
+	lgi_Bitmap result;
 	ZeroMemory(&result,sizeof(result));
 
 	/* XXX use own memory */
 	void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
 
-	result.format=EMU_FORMAT_R8G8B8A8_UNORM;
+	result.format=lgi_Format_R8G8B8A8_UNORM;
 	result.memory=memory;
 	result.stride=result.size_x*4;
 	return result;
 }
 
 unsigned __int64
-rx_getClockFrequency() {
-
+lgi_OS__queryClockFrequency() {
 	LARGE_INTEGER l;
 	QueryPerformanceFrequency(&l);
 	return l.QuadPart;
 }
 
 unsigned __int64
-rx_getClockTicks() {
+lgi_OS__queryClock() {
 	LARGE_INTEGER l;
 	QueryPerformanceCounter(&l);
 	return l.QuadPart;
@@ -496,8 +518,8 @@ rx_getClockTicks() {
 void rx_pollClock() {
 
 	/* todo: */
-	unsigned __int64 freq = rx_getClockFrequency();
-	unsigned __int64 ticks = rx_getClockTicks();
+	unsigned __int64 freq = lgi_OS__queryClockFrequency();
+	unsigned __int64 ticks = lgi_OS__queryClock();
 	rx.total_ticks = ticks-rx.start_ticks;
 	rx.total_seconds = rx.total_ticks / (double) freq;
 	rx.delta_ticks=ticks-rx.frame_ticks;
@@ -525,11 +547,11 @@ rx_window_message_callback_win32(HWND,UINT,WPARAM,LPARAM);
 #define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
 # endif
 
-#define rx_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
+#define lgi_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
 #define rx_testAltKey() (rx.wnd.in.kbrd.is_menu != 0)
 #define rx_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
-#define rx_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
-#define rx_testFKey(xx) (rx_testKey(rxKEY_kF1 + iclamp(xx,1,12)-1))
+#define lgi_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
+#define lgi_testFKey(xx) (lgi_testKey(rxKEY_kF1 + iclamp(xx,1,12)-1))
 
 int
 rx_testChar() {
@@ -539,8 +561,8 @@ rx_testChar() {
 /* todo: this is provisional */
 void
 rxGPU_set_clip(int x0, int y0, int x1, int y1) {
-	rx_assert(x0 <= x1);
-	rx_assert(y0 <= y1);
+	lgi_ensure(x0 <= x1);
+	lgi_ensure(y0 <= y1);
 
 	x0 = iclamp(x0,0,rx.wnd.size_x);
 	y0 = iclamp(y0,0,rx.wnd.size_y);
@@ -556,7 +578,7 @@ rxGPU_set_clip(int x0, int y0, int x1, int y1) {
 }
 
 int
-rxpoll() {
+lgi_poll() {
 	/* todo: */
 	memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));
 	memset(rx.wnd.in.kbrd.key,                     0,sizeof(rx.wnd.in.kbrd.key));
@@ -584,17 +606,17 @@ rxpoll() {
 	return !rx.wnd.off;
 }
 
-rxAPI int
-rxtick() {
+lgi_API int
+lgi_tick() {
 
 	rx.frame_count += 1;
 
-	rxpoll();
+	lgi_poll();
 
 	/* todo */
 	SetCursor(rx.win32.cursor.arrow);
 
-	rxIMP_flush();
+	lgi_flushImmediatly();
 
 	/* this has to be formalized #todo */
 	rxGPU_copyTexture(rx.wnd.out.tar,rx.imp.pip.out.color[0]);
@@ -629,8 +651,8 @@ rxtick() {
 	return !rx.wnd.off;
 }
 
-rxAPI void
-init_windowed(int window_width, int window_height, char const *window_title) {
+lgi_API void
+lgi_initWindowed(int window_width, int window_height, char const *window_title) {
 
 	typedef BOOL (WINAPI * XXX)(HANDLE);
 
@@ -674,7 +696,7 @@ init_windowed(int window_width, int window_height, char const *window_title) {
 		}
 	}
 #endif
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 
 	wchar_t unicode_window_title[MAX_PATH];
 	MultiByteToWideChar(CP_ACP,0,window_title,-1,unicode_window_title,MAX_PATH);
@@ -685,35 +707,32 @@ init_windowed(int window_width, int window_height, char const *window_title) {
 	wnd_class.hInstance=GetModuleHandleW(NULL);
 	wnd_class.lpszClassName=unicode_window_title;
 	if (RegisterClassW(&wnd_class)) {
-		int wnd_size_x = window_width  != 0 ? window_width  : _RX_DEFAULT_WINDOW_SIZE_X;
-		int wnd_size_y = window_height != 0 ? window_height : _RX_DEFAULT_WINDOW_SIZE_Y;
-		if(wnd_size_x == CW_USEDEFAULT) {
-			wnd_size_x = 720;
-		}
-		if(wnd_size_y == CW_USEDEFAULT) {
-			wnd_size_y = 720;
-		}
+		window_width = window_width != 0 ? window_width  : lgi_DEFAULT_WINDOW_WIDTH;
+		window_height = window_height != 0 ? window_height : lgi_DEFAULT_WINDOW_HEIGHT;
+
+		window_width = window_width != CW_USEDEFAULT ? window_width : 720;
+		window_height = window_height != CW_USEDEFAULT ? window_height : 720;
+
 		RECT wnd_rect;
-		wnd_rect.  left=0;
-		wnd_rect.   top=0;
-		wnd_rect. right=wnd_size_x;
-		wnd_rect.bottom=wnd_size_y;
+		wnd_rect.left=0;
+		wnd_rect.top=0;
+		wnd_rect.right=window_width;
+		wnd_rect.bottom=window_height;
 		AdjustWindowRect(&wnd_rect,WS_OVERLAPPEDWINDOW,FALSE);
 
-		wnd_size_x = wnd_rect. right - wnd_rect.left;
-		wnd_size_y = wnd_rect.bottom - wnd_rect. top;
+		window_width = wnd_rect. right - wnd_rect.left;
+		window_height = wnd_rect.bottom - wnd_rect. top;
+		lgi_logTrace("create window %ix%i",window_width,window_height);
 
 		/* This makes the window not resizable */
 		// &~WS_THICKFRAME
-		rx.wnd.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,wnd_class.lpszClassName,unicode_window_title,
-		WS_OVERLAPPEDWINDOW,CW_USEDEFAULT,CW_USEDEFAULT,wnd_size_x,wnd_size_y,
-		NULL,NULL,wnd_class.hInstance,NULL);
+		rx.wnd.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,wnd_class.lpszClassName,unicode_window_title,WS_OVERLAPPEDWINDOW,0,0,window_width,window_height,NULL,NULL,wnd_class.hInstance,NULL);
 	}
 
 	/* [[!]]:
 		Poll here to get the window dimensions, which are needed to create some
 		window dependent resources */
-	rxpoll();
+	lgi_poll();
 
 	IDXGIDevice * device_dxgi = NULL;
 	IDXGIAdapter * adapter_dxgi = NULL;
@@ -746,11 +765,11 @@ init_windowed(int window_width, int window_height, char const *window_title) {
 	sc_fs_config.Windowed=TRUE;
 
 	error = IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,(IUnknown *)rx.d3d11.dev,rx.wnd.win32.handle,&sc_config_d3d,&sc_fs_config,NULL,(IDXGISwapChain1 **)&rx.wnd.out.d3d11.swap_chain);
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 
 	ID3D11Texture2D *texture_d3d;
 	error = IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
-	rx_assert(SUCCEEDED(error));
+	lgi_ensure(SUCCEEDED(error));
 	// rxGPU_delete_texture(rx.imp.pip.out.color[0]);
 	// rxGPU_delete_texture(rx.imp.pip.out.depth);
 	// rxGPU_delete_texture(rx.wnd.out.tar);
@@ -789,10 +808,10 @@ init_windowed(int window_width, int window_height, char const *window_title) {
 	viewport_d3d.MaxDepth=1;
 	ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
 
-	rx.start_ticks=rx_getClockTicks();
+	rx.start_ticks=lgi_OS__queryClock();
 	rx.frame_ticks=rx.start_ticks;
 
-	rxpoll();
+	lgi_poll();
 }
 
 LRESULT CALLBACK
