@@ -22,13 +22,13 @@ void
 rxIMP_init() {
 	rx.imp.varying = rxGPU_makeUniformBuffer(sizeof(rx.imp.pip.var),NULL);
 
-	rx.imp.sha_vtx = lgi_GPU__loadShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "default_vs", sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
-	rx.imp.sha_pxl = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "default_ps", sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
-	rx.imp.sha_pxl_txt = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT|rxGPU_kDUAL_SOURCE_BLENDING_BIT, "ps_txt", sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
-	rx.imp.sha_pxl_txt_sdf = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_txt_sdf", sizeof(rx_ps_txt_sdf_sb),(void*)rx_ps_txt_sdf_sb);
-	rx.imp.sha_vtx_sdf = lgi_GPU__loadShaderFromBytecode(rxGPU_kVERTEX_SHADER_BIT, "vs_sdf", sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
-	rx.imp.sha_pxl_sdf_cir = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_cir", sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
-	rx.imp.sha_pxl_sdf_box = lgi_GPU__loadShaderFromBytecode(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_box", sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
+	rx.imp.sha_vtx = lgi_compileShader(rxGPU_kVERTEX_SHADER_BIT, "default_vs", sizeof(rx_vs_shader_bytecode),(void*)rx_vs_shader_bytecode);
+	rx.imp.sha_pxl = lgi_compileShader(rxGPU_kPIXEL_SHADER_BIT, "default_ps", sizeof(rx_ps_shader_bytecode),(void*)rx_ps_shader_bytecode);
+	rx.imp.sha_pxl_txt = lgi_compileShader(rxGPU_kPIXEL_SHADER_BIT|rxGPU_kDUAL_SOURCE_BLENDING_BIT, "ps_txt", sizeof(rx_ps_txt_sb),(void*)rx_ps_txt_sb);
+	rx.imp.sha_pxl_txt_sdf = lgi_compileShader(rxGPU_kPIXEL_SHADER_BIT, "ps_txt_sdf", sizeof(rx_ps_txt_sdf_sb),(void*)rx_ps_txt_sdf_sb);
+	rx.imp.sha_vtx_sdf = lgi_compileShader(rxGPU_kVERTEX_SHADER_BIT, "vs_sdf", sizeof(rx_vs_sdf_sb),(void*)rx_vs_sdf_sb);
+	rx.imp.sha_pxl_sdf_cir = lgi_compileShader(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_cir", sizeof(rx_ps_sdf_cir_sb),(void*)rx_ps_sdf_cir_sb);
+	rx.imp.sha_pxl_sdf_box = lgi_compileShader(rxGPU_kPIXEL_SHADER_BIT, "ps_sdf_box", sizeof(rx_ps_sdf_box_sb),(void*)rx_ps_sdf_box_sb);
 
 	rx.imp.asm_idx = rxGPU_makeIndexBuffer(sizeof(rxIMP_Index), rxIMP_INDEX_BUFFER_SIZE);
 	rx.imp.asm_vtx = rxGPU_makeVertexBuffer(sizeof(lgi_Vertex), rxIMP_VERTEX_BUFFER_SIZE);
@@ -339,8 +339,8 @@ Emu_imp_begin(int index_count, int vertex_count)
 	}
 
 	if (rx.imp.vertex_array == NULL) {
-		rx.imp.vertex_array = lgi_Buffer__borrowVertexMemory(rx.imp.asm_vtx,lgi_Null);
-		rx.imp.index_array = lgi_Buffer__borrowIndexMemory(rx.imp.asm_idx,lgi_Null);
+		rx.imp.vertex_array = lgi_borrowVertexBufferMemory(rx.imp.asm_vtx,lgi_Null);
+		rx.imp.index_array = lgi_borrowIndexBufferMemory(rx.imp.asm_idx,lgi_Null);
 		rx.imp.vertex_tally = 0;
 		rx.imp.index_tally = 0;
 

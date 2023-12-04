@@ -62,12 +62,12 @@ lgi_Buffer__borrowMemory(lgi_Buffer *xx, int *lpStride) {
 }
 
 lgi_API void *
-lgi_Buffer__borrowVertexMemory(lgi_Vertex_Buffer xx, int *lpStride) {
+lgi_borrowVertexBufferMemory(lgi_Vertex_Buffer xx, int *lpStride) {
 	return lgi_Buffer__borrowMemory(xx.lpBuffer,lpStride);
 }
 
 lgi_API void *
-lgi_Buffer__borrowIndexMemory(lgi_Index_Buffer xx, int *lpStride) {
+lgi_borrowIndexBufferMemory(lgi_Index_Buffer xx, int *lpStride) {
 	return lgi_Buffer__borrowMemory(xx.lpBuffer,lpStride);
 }
 
@@ -432,7 +432,7 @@ lgi_GPU__createTextureSimply(int size_x, int size_y, int format, int stride, voi
 /* [[SHADER]] */
 
 lgi_Shader
-lgi_GPU__loadShaderFromBytecode(int flags, char const *label, size_t hlsl_length, void *hlsl_memory) {
+lgi_compileShader(int flags, char const *label, size_t hlsl_length, void *hlsl_memory) {
 	lgi_Shader_Config config;
 	ZeroMemory(&config,sizeof(config));
 	config.flags = flags;

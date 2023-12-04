@@ -99,6 +99,7 @@
 #endif
 
 #define lgi__allocate_typeof(T) ((T*)lgi__allocate_memory(sizeof(T),NULL))
+#define lgi__clear_typeof(T) (memset(T,0,sizeof(*T)))
 
 #define lgi_logTrace(fmt,...) printf("lgi trace: " fmt "\n", __VA_ARGS__)
 #define lgi_logError(fmt,...) printf("lgi error: " fmt "\n", __VA_ARGS__)
@@ -463,7 +464,7 @@ lgi_uploadTextureContents(lgi_Bitmap image) {
 }
 
 lgi_Bitmap
-lgi_allocateTextureContents(int size_x, int size_y, int format) {
+lgi_makeBitmap(int size_x, int size_y, int format) {
 	int bpp = 0;
 	if (format == lgi_Format_R8_UNORM) {
 		bpp = 1;

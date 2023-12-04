@@ -68,7 +68,7 @@ lgi_API lgi_Texture *rxGPU_create_color_target(int size_x, int size_y, int forma
 	Try to pack things into bigger units if you run into alignment issues, or try
 	re-ordering the structure. */
 lgi_API void lgi_GPU__createShader(lgi_Shader *shader, lgi_Shader_Config *config);
-lgi_API lgi_Shader lgi_GPU__loadShaderFromBytecode(int flags, char const *label, size_t length, void *memory);
+lgi_API lgi_Shader lgi_compileShader(int flags, char const *label, size_t length, void *memory);
 
 
 #if 0
