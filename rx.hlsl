@@ -18,11 +18,13 @@
 **
 */
 
-/* shared structures */
-cbuffer _ : register(b0)
-{ float4x4  transform;
+//
+// Shared Structures:
+//
+cbuffer _ : register(b0) {
+	float4x4  transform;
 	float2    xyscreen;
-	float2    xysample;
+	float2    xysource;
 	float2    xycursor;
 
 	double    total_seconds;
@@ -32,19 +34,18 @@ cbuffer _ : register(b0)
 SamplerState      sampler0: register(s0);
 Texture2D<float4> texture0: register(t0);
 
-/* this is the basic vertex shader */
-struct VS_INPUT
-{ float4  xyzw:POSITION;
+struct VS_INPUT {
+	float4  xyzw:POSITION;
 	float4 color:COLOR0;
 	float2    uv:TEXCOORD0;
 };
-struct PS_INPUT
-{ float4  xyzw:SV_POSITION;
+struct PS_INPUT {
+	float4  xyzw:SV_POSITION;
 	float4 color:COLOR0;
 	float2    uv:TEXCOORD0;
 };
-PS_INPUT MainVS(VS_INPUT i)
-{
+
+PS_INPUT MainVS(VS_INPUT i) {
 	PS_INPUT o;
 	o.    xyzw=mul(transform,i.xyzw);
 	o.   color=i.color;
@@ -52,24 +53,22 @@ PS_INPUT MainVS(VS_INPUT i)
 	return o;
 }
 
-float4 MainPS(PS_INPUT i) : SV_Target
-{
+float4 MainPS(PS_INPUT i): SV_Target {
 	return i.color * texture0.Sample(sampler0, i.uv);
 }
 
-struct PS_OUTPUT
-{
+struct PS_OUTPUT {
 	float4 color:      SV_TARGET0;
 	float4 color_mask: SV_TARGET1;
 };
-PS_OUTPUT MainPS_Text(PS_INPUT i)
-{
+
+PS_OUTPUT MainPS_Text(PS_INPUT i) {
 	const float samplingBias = 1.;
 	float3 triSample =
 	float3(
-	texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
+	texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysource).r,
 	texture0.Sample(sampler0, i.uv).r,
-	texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
+	texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysource).r );
 
 	PS_OUTPUT o;
 	o.color      = i.color;
@@ -77,8 +76,7 @@ PS_OUTPUT MainPS_Text(PS_INPUT i)
 	return o;
 }
 
-float4 MainPS_TextSDF(PS_INPUT i): SV_TARGET0
-{
+float4 MainPS_TextSDF(PS_INPUT i): SV_TARGET0 {
 	float onEdge = -.5 + texture0.Sample(sampler0,i.uv).r;
 	float range = length(float2( ddx(onEdge), ddy(onEdge) ));
 	float alpha = smoothstep(-range, range, onEdge);
@@ -86,23 +84,21 @@ float4 MainPS_TextSDF(PS_INPUT i): SV_TARGET0
 }
 
 /* these are the extended versions for SDF shape rendering */
-struct VS_INPUT_SDF
-{ float2 xy                 : POSITION0;
-	float4 shape_xyxy         : POSITION1;
-	float4 shape_rgba         :    COLOR0;
-  /* flag.x: corner radius for rounded rects
-  flag.w: shape softness */
-  float4 shape_flag         : TEXCOORD0;
-};
-struct PS_INPUT_SDF
-{ float4 xyzw        : SV_POSITION;
-	float4 shape_xyxy  :   POSITION1;
-	float4 shape_rgba  :      COLOR0;
-	float4 shape_flag  :   TEXCOORD0;
+struct VS_INPUT_SDF {
+	float2 xy: POSITION0;
+	float4 shape_xyxy: POSITION1;
+	float4 shape_rgba: COLOR0;
+  	float4 shape_flag: TEXCOORD0;
 };
 
-PS_INPUT_SDF MainVS_SDF(VS_INPUT_SDF i)
-{
+struct PS_INPUT_SDF {
+	float4 xyzw: SV_POSITION;
+	float4 shape_xyxy: POSITION1;
+	float4 shape_rgba: COLOR0;
+	float4 shape_flag: TEXCOORD0;
+};
+
+PS_INPUT_SDF MainVS_SDF(VS_INPUT_SDF i) {
 	PS_INPUT_SDF o;
 	o.xyzw     =mul(transform,float4(i.xy,.0,1.));
 	o.shape_rgba=i.shape_rgba;
@@ -116,23 +112,18 @@ float box_sdf(float2 distance_from_center, float2 dimensions, float r) {
 	return length(max(d,.0)) + min(max(d.x,d.y),.0) - r;
 }
 
-float circle_sdf(float2 p, float r)
-{
+float circle_sdf(float2 p, float r) {
 	return length(p) - r;
 }
 
-float4 MainPS_CircleSDF(PS_INPUT_SDF i) : SV_Target
-{
+float4 MainPS_CircleSDF(PS_INPUT_SDF i) : SV_Target {
 	float2 xy = float2(i.xyzw.x,xyscreen.y - i.xyzw.y);
-
 	return float4(i.shape_rgba.rgb,
 	i.shape_rgba.a * smoothstep(0.,i.shape_flag.w,(1-circle_sdf(xy-i.shape_xyxy.xy,i.shape_xyxy.z))));
 }
 
-float4 MainPS_BoxSDF(PS_INPUT_SDF i) : SV_Target
-{
+float4 MainPS_BoxSDF(PS_INPUT_SDF i) : SV_Target {
 	float2 xy = float2(i.xyzw.x,xyscreen.y - i.xyzw.y);
-
 	return float4(i.shape_rgba.rgb,
 	i.shape_rgba.a * smoothstep(0.,i.shape_flag.w,(1-box_sdf(xy-i.shape_xyxy.xy,i.shape_xyxy.zw,i.shape_flag.x))));
 }
@@ -142,8 +133,7 @@ float4 MainPS_BoxSDF(PS_INPUT_SDF i) : SV_Target
 
 
 #if 0
-float4 MainPS_Text(PS_INPUT i) : SV_Target
-{
+float4 MainPS_Text(PS_INPUT i) : SV_Target {
 	const float smoothing = 1./8.;
 	const float samplingBias = 1.;
 	const float contrasting  = 1.;
@@ -151,9 +141,9 @@ float4 MainPS_Text(PS_INPUT i) : SV_Target
 
 	float3 trilinearSample =
 	float3(
-	texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
+	texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysource).r,
 	texture0.Sample(sampler0, i.uv).r,
-	texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
+	texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysource).r );
 
 	float strength = contrasting -
 	saturate( length(ddx(trilinearSample.g)) +
@@ -177,9 +167,9 @@ const float delineation  = .95;
    promote contrast and help blending */
    trilinearSample =
    float3(
-   texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysample).r,
+   texture0.Sample(sampler0, i.uv + float2(-samplingBias, 0) / xysource).r,
    texture0.Sample(sampler0, i.uv).r,
-   texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysample).r );
+   texture0.Sample(sampler0, i.uv + float2(+samplingBias, 0) / xysource).r );
 
    float contrastFactor = contrasting;
    // saturate( length(ddx(trilinearSample.g)) +

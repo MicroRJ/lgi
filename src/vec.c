@@ -83,14 +83,14 @@ rxvec3i_t  rxvec3i_z  (float z);
 
 typedef struct {
 	float x,y;
-} rxvec2_t;
+} Vec2;
 
 typedef struct {
 	union {
 		struct {
 			float x,y,z;
 		};
-		rxvec2_t xy;
+		Vec2 xy;
 	};
 } rxvec3_t;
 
@@ -112,11 +112,11 @@ typedef struct {
 		};
 		rxvec3_t xyz;
 		rxvec3_t rgb;
-		rxvec2_t xy;
+		Vec2 xy;
 	};
-} rxvec4_t;
+} Vec4;
 
-rxvec4_t rxvec4_xyzw(float x, float y, float z, float w);
+Vec4 Vec4_xyzw(float x, float y, float z, float w);
 
 typedef struct {
 	union {
@@ -151,11 +151,11 @@ float x, float y, float z)
 	return r;
 }
 
-rxvec4_t
-rxvec4_xyzw(
+Vec4
+Vec4_xyzw(
 float x, float y, float z, float w)
 {
-	rxvec4_t r;
+	Vec4 r;
 	r.x = x;
 	r.y = y;
 	r.z = z;
@@ -207,27 +207,27 @@ rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
  	return sqrtf(rxvector_dot(a,a));
  }
 
- float rxvec2_dot(rxvec2_t a, rxvec2_t b)
+ float rxvec2_dot(Vec2 a, Vec2 b)
  {
  	return a.x*b.x + a.y*b.y;
  }
 
- float rxvec2_len(rxvec2_t a)
+ float rxvec2_len(Vec2 a)
  {
  	return sqrtf(rxvec2_dot(a,a));
  }
 
- rxvec2_t rxvec2_add(rxvec2_t a, rxvec2_t b)
+ Vec2 rxvec2_add(Vec2 a, Vec2 b)
  {
- 	rxvec2_t r;
+ 	Vec2 r;
  	r.x = a.x+b.x;
  	r.y = a.y+b.y;
  	return r;
  }
 
- rxvec2_t rxvec2_sub(rxvec2_t a, rxvec2_t b)
+ Vec2 rxvec2_sub(Vec2 a, Vec2 b)
  {
- 	rxvec2_t r;
+ 	Vec2 r;
  	r.x = a.x-b.x;
  	r.y = a.y-b.y;
  	return r;
@@ -421,9 +421,9 @@ rxmatrix_t rxmatrix_flip_vertically()
 
 
 /* All this has to be worked out */
-rxvec4_t rxmul_matvec(rxmatrix_t m, rxvec4_t v)
+Vec4 rxmul_matvec(rxmatrix_t m, Vec4 v)
 {
-	rxvec4_t r;
+	Vec4 r;
 	r.x = m.m[0][0] * v.x + m.m[1][0] * v.y + m.m[2][0] * v.z + m.m[3][0];
 	r.y = m.m[0][1] * v.x + m.m[1][1] * v.y + m.m[2][1] * v.z + m.m[3][1];
 	r.z = m.m[0][2] * v.x + m.m[1][2] * v.y + m.m[2][2] * v.z + m.m[3][2];
@@ -431,35 +431,35 @@ rxvec4_t rxmul_matvec(rxmatrix_t m, rxvec4_t v)
 	return r;
 }
 
-rxvec2_t rxadd_vec2(rxvec2_t v0, rxvec2_t v1)
+Vec2 rxadd_vec2(Vec2 v0, Vec2 v1)
 {
-	rxvec2_t r;
+	Vec2 r;
 	r.x = v0.x + v1.x;
 	r.y = v0.y + v1.y;
 	return r;
 }
 
-rxvec2_t rxmul_vec2(rxvec2_t v0, rxvec2_t v1)
+Vec2 rxmul_vec2(Vec2 v0, Vec2 v1)
 {
-	rxvec2_t r;
+	Vec2 r;
 	r.x = v0.x * v1.x;
 	r.y = v0.y * v1.y;
 	return r;
 }
 
-rxvec2_t rxvec2_xy(float x, float y)
+Vec2 rxvec2_xy(float x, float y)
 {
 
-	rxvec2_t r;
+	Vec2 r;
 	r.x = x;
 	r.y = y;
 
 	return r;
 }
 
-rxvec2_t rxvec2i_vec2(rxvec2i_t v)
+Vec2 rxvec2i_vec2(rxvec2i_t v)
 {
-	rxvec2_t r;
+	Vec2 r;
 	r.x = v.x;
 	r.y = v.y;
 	return r;

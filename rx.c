@@ -52,121 +52,285 @@
 **     see that color, then it could be a driver error, in which case, run Visual Studio's Graphic Debugger.
 */
 // todo: bind different textures to the shader to avoid having to switch them multiple times per frame?
-#ifndef _RX_H
-#define _RX_H
+#ifndef _lgi_
+#define _lgi_
 
-# ifndef _RX_NO_WINDOWS
-# pragma comment(lib,"user32")
-# define             NOMINMAX
-# define  WIN32_LEAN_AND_MEAN
-# define _NO_CRT_STDIO_INLINE
-#include     <windows.h>
-#include    <Windowsx.h>
-#  endif
+// TODO:
+// Allocators!
+
+//
+// Basic Setup Macros:
+//
+//
+// NOTE: These Options Can be Changed At Runtime!
+//
+#if !defined(lgi_DEFAULT_WINDOW_WIDTH)
+	#define lgi_DEFAULT_WINDOW_WIDTH CW_USEDEFAULT
+#endif
+
+#if !defined(lgi_DEFAULT_WINDOW_HEIGHT)
+	#define lgi_DEFAULT_WINDOW_HEIGHT CW_USEDEFAULT
+#endif
+
+#if !defined(lgi_DEFAULT_INDEX_BUFFER_LENGTH)
+	#define lgi_DEFAULT_INDEX_BUFFER_LENGTH 0x1000
+#endif
+#if !defined(lgi_DEFAULT_VERTEX_BUFFER_LENGTH)
+	#define lgi_DEFAULT_VERTEX_BUFFER_LENGTH 0x1000
+#endif
+
+
+//
+// NOTE: Multi-Sampling Anti-Aliasing!
+// 1) Disabled, Single-Sampling!
+//
+#if !defined(lgi_MSAA)
+	#define lgi_MSAA 1
+#endif
+
+#if !defined(lgi_REFRESH_RATE)
+	#define lgi_REFRESH_RATE 60
+#endif
+
+//
+// Device Setup Macros:
+//
+
+#if defined(_DEBUG)
+	#define lgi_DEBUGGABLE_DEVICE
+#endif
+
+#if !defined(lgi_COMMON_DEVICE_SETUP_FLAGS)
+	#define lgi_COMMON_DEVICE_SETUP_FLAGS D3D11_CREATE_DEVICE_BGRA_SUPPORT
+#endif
+
+#if !defined(lgi_DEFAULT_DEVICE_SETUP_FLAGS)
+	#if defined(lgi_DEBUGGABLE_DEVICE)
+		#define lgi_DEFAULT_DEVICE_SETUP_FLAGS lgi_COMMON_DEVICE_SETUP_FLAGS|D3D11_CREATE_DEVICE_DEBUG|D3D11_CREATE_DEVICE_SINGLETHREADED
+	#else
+		#define lgi_DEFAULT_DEVICE_SETUP_FLAGS lgi_COMMON_DEVICE_SETUP_FLAGS
+	#endif
+#endif
+
+//
+// Shader Compilation Setup Macros:
+//
+
+#if !defined(lgi_COMMON_SHADER_BUILD_FLAGS)
+	#define lgi_COMMON_SHADER_BUILD_FLAGS D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|D3DCOMPILE_WARNINGS_ARE_ERRORS|D3DCOMPILE_ENABLE_STRICTNESS
+#endif
+
+#if !defined(lgi_DEFAULT_SHADER_BUILD_FLAGS)
+	#if defined(lgi_DEBUGGABLE_SHADERS)
+		#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_DEBUG|D3DCOMPILE_SKIP_OPTIMIZATION
+	#else
+		#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_OPTIMIZATION_LEVEL3
+	#endif
+#endif
+
+//
+// Memory Macros:
+//
+
+#if !defined(lgi__deallocate_memory)
+	#define lgi__deallocate_memory(memory,user) ((void)(user),free(memory))
+#endif
+#if !defined(lgi__allocate_memory)
+	#define lgi__allocate_memory(length,user) ((void)(user),malloc(length))
+#endif
+#if !defined(lgi__reallocate_memory)
+	#define lgi__reallocate_memory(length,memory,user) ((void)(user),realloc(length,memory))
+#endif
+#if !defined(lgi__clear_memory)
+	#define lgi__clear_memory(memory,length) (memset(memory,0,length))
+#endif
+
+#define lgi__allocate_typeof(T) ((T*)lgi__allocate_memory(sizeof(T),NULL))
+#define lgi__clear_typeof(T) (lgi__clear_memory(T,sizeof(*(T))))
+
+//
+// Logging:
+//
+
+static char *lgi__StringFormat(char const *format, ...);
+static void lgi_LogFunction(int severity, char const *message);
+static void lgi_SourceLogFunction(int severity, char const *message, char const *file, char const *func, int line);
+
+//
+// NOTE: This is so that it works with d3d out of the box!
+//
+
+#define lgi_CORRUPTION  D3D11_MESSAGE_SEVERITY_CORRUPTION
+#define lgi_ERROR       D3D11_MESSAGE_SEVERITY_ERROR
+#define lgi_WARNING     D3D11_MESSAGE_SEVERITY_WARNING
+#define lgi_INFO        D3D11_MESSAGE_SEVERITY_INFO
+#define lgi_MESSAGE     D3D11_MESSAGE_SEVERITY_MESSAGE
+
+#if !defined(lgi_logSomething)
+	#define lgi_logSomething(TAG,FMT,...) (lgi_SourceLogFunction(TAG,lgi__StringFormat(FMT,__VA_ARGS__),__FILE__,__func__,__LINE__),0)
+#endif
+#if !defined(lgi_logInfo)
+	#define lgi_logInfo(FMT,...) lgi_logSomething(lgi_INFO,FMT, __VA_ARGS__)
+#endif
+#if !defined(lgi_logError)
+	#define lgi_logError(FMT,...) lgi_logSomething(lgi_ERROR,FMT, __VA_ARGS__)
+#endif
+
+//
+// Assert Macros:
+//
+
+#ifndef lgi_ASSERT
+# ifdef _DEBUG
+#  define lgi_ASSERT(is_true,...) do{ if(!(is_true)) { lgi_logError("assertion triggered"); __debugbreak(); } } while(0)
+# else
+#  define lgi_ASSERT(is_true,...)
+# endif
+#endif
+
+//
+// NOTE: To Make Struct Literals In C or CPP Mode!
+//
+
+#if !defined(lgi_T)
+	#if !defined(__cplusplus)
+		#define lgi_T(T) (T)
+	#else
+		#define lgi_T(T)
+	#endif
+#endif
+
+
+//
+// Attribute Macros:
+//
+
+#if !defined(lgi_API)
+	#define lgi_API static
+#endif
+
+#if !defined(lgi_Global)
+	#define lgi_Global static
+#endif
+
+//
+// Constant Definitions:
+//
+
+#define lgi_PI  3.14159
+#define lgi_TAU 6.28318
+
+//
+// [[INCLUSIONS]]
+//
+
+// #include <stdio.h> // For: vsnprintf
+
+//
+// WINDOWS
+//
+
+
+#if !defined(lgi_NO_WINDOWS)
+
+	#pragma comment(lib,"user32")
+
+	#define NOMINMAX
+	#define WIN32_LEAN_AND_MEAN
+	#define _NO_CRT_STDIO_INLINE
+	#include <windows.h>
+// #include    <Windowsx.h>
+# endif
+
+//
+// D3D
+//
 
 #pragma comment(lib,        "Gdi32")
 #pragma comment(lib,       "dxguid")
 #pragma comment(lib,        "d3d11")
 #pragma comment(lib,  "d3dcompiler")
 
-# define CINTERFACE
-# define COBJMACROS
-# define D3D11_NO_HELPERS
-/* suppress some warnings generated by d3dcompiler.h */
-# pragma warning(push)
-# pragma warning(disable:4115)
+#define CINTERFACE
+#define COBJMACROS
+#define D3D11_NO_HELPERS
+
+// NOTE: Suppress some warnings generated by d3dcompiler.h
+
+#pragma warning(push)
+#pragma warning(disable:4115)
+
 #include <d3dcompiler.h>
-# pragma warning(pop)
-/* suppress some warnings generated by d3d11.h */
+
+#pragma warning(pop)
+
+// NOTE: Suppress some warnings generated by d3d11.h
 # pragma warning(push)
 # pragma warning(disable:4201)
+
 // #include       <d3d11.h>
-#include     <d3d11_3.h>
-# pragma warning(pop)
+#include <d3d11_3.h>
 
-#include   <dxgidebug.h>
-#include        <dxgi.h>
-#include     <dxgi1_3.h>
+#pragma warning(pop)
 
-#ifndef lgi__deallocate_memory
-#define lgi__deallocate_memory(memory,user) ((void)(user),free(memory))
+
+#include <dxgidebug.h>
+#include <dxgi.h>
+#include <dxgi1_3.h>
+
+//
+// STB:
+//
+
+#if !defined(STB_SPRINTF_IMPLEMENTATION)
+	#define STB_SPRINTF_IMPLEMENTATION
+	#include <stb/stb_sprintf.h>
 #endif
-#ifndef lgi__allocate_memory
-#define lgi__allocate_memory(size,user) ((void)(user),malloc(size))
+
+#if !defined(STB_IMAGE_IMPLEMENTATION)
+	#define STB_IMAGE_IMPLEMENTATION
+	#define STBI_MALLOC(size) lgi__allocate_memory(size,NULL)
+	#define STBI_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
+	#define STBI_FREE(memory) lgi__deallocate_memory(memory,NULL)
+	#include <stb/stb_image.h>
 #endif
-#ifndef lgi__reallocate_memory
-#define lgi__reallocate_memory(size,memory,user) ((void)(user),realloc(size,memory))
-#endif
 
-#define lgi__allocate_typeof(T) ((T*)lgi__allocate_memory(sizeof(T),NULL))
-#define lgi__clear_typeof(T) (memset(T,0,sizeof(*T)))
-
-#define lgi_logTrace(fmt,...) printf("lgi trace: " fmt "\n", __VA_ARGS__)
-#define lgi_logError(fmt,...) printf("lgi error: " fmt "\n", __VA_ARGS__)
-
-#define lgi_API static
-#define lgi_Global static
-
-typedef int lgi_Bool;
-#define lgi_Null NULL
-#define lgi_True  ((lgi_Bool) 1)
-#define lgi_False ((lgi_Bool) 0)
-
-#define lgi_PI  3.14159
-#define lgi_TAU 6.28318
-
-// todo: enhance these assertions? ...
-#ifndef lgi_ensure
-# ifdef _DEBUG
-#  define lgi_ensure(is_true,...) do{ if(!(is_true)) { lgi_logError("assertion triggered"); __debugbreak(); } } while(0)
-# else
-#  define lgi_ensure(is_true,...) lgi_Null
-# endif
+#if !defined(STB_IMAGE_WRITE_IMPLEMENTATION)
+	#define STB_IMAGE_WRITE_IMPLEMENTATION
+	#define STBIW_MALLOC(size) lgi__allocate_memory(size,NULL)
+	#define STBIW_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
+	#define STBIW_FREE(memory) lgi__deallocate_memory(memory,NULL)
+	#include <stb/stb_image_write.h>
 #endif
 
 
-// TODO: rid of this!
-#ifndef isWithin
-#define isWithin(x,l,r) (((x)>=(l))&&((x)<=(r)))
+//
+// Weird Macros:
+//
+
+#if !defined(isWithin)
+	#define isWithin(x,l,r) (((x)>=(l))&&((x)<=(r)))
 #endif
-#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
 
-// #if defined(_RX_STANDALONE)
-// #error "this option is deprecated!"
-// #endif
+#if !defined(isWithin3)
+	#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
+#endif
 
-# ifndef STB_SPRINTF_IMPLEMENTATION
-# define STB_SPRINTF_IMPLEMENTATION
-#include <stb/stb_sprintf.h>
-#  endif
-
-#include <src/win32.c>
 #include <src/dlb.c>
 
-#ifndef STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_MALLOC(size) lgi__allocate_memory(size,NULL)
-#define STBI_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
-#define STBI_FREE(memory) lgi__deallocate_memory(memory,NULL)
-#include <stb/stb_image.h>
-#endif//STB_IMAGE_IMPLEMENTATION
-
-#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define STBIW_MALLOC(size) lgi__allocate_memory(size,NULL)
-#define STBIW_REALLOC(size,memory) lgi__reallocate_memory(size,memory,NULL)
-#define STBIW_FREE(memory) lgi__deallocate_memory(memory,NULL)
-#include <stb/stb_image_write.h>
-#endif//STB_IMAGE_WRITE_IMPLEMENTATION
-
 /* todo: this is to be embedded eventually */
-#include  "rxps.hlsl"
-#include  "rxvs.hlsl"
-#include  "rxsdf.vs.hlsl"
-#include  "rxtxt.ps.hlsl"
-#include  "rxtxt_sdf.ps.hlsl"
-#include  "rxsdf_cir.ps.hlsl"
-#include  "rxsdf_box.ps.hlsl"
+#include <src\hlsl\rxps.h>
+#include <src\hlsl\rxvs.h>
+#include <src\hlsl\rxsdf.vs.h>
+#include <src\hlsl\rxtxt.ps.h>
+#include <src\hlsl\rxtxt_sdf.ps.h>
+#include <src\hlsl\rxsdf_cir.ps.h>
+#include <src\hlsl\rxsdf_box.ps.h>
+
+
+//
+// Warning Suppression:
+//
 
 /* disabled warnings */
 #pragma warning(push)
@@ -178,44 +342,16 @@ typedef int lgi_Bool;
 #pragma warning(disable:4244)
 #pragma warning(disable:4305)
 
-/* delicacies of programming */
-#ifndef lgi_T
-#ifndef __cplusplus
-#define lgi_T(T) (T)
-#  else
-#define lgi_T(T)
-# endif//__cplusplus
-# endif//lgi_T
 
-#ifndef lgi_DEFAULT_WINDOW_WIDTH
-#define lgi_DEFAULT_WINDOW_WIDTH CW_USEDEFAULT
-# endif//lgi_DEFAULT_WINDOW_WIDTH
+//
+// Basic Types:
+//
 
-#ifndef lgi_DEFAULT_WINDOW_HEIGHT
-#define lgi_DEFAULT_WINDOW_HEIGHT CW_USEDEFAULT
-# endif//lgi_DEFAULT_WINDOW_HEIGHT
+typedef signed int lgi_Bool;
+#define lgi_Null NULL
+#define lgi_True  ((lgi_Bool) 1)
+#define lgi_False ((lgi_Bool) 0)
 
-
-#ifndef lgi_COMMON_SHADER_BUILD_FLAGS
-#define lgi_COMMON_SHADER_BUILD_FLAGS D3DCOMPILE_PACK_MATRIX_COLUMN_MAJOR|D3DCOMPILE_WARNINGS_ARE_ERRORS|D3DCOMPILE_ENABLE_STRICTNESS
-#endif//lgi_COMMON_SHADER_BUILD_FLAGS
-
-#ifndef lgi_DEFAULT_SHADER_BUILD_FLAGS
-# ifdef lgi_DEBUGGABLE_SHADERS
-#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_DEBUG|D3DCOMPILE_SKIP_OPTIMIZATION
-#  else
-#define lgi_DEFAULT_SHADER_BUILD_FLAGS lgi_COMMON_SHADER_BUILD_FLAGS|D3DCOMPILE_OPTIMIZATION_LEVEL3
-# endif//lgi_DEBUGGABLE_SHADERS
-# endif//lgi_DEFAULT_SHADER_BUILD_FLAGS
-
-
-// TODO:
-#ifndef _RX_MSAA
-#define _RX_MSAA 1
-# endif//_RX_MSAA
-#ifndef _RX_REFRESH_RATE
-#define _RX_REFRESH_RATE 60
-# endif//_RX_REFRESH_RATE
 
 typedef enum {
 	lgi_Error_NONE = 0,
@@ -235,14 +371,16 @@ typedef enum {
 **  NOLI SE TANGERE
 **
 */
-typedef rxvec4_t lgi_Color;
 
-#ifndef lgi_RGBA
-#define lgi_RGBA(R,G,B,A) lgi_T(lgi_Color){R,G,B,A}
-# endif
-#ifndef lgi_RGBA_U
-#define lgi_RGBA_U(R,G,B,A) lgi_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
-# endif
+typedef Vec4 lgi_Color;
+
+#if !defined(lgi_RGBA)
+	#define lgi_RGBA(R,G,B,A) lgi_T(lgi_Color){R,G,B,A}
+#endif
+
+#if !defined(lgi_RGBA_U)
+	#define lgi_RGBA_U(R,G,B,A) lgi_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
+#endif
 
 #define lgi_Color__WHITE       lgi_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
 #define lgi_Color__BLACK       lgi_RGBA_U(0x00, 0x00, 0x00, 0xFF)
@@ -271,19 +409,160 @@ typedef rxvec4_t lgi_Color;
 #define lgi_Color__SALMON      lgi_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
 #define lgi_Color__AQUAMARINE  lgi_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
 
+//
+// Common Types:
+//
+
+typedef ID3D11DeviceChild *lgi_Unknown;
+
+typedef struct lgi_Sampler lgi_Sampler;
+
+typedef struct lgi_Texture_Config lgi_Texture_Config;
+typedef struct lgi_Texture lgi_Texture;
+
+typedef struct lgi_Buffer lgi_Buffer;
+
+typedef struct lgi_Shader_Config lgi_Shader_Config;
+typedef struct lgi_Shader lgi_Shader;
+
+typedef struct lgi_Program lgi_Program;
+
+
+
+//
+// TODO: Could We Just Make This A Part Of Texture!
+//
+
+typedef struct lgi_Image {
+	int size_x, size_y;
+	int format;
+	int stride;
+	void * memory;
+} lgi_Image;
+
+
+//
+// API:
+//
+
+// Main API:
+
+lgi_API void lgi_initWindowed(int windowWidth, int windowHeight, char const *windowTitle);
+lgi_API void lgi_clearBackground(lgi_Color color);
+lgi_API void lgi_bindProgram(lgi_Program);
+lgi_API void lgi_bindShaders(lgi_Shader *v, lgi_Shader *p, int flush);
+lgi_API void lgi_bindTexture(int slot, lgi_Texture *texture, int flush);
+lgi_API void lgi_flushImmediatly();
+
+// Platform API:
+
+lgi_API elBool lgi_setActiveWindow(HWND window);
+lgi_API void lgi_setCursor(HCURSOR cursor);
+lgi_API unsigned __int64 lgi_queryTicksPerSecond();
+lgi_API unsigned __int64 lgi_pollTickClock();
+
+lgi_API void lgi_unloadFileContents(void *fileContents);
+lgi_API void *lgi_loadFileContents(char const *fileName, int *length);
+
+// Input API:
+
+lgi_API int lgi_wasButtonDown(int x);
+lgi_API int lgi_isButtonDown(int x);
+lgi_API int lgi_isButtonReleased(int x);
+lgi_API int lgi_isButtonPressed(int x);
+lgi_API int lgi_testKey(int x);
+lgi_API int lgi_testFKey(int x);
+lgi_API int lgi_testCtrlKey();
+lgi_API int lgi_testAltKey();
+lgi_API int lgi_testShiftKey();
+lgi_API int lgi_lastChar();
+
+//
+// Shader API:
+//
+
+/* [[BEWARE]]:
+	May not handle padding very well should you choose to let the API create the input layout for you
+	automatically using the reflection API.
+	Try to pack things into bigger units if you run into alignment issues, or try
+	re-ordering the structure. */
+lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config);
+lgi_API lgi_Shader *lgi_buildShader(int flags, char const *label, size_t length, void *memory);
+lgi_API lgi_Shader *lgi_loadShader(int flags, char const *label, char const *entry, char const *fileName);
+
+lgi_API lgi_Buffer *lgi_getShaderInputBlock(lgi_Shader *shader);
+lgi_API void lgi_resizeShaderInputBlock(lgi_Shader *shader, int length);
+lgi_API void lgi_updateShaderInputBlock(lgi_Shader *shader, int length, void *memory);
+
+//
+// Buffer API:
+//
+
+lgi_API void lgi_deleteBuffer(lgi_Buffer *xx);
+
+lgi_API void lgi_returnBufferContents(lgi_Buffer *xx);
+lgi_API void lgi_updateBufferContents(lgi_Buffer *xx, void *lpMemory, size_t length);
+lgi_API void *lgi_borrowBufferContents(lgi_Buffer *xx, int *lpStride);
+
+lgi_API lgi_Buffer *lgi_makeConstBuffer(unsigned int length, void *memory);
+lgi_API lgi_Buffer *lgi_makeIndexBuffer(int index_size, int index_count);
+lgi_API lgi_Buffer *lgi_makeVertexBuffer(int vertex_size, int vertex_count);
+lgi_API lgi_Buffer *lgi_makeStructuredBuffer(int struct_size, int struct_count);
+
+
+//
+// Image API:
+//
+
+lgi_API lgi_Image lgi_makeImage(int size_x, int size_y, int format);
+lgi_API lgi_Image lgi_loadImage(const char *name);
+
+//
+// Texture API:
+//
+
+lgi_API lgi_Texture_Config lgi_makeTextureConfig(int size_x, int size_y, DXGI_FORMAT format, int stride, void  *memory, int samples, int quality, D3D11_USAGE memtype, int useflag, int memflag);
+lgi_API lgi_Error lgi_initTexture(lgi_Texture *xx, lgi_Texture_Config *config);
+lgi_API void lgi_closeTexture(lgi_Texture *xx);
+lgi_API void lgi_deleteTexture(lgi_Texture *xx);
+lgi_API lgi_Texture *lgi_createTexture(lgi_Texture_Config *config);
+lgi_API lgi_Texture *lgi_makeTexture(int size_x, int size_y, DXGI_FORMAT format, int stride, void *memory);
+lgi_API lgi_Texture *lgi_loadTexture(char const *fileName);
+lgi_API lgi_Texture *lgi_uploadImage(lgi_Image image);
+lgi_API void *lgi_borrowTextureContents(lgi_Texture *xx, int *stride);
+lgi_API void lgi_returnTextureContents(lgi_Texture *xx);
+lgi_API void lgi_updateTexture(lgi_Texture *xx, lgi_Image image);
+lgi_API void lgi_copyTexture(lgi_Texture *dst, lgi_Texture *src);
+lgi_API lgi_Texture *lgi_makeDepthTarget(int size_x, int size_y, int format);
+lgi_API lgi_Texture *lgi_makeColorTarget(int size_x, int size_y, int format, int samples, int quality);
+
+
+lgi_API void lgi_closeHandle(lgi_Unknown handle) {
+	if (handle != 0) {
+		IUnknown_Release(handle);
+	}
+}
+
 
 enum {
 	rx_kNONE = 0,
 	rx_kESCAPE,
+	// NOTE: Could be stored in a byte
 	rxKEY_kLEFT,rxKEY_kRIGHT,rxKEY_kUP,rxKEY_kDOWN,
+	// NOTE: Could be stored in a short
 	rxKEY_kF1,rxKEY_kF2,rxKEY_kF3,rxKEY_kF4,rxKEY_kF5,
 	rxKEY_kF6,rxKEY_kF7,rxKEY_kF8,rxKEY_kF9,
 	rxKEY_kF10,rxKEY_kF11,rxKEY_kF12,
-	rxKEY_kRETURN,
+
+	// NOTE: Could be stored in a byte!
 	rx_kLCTRL,rx_kRCTRL,
 	rx_kLSFHT,rx_kRSFHT,
+
+	rxKEY_kRETURN,
 	rx_kBCKSPC,rx_kDELETE,
 	rx_kHOME,rx_kEND,
+
+	// NOTE: Could be stored with 2 ints
 	rxKEY_kSPACE = ' ',
 	rxKEY_kA     = 'A',
 	rxKEY_kZ     = 'Z',
@@ -291,46 +570,282 @@ enum {
 	rxKEY_k9     = '9',
 };
 
+typedef int lgi_Index;
 
-typedef struct lgi_Bitmap lgi_Bitmap;
+typedef union {
+	struct {
+		Vec4 xyzw;
+		Vec4 rgba;
+		Vec2 uv;
+	};
+	struct {
+		float x,y,z,w;
+		float r,g,b,a;
+		float u,v;
+	};
+	//
+	// TODO: Remove!
+	//
+	struct {
+		Vec2 xy;
+		Vec4 xyxy;
+		Vec4 rgba;
+		Vec4 flag;
+	} rect;
+} lgi_Vertex;
 
-#include <src/rxgpu.h>
-#include <src/rximp.h>
+typedef struct {
+	rxmatrix_t matrix;
+	Vec2   xyscreen;
+	Vec2   xysource;
+	Vec2   xycursor;
+	double total_seconds;
+	double delta_seconds;
+} lgi_ConstSlots;
+
+typedef struct lgi_Buffer {
+	struct {
+		int   stride;
+		void *memory;
+	} mapped;
+	struct {
+		union {
+			ID3D11Buffer *buffer;
+			ID3D11Resource *resource;
+		};
+		ID3D11ShaderResourceView *shader_target;
+	} d3d11;
+} lgi_Buffer;
+
+// TODO: we can associate this with a texture and forget about it!
+typedef struct lgi_Sampler {
+	struct {
+		ID3D11SamplerState *state;
+	} d3d11;
+} lgi_Sampler;
+
+typedef struct lgi_Texture_Config {
+	int    format;
+	int    size_x;
+	int    size_y;
+  	/* multisampling, default should be 1,0 */
+	int    samples;
+	int    quality;
+
+  	/* replace this with a single flag field instead #todo */
+	struct {
+  		/* GPU allocation flags */
+		D3D11_USAGE memtype;
+		int useflag;
+    	/* CPU access flags */
+		int memflag;
+	};
+
+	/* memory and stride are optional, if memory provided stride may not be 0 */
+	int    stride;
+	void  *memory;
+
+ 	/* optional in/out */
+	struct {
+		union {
+			ID3D11Resource  *resource;
+			ID3D11Texture2D *texture_2d;
+		};
+
+		ID3D11ShaderResourceView  *shader_target;
+		ID3D11RenderTargetView     *color_target;
+		ID3D11DepthStencilView     *depth_target;
+
+		ID3D11SamplerState *sampler;
+	} d3d11;
+} lgi_Texture_Config;
+
+typedef struct lgi_Texture {
+	int format;
+	int size_x;
+	int size_y;
+	int samples;
+	int quality;
+
+	struct {
+		int   stride;
+		void *memory;
+	} mapped;
+
+	struct {
+		union {
+			ID3D11Resource  *resource;
+			ID3D11Texture2D *texture_2d;
+		};
+		// NOTE(RJ):
+		ID3D11SamplerState *sampler;
+
+    	// NOTE(RJ): optional!
+		ID3D11ShaderResourceView *shader_target;
+		ID3D11RenderTargetView   *color_target;
+		ID3D11DepthStencilView   *depth_target;
+	} d3d11;
+	char const *debug_label;
+} lgi_Texture;
+
+
+enum {
+	rxGPU_kINVALID = 0 << 0,
+	rxGPU_kPIXEL_SHADER_BIT = 1 << 1,
+	rxGPU_kVERTEX_SHADER_BIT = 1 << 2,
+	rxGPU_kCOMPUTE_SHADER_BIT = 1 << 3,
+};
+
+typedef struct lgi_Shader_Config {
+	char const *label;
+	int flags;
+	int expected_color_attachments;
+	int expected_input_buffers;
+	struct {
+		struct {
+			size_t length;
+			union {
+				void *memory;
+				char *string;
+			};
+		} bytecode;
+		struct {
+			char const *debug_label;
+			char const *model;
+			char const *entry;
+			struct {
+				size_t  length;
+				void   *memory;
+			};
+		} compile;
+	} source;
+	struct {
+		D3D11_INPUT_ELEMENT_DESC attr_array[0x20];
+		int attr_count;
+		struct {
+			ID3D11InputLayout *layout;
+		} d3d11;
+	} layout;
+	unsigned force_create_layout: 1;
+	unsigned donot_create_layout: 1;
+} lgi_Shader_Config;
+
+typedef struct lgi_Shader {
+	char const *label;
+	int flags;
+	int expected_color_attachments;
+	int expected_input_buffers;
+	lgi_Buffer *inputBlock;
+	struct {
+		union {
+			ID3D11DeviceChild *unknown;
+			ID3D11VertexShader *vertexShader;
+			ID3D11PixelShader *pixelShader;
+		};
+		ID3D11InputLayout *layout;
+	} d3d11;
+} lgi_Shader;
+
+typedef struct lgi_Program {
+
+	lgi_Shader *vertexShader;
+	lgi_Shader *pixelShader;
+
+	struct {
+		ID3D11BlendState *blendState;
+	} d3d11;
+} lgi_Program;
+
+typedef struct {
+
+	int mode;
+
+	rxmatrix_t view_matrix;
+	rxmatrix_t world_matrix;
+
+	lgi_ConstSlots constSlots;
+
+
+	lgi_Shader *liveVertexShader;
+	lgi_Shader *livePixelShader;
+
+	lgi_Texture *liveTextures[8];
+
+	struct {
+		ID3D11BlendState *blendState;
+		ID3D11BlendState *rasterizerState;
+		ID3D11SamplerState *samplerStates[8];
+	} d3d11;
+	lgi_Buffer  *constBuffer;
+
+
+	lgi_Buffer *vertexBuffer;
+	lgi_Buffer *indexBuffer;
+
+	lgi_Vertex *vertex_array;
+	lgi_Index *index_array;
+	int vertex_tally;
+	int index_tally;
+
+	int index_offset;
+	lgi_Vertex attr;
+} lgi_State;
+
+//
+// Core:
+//
 
 typedef struct lgi_Core lgi_Core;
 typedef struct lgi_Core {
 
 	/* timing stuff */
-	__int64 frame_count;
-	unsigned __int64   start_ticks;
-	unsigned __int64   frame_ticks;
-	unsigned __int64   total_ticks;
-	unsigned __int64   delta_ticks;
+	__int64 frameTally;
 
-	/* [[TODO]]: there are more correct and robust ways to store time long term, @TomForsyth */
-	double          total_seconds;
-	double          delta_seconds;
+	// lgi::Time
+	struct {
+		unsigned __int64 ticksPerSecond;
 
-	/* todo: constants, should be upper case */
-	lgi_Sampler linear_sampler;
-	lgi_Sampler point_sampler;
-	lgi_Sampler anisotropic_sampler;
+		unsigned __int64 start_ticks;
+		unsigned __int64 total_ticks;
 
+		unsigned __int64 frame_ticks;
+		unsigned __int64 delta_ticks;
 
+		double total_seconds;
+		double delta_seconds;
+	} Time;
+
+	// lgi::Input
 	struct {
 		struct {
-			ID3D11InfoQueue        *inf;
-			ID3D11Device           *dev;
-			ID3D11DeviceContext    *ctx;
-		};
-		// todo: gpu.d3d11
-	} d3d11;
+			int lastChar;
 
-	/* window related structure, we only support one window for now but it'd be
-		trivial to extend this */
+			/* todo: store this better */
+			char     oldKeyState[0x100];
+			char     newKeyState[0x100];
+
+			unsigned is_ctrl: 1;
+			unsigned is_menu: 1;
+			unsigned is_shft: 1;
+		} Keyboard;
+		struct {
+			int xcursor;
+			int ycursor;
+			int yscroll;
+			int xscroll;
+
+			int  xclick;
+			int  yclick;
+
+			int oldButtonState;
+			int newButtonState;
+		} Mice;
+	} Input;
+
+	// lgi::Window
 	struct {
-		unsigned  off: 1;
-		unsigned  vis: 1;
+		unsigned isClosed: 1;
+		unsigned isVisible: 1;
 
 		struct {
 			int size_x;
@@ -345,42 +860,50 @@ typedef struct lgi_Core {
 
 		/* output media */
 		struct {
-			lgi_Texture *tar;
+			lgi_Texture *target;
 
 			struct {
-				IDXGISwapChain2 *swap_chain;
+				IDXGISwapChain2 *stage;
 				void            *frame_await;
 			} d3d11;
-		} out;
+		} Output;
+	} Window;
 
-		/* input handling members, these get updated once every tick */
+
+	/* todo: constants, should be upper case */
+	lgi_Sampler linear_sampler;
+	lgi_Sampler point_sampler;
+	lgi_Sampler anisotropic_sampler;
+
+	ID3D11SamplerState *LINEAR_SAMPLER;
+	ID3D11SamplerState *POINT_SAMPLER;
+	ID3D11SamplerState *ANISOTROPIC_SAMPLER;
+
+
+	lgi_Program defaultProgram;
+	lgi_Program lcdTextProgram;
+	lgi_Program sdfTextProgram;
+	lgi_Program sdfCircleProgram;
+	lgi_Program sdfBoxProgram;
+
+	lgi_Texture *defaultDepthTarget;
+	lgi_Texture *defaultColorTarget;
+	lgi_Buffer  *defaultConstBlock;
+
+	lgi_Texture *whiteTexture;
+
+
+	// lgi::d3d11
+	struct {
 		struct {
-			struct {
-/* todo: store this better - rj */
-				int chr;
-
-/* todo: store this better */
-				char     key_lst[0x100];
-				char     key    [0x100];
-
-				unsigned is_ctrl: 1;
-				unsigned is_menu: 1;
-				unsigned is_shft: 1;
-			} kbrd;
-			struct {
-				int xcursor;
-				int ycursor;
-				int yscroll;
-				int xscroll;
-
-				int  xclick;
-				int  yclick;
-
-				int btn_old;
-				int btn_cur;
-			} mice;
-		} in;
-	} wnd;
+			ID3D11InfoQueue        *inf;
+			ID3D11Device           *dev;
+			ID3D11DeviceContext    *ctx;
+		};
+		ID3D11BlendState *defaultBlendState;
+		ID3D11RasterizerState *defaultRasterizerState;
+		ID3D11DepthStencilState *defaultStencilState;
+	} d3d11;
 
 	struct {
 		HMODULE user32_dll;
@@ -389,35 +912,106 @@ typedef struct lgi_Core {
 		} cursor;
 	} win32;
 
-
-	rxIMP_Context   imp;
-
-	/* [[NOTE]]: not sure how well this is going to work in the long run */
-#ifdef RX_EXTENSION_SLOT_0
-	RX_EXTENSION_SLOT_0;
-#endif
-#ifdef RX_EXTENSION_SLOT_1
-	RX_EXTENSION_SLOT_1;
-#endif
+	lgi_State State;
 } lgi_Core;
 
 /* the source of all evil is here */
 lgi_Global lgi_Core rx;
+#define lgi rx
 
-#include <src/rxgpu.c>
-#include <src/rximp.c>
 
-/* [[TODO]]:
-	This is temporary */
-void
-lgi_OS__unloadFileContents(LPVOID fileContents) {
+//
+// Logging:
+//
+
+char *lgi__StringFormat(char const *format, ...) {
+	// TODO(RJ): Ensure we don't overflow buffer!
+	static char buffer[0x1000];
+	static char *cursor = buffer;
+	va_list xx;
+	va_start(xx,format);
+	int length = stbsp_vsnprintf(NULL,0,format,xx);
+	if (((cursor-buffer)+length) >= sizeof(buffer)) {
+		cursor=buffer;
+	}
+	stbsp_vsnprintf(cursor,(int)sizeof(buffer) - (cursor-buffer),format,xx);
+	char *result = cursor;
+	cursor += length+1;
+	va_end(xx);
+	return result;
+}
+
+static void lgi_LogFunction(int severity, char const *message) {
+	char const *name = "TRACE";
+	switch (severity) {
+		case lgi_CORRUPTION: name = "CORRUPTION";
+		case lgi_ERROR: name = "ERROR";
+		case lgi_WARNING: name = "WARNING";
+		case lgi_INFO: name = "INFO";
+		case lgi_MESSAGE: name = "MESSAGE";
+	}
+	printf("%s => %s\n",name,message);
+}
+
+static void lgi_SourceLogFunction(int severity, char const *message, char const *file, char const *func, int line) {
+	char const *name = "TRACE";
+	switch (severity) {
+		case lgi_CORRUPTION: name = "CORRUPTION";
+		case lgi_ERROR: name = "ERROR";
+		case lgi_WARNING: name = "WARNING";
+		case lgi_INFO: name = "INFO";
+		case lgi_MESSAGE: name = "MESSAGE";
+	}
+	char const *fileName = file;
+	for(; *file != 0; file += 1) {
+		if ((*file == '/') || (*file == '\\')) {
+			fileName = file+1;
+		}
+	}
+	// ID3D11InfoQueue_AddApplicationMessage(lgi.d3d11.inf,D3D11_MESSAGE_SEVERITY_INFO,completeMessage);
+
+	printf("%s => %s[%i] %s(): %s\n",name,fileName,line,func,message);
+}
+
+//
+// Platform API:
+//
+
+lgi_API elBool lgi_setActiveWindow(HWND window) {
+	HWND lastWnd = SetActiveWindow(window);
+	return lastWnd != INVALID_HANDLE_VALUE;
+}
+
+lgi_API void lgi_setCursor(HCURSOR cur) {
+	SetCursor(cur);
+}
+
+lgi_API unsigned __int64 lgi_queryTicksPerSecond() {
+#if defined(_WIN32)
+	LARGE_INTEGER l;
+	QueryPerformanceFrequency(&l);
+	return l.QuadPart;
+#else
+	#error
+#endif
+}
+
+lgi_API unsigned __int64 lgi_pollTickClock() {
+#if defined(_WIN32)
+	LARGE_INTEGER l;
+	QueryPerformanceCounter(&l);
+	return l.QuadPart;
+#else
+	#error
+#endif
+}
+
+
+lgi_API void lgi_unloadFileContents(LPVOID fileContents) {
 	VirtualFree(fileContents,0,MEM_RELEASE);
 }
 
-/* [[TODO]]:
-	This is temporary */
-void *
-lgi_OS__loadFileContents(char const *fileName, __int32 *lpSize) {
+lgi_API void *lgi_loadFileContents(char const *fileName, __int32 *lpSize) {
 	*lpSize = 0;
 	char *lpBuffer = lgi_Null;
 	HANDLE hFile = CreateFileA(fileName,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,0x00,NULL);
@@ -429,7 +1023,7 @@ lgi_OS__loadFileContents(char const *fileName, __int32 *lpSize) {
 		if (ReadFile(hFile,lpBuffer,lowFileSize,&bytesRead,NULL) != FALSE) {
 			*lpSize = bytesRead;
 		} else {
-			lgi_OS__unloadFileContents(lpBuffer);
+			lgi_unloadFileContents(lpBuffer);
 			lpBuffer = lgi_Null;
 		}
 		CloseHandle(hFile);
@@ -437,34 +1031,61 @@ lgi_OS__loadFileContents(char const *fileName, __int32 *lpSize) {
 	return lpBuffer;
 }
 
-lgi_Shader
-lgi_loadShader(int flags, char const *label, char const *entry, char const *fileName) {
+//
+// Input API:
+//
 
-	__int32 length = 0;
-	void *memory = lgi_OS__loadFileContents(fileName,&length);
 
-	lgi_Shader_Config config;
-	ZeroMemory(&config,sizeof(config));
-	config.flags = flags;
-	config.label = label;
-	config.source.compile.memory = memory;
-	config.source.compile.length = length;
-	config.source.compile.entry = entry;
-
-	lgi_Shader shader;
-	lgi_GPU__createShader(&shader,&config);
-
-	lgi_OS__unloadFileContents(memory);
-	return shader;
+lgi_API int lgi_wasButtonDown(int x) {
+	return ((lgi.Input.Mice.oldButtonState & (1 << x)) != 0);
 }
 
-lgi_Texture *
-lgi_uploadTextureContents(lgi_Bitmap image) {
-	return lgi_GPU__createTextureSimply(image.size_x,image.size_y,image.format,image.stride,image.memory);
+lgi_API int lgi_isButtonDown(int x) {
+	return ((lgi.Input.Mice.newButtonState & (1 << x)) != 0);
 }
 
-lgi_Bitmap
-lgi_makeBitmap(int size_x, int size_y, int format) {
+lgi_API int lgi_isButtonReleased(int x) {
+	return !lgi_isButtonDown(x) && lgi_wasButtonDown(x);
+}
+
+lgi_API int lgi_isButtonPressed(int x) {
+	return lgi_isButtonDown(x) && !lgi_wasButtonDown(x);
+}
+
+lgi_API int lgi_testKey(int x) {
+	return (lgi.Input.Keyboard.newKeyState[x] != 0);
+}
+
+lgi_API int lgi_testFKey(int x) {
+	return (lgi_testKey(rxKEY_kF1 + iclamp(x,1,12)-1));
+}
+
+lgi_API int lgi_testCtrlKey() {
+	return (lgi.Input.Keyboard.is_ctrl != 0);
+}
+
+lgi_API int lgi_testAltKey() {
+	return (lgi.Input.Keyboard.is_menu != 0);
+}
+
+lgi_API int lgi_testShiftKey() {
+	return (lgi.Input.Keyboard.is_shft != 0);
+}
+
+lgi_API int lgi_lastChar() {
+	return lgi.Input.Keyboard.lastChar;
+}
+
+//
+// Image API:
+//
+
+lgi_API lgi_Texture *lgi_uploadImage(lgi_Image image) {
+
+	return lgi_makeTexture(image.size_x,image.size_y,image.format,image.stride,image.memory);
+}
+
+lgi_API lgi_Image lgi_makeImage(int size_x, int size_y, int format) {
 	int bpp = 0;
 	if (format == lgi_Format_R8_UNORM) {
 		bpp = 1;
@@ -474,24 +1095,23 @@ lgi_makeBitmap(int size_x, int size_y, int format) {
 	}
 	size_t size = size_y * size_x * bpp;
 
-	lgi_ensure(bpp != 0);
+	lgi_ASSERT(bpp != 0);
 
-	lgi_Bitmap result;
+	lgi_Image result;
 	result.size_x = size_x;
 	result.size_y = size_y;
 	result.format = format;
 	result.stride = size_x * bpp;
 	result.memory = lgi__allocate_memory(size, NULL);
-	memset(result.memory,0,size);
+	lgi__clear_memory(result.memory,size);
 
 	return result;
 }
 
-lgi_Bitmap
-lgi_loadTextureContents(const char *name) {
+lgi_API lgi_Image lgi_loadImage(const char *name) {
 
-	lgi_Bitmap result;
-	ZeroMemory(&result,sizeof(result));
+	lgi_Image result;
+	lgi__clear_typeof(&result);
 
 	/* XXX use own memory */
 	void *memory=stbi_load(name,&result.size_x,&result.size_y,0,4);
@@ -502,93 +1122,58 @@ lgi_loadTextureContents(const char *name) {
 	return result;
 }
 
-unsigned __int64
-lgi_OS__queryClockFrequency() {
-	LARGE_INTEGER l;
-	QueryPerformanceFrequency(&l);
-	return l.QuadPart;
+
+
+#include <src/lgi_core.c>
+#include <src/lgi_draw.c>
+
+
+
+//
+// Polling:
+//
+
+lgi_API void lgi_pollDebugMessages() {
+	// int infoMessageCount = ID3D11InfoQueue_GetNumStoredMessages(lgi.d3d11.inf);
+	// int infoMessageCountStored = ID3D11InfoQueue_GetNumMessagesAllowedByStorageFilter(lgi.d3d11.inf);
+	// int infoMessageCountDenied = ID3D11InfoQueue_GetNumMessagesDeniedByStorageFilter(lgi.d3d11.inf);
+	// int infoMessageCountRetrieved = ID3D11InfoQueue_GetNumStoredMessagesAllowedByRetrievalFilter(lgi.d3d11.inf);
+	// int infoMessageCountDeniedByLimit = ID3D11InfoQueue_GetNumMessagesDiscardedByMessageCountLimit(lgi.d3d11.inf);
+
+	int messageCount = ID3D11InfoQueue_GetNumStoredMessagesAllowedByRetrievalFilter(lgi.d3d11.inf);
+	for (int i=0; i<messageCount; i+=1) {
+		char buffer[sizeof(D3D11_MESSAGE) + 0x1000];
+		size_t length = sizeof(buffer);
+		D3D11_MESSAGE *message = (void *) buffer;
+		HRESULT error = ID3D11InfoQueue_GetMessage(lgi.d3d11.inf,i,message,&length);
+		if (SUCCEEDED(error)) {
+			lgi_LogFunction(message->Severity,message->pDescription);
+		}
+	}
+
+	ID3D11InfoQueue_ClearStoredMessages(lgi.d3d11.inf);
 }
 
-unsigned __int64
-lgi_OS__queryClock() {
-	LARGE_INTEGER l;
-	QueryPerformanceCounter(&l);
-	return l.QuadPart;
+lgi_API void lgi_pollTime() {
+	unsigned __int64 ticks = lgi_pollTickClock();
+	lgi.Time.total_ticks = ticks - lgi.Time.start_ticks;
+	lgi.Time.delta_ticks = ticks - lgi.Time.frame_ticks;
+	lgi.Time.frame_ticks = ticks;
+
+	lgi.Time.total_seconds = lgi.Time.total_ticks / (double) lgi.Time.ticksPerSecond;
+	lgi.Time.delta_seconds = lgi.Time.delta_ticks / (double) lgi.Time.ticksPerSecond;
 }
 
-void rx_pollClock() {
-
+lgi_API int lgi_pollInput() {
 	/* todo: */
-	unsigned __int64 freq = lgi_OS__queryClockFrequency();
-	unsigned __int64 ticks = lgi_OS__queryClock();
-	rx.total_ticks = ticks-rx.start_ticks;
-	rx.total_seconds = rx.total_ticks / (double) freq;
-	rx.delta_ticks=ticks-rx.frame_ticks;
-	rx.delta_seconds = rx.delta_ticks / (double) freq;
-	rx.frame_ticks=ticks;
-}
+	memcpy(lgi.Input.Keyboard.oldKeyState,lgi.Input.Keyboard.newKeyState,sizeof(lgi.Input.Keyboard.newKeyState));
+	memset(lgi.Input.Keyboard.newKeyState,0,sizeof(lgi.Input.Keyboard.newKeyState));
+	lgi.Input.Keyboard.lastChar = 0;
 
-int
-rx_window_message_handler_win32(UINT,WPARAM,LPARAM);
-
-LRESULT CALLBACK
-rx_window_message_callback_win32(HWND,UINT,WPARAM,LPARAM);
-
-/* todo: rename */
-#ifndef       WAS_DOWN
-#define       WAS_DOWN(x) ((rx.wnd.in.mice.btn_old & (1 << x)) != 0)
-# endif
-#ifndef        IS_DOWN
-#define        IS_DOWN(x) ((rx.wnd.in.mice.btn_cur & (1 << x)) != 0)
-# endif
-#ifndef IS_CLICK_LEAVE
-#define IS_CLICK_LEAVE(x) !IS_DOWN(x) &&  WAS_DOWN(x)
-# endif
-#ifndef IS_CLICK_ENTER
-#define IS_CLICK_ENTER(x)  IS_DOWN(x) && !WAS_DOWN(x)
-# endif
-
-#define lgi_testCtrlKey() (rx.wnd.in.kbrd.is_ctrl != 0)
-#define rx_testAltKey() (rx.wnd.in.kbrd.is_menu != 0)
-#define rx_testShiftKey() (rx.wnd.in.kbrd.is_shft != 0)
-#define lgi_testKey(xx) (rx.wnd.in.kbrd.key[xx] != 0)
-#define lgi_testFKey(xx) (lgi_testKey(rxKEY_kF1 + iclamp(xx,1,12)-1))
-
-int
-rx_testChar() {
-	return rx.wnd.in.kbrd.chr;
-}
-
-/* todo: this is provisional */
-void
-rxGPU_set_clip(int x0, int y0, int x1, int y1) {
-	lgi_ensure(x0 <= x1);
-	lgi_ensure(y0 <= y1);
-
-	x0 = iclamp(x0,0,rx.wnd.size_x);
-	y0 = iclamp(y0,0,rx.wnd.size_y);
-	x1 = iclamp(x1,0,rx.wnd.size_x);
-	y1 = iclamp(y1,0,rx.wnd.size_y);
-
-	D3D11_RECT rect_d3d;
-	rect_d3d.left  = x0;
-	rect_d3d.top   = rx.wnd.size_y - y1;
-	rect_d3d.right = x1;
-	rect_d3d.bottom= rx.wnd.size_y - y0;
-	ID3D11DeviceContext_RSSetScissorRects(rx.d3d11.ctx,1,&rect_d3d);
-}
-
-int
-lgi_poll() {
-	/* todo: */
-	memcpy(rx.wnd.in.kbrd.key_lst,rx.wnd.in.kbrd.key,sizeof(rx.wnd.in.kbrd.key));
-	memset(rx.wnd.in.kbrd.key,                     0,sizeof(rx.wnd.in.kbrd.key));
-	rx.wnd.in.kbrd.chr = 0;
-
-	rx.wnd.in.mice.yscroll = 0;
-	rx.wnd.in.mice.xscroll = 0;
-	rx.wnd.in.mice.btn_old = rx.wnd.in.mice.btn_cur;
-	rx.wnd.in.mice.btn_cur = 0;
+	lgi.Input.Mice.yscroll = 0;
+	lgi.Input.Mice.xscroll = 0;
+	lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+	lgi.Input.Mice.newButtonState = 0;
 
 	MSG message;
 	while (PeekMessage(&message,NULL,0,0,PM_REMOVE)) {
@@ -597,117 +1182,131 @@ lgi_poll() {
 	}
 
 	RECT client;
-	if (GetClientRect(rx.wnd.win32.handle,&client)) {
-		rx.wnd.size_x = client. right - client.left;
-		rx.wnd.size_y = client.bottom - client. top;
-		rx.wnd.center_x=rx.wnd.size_x>>1;
-		rx.wnd.center_y=rx.wnd.size_y>>1;
+	if (GetClientRect(lgi.Window.win32.handle,&client)) {
+		lgi.Window.size_x = client. right - client.left;
+		lgi.Window.size_y = client.bottom - client. top;
+		lgi.Window.center_x=lgi.Window.size_x>>1;
+		lgi.Window.center_y=lgi.Window.size_y>>1;
 	}
 
-	return !rx.wnd.off;
+	return !lgi.Window.isClosed;
 }
 
-lgi_API int
-lgi_tick() {
+lgi_API void lgi_clearBackground(lgi_Color color) {
+	ID3D11DeviceContext_ClearDepthStencilView(lgi.d3d11.ctx,lgi.defaultDepthTarget->d3d11.depth_target,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
+	ID3D11DeviceContext_ClearRenderTargetView(lgi.d3d11.ctx,lgi.defaultColorTarget->d3d11.color_target,(float *) &color);
+}
 
-	rx.frame_count += 1;
-
-	lgi_poll();
-
-	/* todo */
-	SetCursor(rx.win32.cursor.arrow);
+lgi_API void lgi_finishDrawing() {
 
 	lgi_flushImmediatly();
 
-	/* this has to be formalized #todo */
-	rxGPU_copyTexture(rx.wnd.out.tar,rx.imp.pip.out.color[0]);
+	lgi_copyTexture(lgi.Window.Output.target,lgi.defaultColorTarget);
 
-	if (rx.wnd.vis != TRUE) {
-		ShowWindow(rx.wnd.win32.handle,SW_SHOW);
-		rx.wnd.vis = TRUE;
-	}
-
-	if (rx.wnd.vis != FALSE) {
-
-		HRESULT error = IDXGISwapChain_Present(rx.wnd.out.d3d11.swap_chain,1u,0);
-
+	if (lgi.Window.isVisible != lgi_False) {
+		HRESULT error = IDXGISwapChain_Present(lgi.Window.Output.d3d11.stage,1u,0);
 		if FAILED(error) {
-			return FALSE;
+			lgi.Window.isClosed = lgi_True;
 		}
-
 		/* this does not serve any purpose in full screen mode */
-		// WaitForSingleObjectEx(rx.wnd.out.d3d11.frame_await,INFINITE,TRUE);
+		// WaitForSingleObjectEx(lgi.Window.Output.d3d11.frame_await,INFINITE,TRUE);
 	}
-
-
-	float clear_color[] = {.0f,.0f,.0f,1.f};
-	ID3D11DeviceContext_ClearDepthStencilView(rx.d3d11.ctx,rx.imp.pip.out.depth->d3d11.depth_target,D3D11_CLEAR_DEPTH|D3D11_CLEAR_STENCIL,1.0f,0);
-	for(int i=0; i<rx.imp.pip.out.count; i+=1) {
-		ID3D11DeviceContext_ClearRenderTargetView(rx.d3d11.ctx,rx.imp.pip.out.color[i]->d3d11.color_target,clear_color);
-	}
-
-
-	rx_pollClock();
-
-	return !rx.wnd.off;
 }
 
-lgi_API void
-lgi_initWindowed(int window_width, int window_height, char const *window_title) {
+lgi_API int lgi_tick() {
+	// NOTE: Ensure the Window is Visible!
+	if (lgi.Window.isVisible != TRUE) {
+		lgi.Window.isVisible = TRUE;
+		ShowWindow(lgi.Window.win32.handle,SW_SHOW);
+	}
 
+	lgi_finishDrawing();
+
+#if defined(lgi_CLEAR_BACKGROUND_AUTOMATICALLY)
+	lgi_clearBackground(lgi_Color__BLACK);
+#endif
+
+	lgi_pollDebugMessages();
+	lgi_pollInput();
+	lgi_pollTime();
+
+	lgi.frameTally += 1;
+	return !lgi.Window.isClosed;
+}
+
+
+int lgi_windowMessageHandler_win32(UINT,WPARAM,LPARAM);
+LRESULT CALLBACK lgi_windowMessageCallback_win32(HWND,UINT,WPARAM,LPARAM);
+static void lgi__initDefaults();
+
+lgi_API void lgi_initWindowed(int window_width, int window_height, char const *window_title) {
+
+	lgi.Time.ticksPerSecond = lgi_queryTicksPerSecond();
+
+	//
+	// NOTE: Look more into this because I really don't even know whether this works
+	//
 	typedef BOOL (WINAPI * XXX)(HANDLE);
-
-	rx.win32.user32_dll = LoadLibraryA("user32.dll");
-
-	XXX SetProcessDpiAwarenessContext = (XXX) GetProcAddress(rx.win32.user32_dll, "SetProcessDpiAwarenessContext");
+	lgi.win32.user32_dll = LoadLibraryA("user32.dll");
+	XXX SetProcessDpiAwarenessContext = (XXX) GetProcAddress(lgi.win32.user32_dll, "SetProcessDpiAwarenessContext");
 	SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-	rx.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
+	lgi.win32.cursor.arrow = LoadCursorA(NULL,IDC_ARROW);
 
-	UINT flags =
-#ifdef RX_DEBUG_DEVICE
-/* note: comment this out to use intel's graphic analyzer utility (I'd rather use RenderDoc instead) */
-	D3D11_CREATE_DEVICE_DEBUG|
-	D3D11_CREATE_DEVICE_SINGLETHREADED|
-#endif
-	D3D11_CREATE_DEVICE_BGRA_SUPPORT;
-
-	D3D_FEATURE_LEVEL feature_menu[2][2]= {
+	D3D_FEATURE_LEVEL featureMenu[2][2]= {
 		{D3D_FEATURE_LEVEL_11_1,D3D_FEATURE_LEVEL_11_0},
 		{D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0},
 	};
 
-	D3D_FEATURE_LEVEL feature_level;
+	D3D_FEATURE_LEVEL featureLevel;
 
-	HRESULT error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,flags,feature_menu[0],
-	ARRAYSIZE(feature_menu[0]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
+	HRESULT error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_HARDWARE,0,lgi_DEFAULT_DEVICE_SETUP_FLAGS,featureMenu[0],
+	ARRAYSIZE(featureMenu[0]),D3D11_SDK_VERSION,&lgi.d3d11.dev,&featureLevel,&lgi.d3d11.ctx);
 
 	if FAILED(error) {
-		error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,flags,feature_menu[1],
-		ARRAYSIZE(feature_menu[1]),D3D11_SDK_VERSION,&rx.d3d11.dev,&feature_level,&rx.d3d11.ctx);
+		error = D3D11CreateDevice(NULL,D3D_DRIVER_TYPE_WARP,0,lgi_DEFAULT_DEVICE_SETUP_FLAGS,featureMenu[1],
+		ARRAYSIZE(featureMenu[1]),D3D11_SDK_VERSION,&lgi.d3d11.dev,&featureLevel,&lgi.d3d11.ctx);
 	}
 
-#if defined(RX_DEBUG_DEVICE)
+#if defined(_DEBUG)
 	if SUCCEEDED(error) {
-		error = IUnknown_QueryInterface(rx.d3d11.dev,&IID_ID3D11InfoQueue,(void**)&rx.d3d11.inf);
+		error = IUnknown_QueryInterface(lgi.d3d11.dev,&IID_ID3D11InfoQueue,(void**)&lgi.d3d11.inf);
 		if SUCCEEDED(error) {
-			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
-			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_ERROR,      TRUE);
-			ID3D11InfoQueue_SetBreakOnSeverity(rx.d3d11.inf, D3D11_MESSAGE_SEVERITY_WARNING,    TRUE);
+			lgi_logInfo("Enabled d3d11 Debug Info Layer Successfully");
+
+			if (ID3D11InfoQueue_GetMuteDebugOutput(lgi.d3d11.inf)) {
+				lgi_logInfo("Debug Info Output Is Muted!");
+			}
+
+			ID3D11InfoQueue_ClearStorageFilter(lgi.d3d11.inf);
+			ID3D11InfoQueue_ClearRetrievalFilter(lgi.d3d11.inf);
+			ID3D11InfoQueue_PushEmptyStorageFilter(lgi.d3d11.inf);
+
+			// NOTE: Don't enable this because otherwise we don't get to see the messages!
+			// ID3D11InfoQueue_SetBreakOnSeverity(lgi.d3d11.inf, D3D11_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+			// ID3D11InfoQueue_SetBreakOnSeverity(lgi.d3d11.inf, D3D11_MESSAGE_SEVERITY_ERROR,      TRUE);
+			// ID3D11InfoQueue_SetBreakOnSeverity(lgi.d3d11.inf, D3D11_MESSAGE_SEVERITY_WARNING,    TRUE);
+
+			// ID3D11InfoQueue_AddApplicationMessage(lgi.d3d11.inf,D3D11_MESSAGE_SEVERITY_INFO,"Test Info Message!");
+			// lgi_pollDebugMessages();
 		}
 	}
 #endif
-	lgi_ensure(SUCCEEDED(error));
+	lgi_ASSERT(SUCCEEDED(error));
 
-	wchar_t unicode_window_title[MAX_PATH];
-	MultiByteToWideChar(CP_ACP,0,window_title,-1,unicode_window_title,MAX_PATH);
+	//
+	// TODO:
+	//
+	wchar_t unicodeWindowTitle[MAX_PATH];
+	MultiByteToWideChar(CP_ACP,0,window_title,-1,unicodeWindowTitle,MAX_PATH);
 
-	WNDCLASSW wnd_class;
-	ZeroMemory(&wnd_class,sizeof(wnd_class));
-	wnd_class.lpfnWndProc=rx_window_message_callback_win32;
-	wnd_class.hInstance=GetModuleHandleW(NULL);
-	wnd_class.lpszClassName=unicode_window_title;
-	if (RegisterClassW(&wnd_class)) {
+	WNDCLASSW windowClass;
+	lgi__clear_typeof(&windowClass);
+	windowClass.lpfnWndProc=lgi_windowMessageCallback_win32;
+	windowClass.hInstance=GetModuleHandleW(NULL);
+	windowClass.lpszClassName=unicodeWindowTitle;
+
+	if (RegisterClassW(&windowClass)) {
 		window_width = window_width != 0 ? window_width  : lgi_DEFAULT_WINDOW_WIDTH;
 		window_height = window_height != 0 ? window_height : lgi_DEFAULT_WINDOW_HEIGHT;
 
@@ -723,31 +1322,64 @@ lgi_initWindowed(int window_width, int window_height, char const *window_title) 
 
 		window_width = wnd_rect. right - wnd_rect.left;
 		window_height = wnd_rect.bottom - wnd_rect. top;
-		lgi_logTrace("create window %ix%i",window_width,window_height);
 
 		/* This makes the window not resizable */
 		// &~WS_THICKFRAME
-		rx.wnd.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,wnd_class.lpszClassName,unicode_window_title,WS_OVERLAPPEDWINDOW,0,0,window_width,window_height,NULL,NULL,wnd_class.hInstance,NULL);
+		lgi.Window.win32.handle = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP,windowClass.lpszClassName,unicodeWindowTitle,WS_OVERLAPPEDWINDOW
+		,	0,0,window_width,window_height,NULL,NULL,windowClass.hInstance,NULL);
+
+		if (IsWindow(lgi.Window.win32.handle)) {
+			lgi_logInfo("Created Window (%ix%i)",window_width,window_height);
+		}
 	}
 
-	/* [[!]]:
-		Poll here to get the window dimensions, which are needed to create some
-		window dependent resources */
-	lgi_poll();
+
+	//
+	// NOTE: Create Some Default Samplers, These Are Needed For Creating Textures!
+	//
+
+	D3D11_SAMPLER_DESC samplerInfo_d3d;
+	ZeroMemory(&samplerInfo_d3d,sizeof(samplerInfo_d3d));
+	samplerInfo_d3d.AddressU=D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerInfo_d3d.AddressV=D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerInfo_d3d.AddressW=D3D11_TEXTURE_ADDRESS_WRAP;
+	samplerInfo_d3d.MaxAnisotropy  = 0;
+	samplerInfo_d3d.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	samplerInfo_d3d.MinLOD         = 0;
+	samplerInfo_d3d.MaxLOD         = D3D11_FLOAT32_MAX;
+	samplerInfo_d3d.Filter=D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	ID3D11Device_CreateSamplerState(lgi.d3d11.dev,&samplerInfo_d3d,(ID3D11SamplerState **)&lgi.LINEAR_SAMPLER);
+	samplerInfo_d3d.Filter=D3D11_FILTER_MIN_MAG_MIP_POINT;
+	ID3D11Device_CreateSamplerState(lgi.d3d11.dev,&samplerInfo_d3d,(ID3D11SamplerState **)&lgi.POINT_SAMPLER);
+	samplerInfo_d3d.Filter=D3D11_FILTER_ANISOTROPIC;
+	ID3D11Device_CreateSamplerState(lgi.d3d11.dev,&samplerInfo_d3d,(ID3D11SamplerState **)&lgi.ANISOTROPIC_SAMPLER);
+
+	lgi.linear_sampler.d3d11.state = (ID3D11SamplerState *) lgi.LINEAR_SAMPLER;
+	lgi.point_sampler.d3d11.state = (ID3D11SamplerState *) lgi.POINT_SAMPLER;
+	lgi.anisotropic_sampler.d3d11.state = (ID3D11SamplerState *) lgi.ANISOTROPIC_SAMPLER;
+
+
+
+
+	//
+	// NOTE: Poll Window Dimensions Before Creating Window-Dependent Resources
+	//
+	lgi_pollInput();
 
 	IDXGIDevice * device_dxgi = NULL;
 	IDXGIAdapter * adapter_dxgi = NULL;
 	IDXGIFactory2 * factory_dxgi = NULL;
 
-	ID3D11Device_QueryInterface(rx.d3d11.dev,&IID_IDXGIDevice,(void **)&device_dxgi);
+	ID3D11Device_QueryInterface(lgi.d3d11.dev,&IID_IDXGIDevice,(void **)&device_dxgi);
 	IDXGIDevice_GetAdapter(device_dxgi,&adapter_dxgi);
 	IDXGIAdapter_GetParent(adapter_dxgi,&IID_IDXGIFactory2,(void**)&factory_dxgi);
 
 	// DXGI_USAGE_UNORDERED_ACCESS
 	DXGI_SWAP_CHAIN_DESC1 sc_config_d3d;
-	ZeroMemory(&sc_config_d3d,sizeof(sc_config_d3d));
-	sc_config_d3d.Width=rx.wnd.size_x;
-	sc_config_d3d.Height=rx.wnd.size_y;
+	lgi__clear_typeof(&sc_config_d3d);
+
+	sc_config_d3d.Width=lgi.Window.size_x;
+	sc_config_d3d.Height=lgi.Window.size_y;
 	sc_config_d3d.Format=DXGI_FORMAT_R8G8B8A8_UNORM;
 	sc_config_d3d.BufferUsage=DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	sc_config_d3d.BufferCount=2;
@@ -760,29 +1392,31 @@ lgi_initWindowed(int window_width, int window_height, char const *window_title) 
 	sc_config_d3d.SampleDesc.Quality=0;
 
 	DXGI_SWAP_CHAIN_FULLSCREEN_DESC sc_fs_config;
-	ZeroMemory(&sc_fs_config,sizeof(sc_fs_config));
-	sc_fs_config.RefreshRate.Numerator=_RX_REFRESH_RATE;
+	lgi__clear_typeof(&sc_fs_config);
+
+	sc_fs_config.RefreshRate.Numerator=lgi_REFRESH_RATE;
 	sc_fs_config.RefreshRate.Denominator=1;
 	sc_fs_config.Windowed=TRUE;
 
-	error = IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,(IUnknown *)rx.d3d11.dev,rx.wnd.win32.handle,&sc_config_d3d,&sc_fs_config,NULL,(IDXGISwapChain1 **)&rx.wnd.out.d3d11.swap_chain);
-	lgi_ensure(SUCCEEDED(error));
+	error = IDXGIFactory2_CreateSwapChainForHwnd(factory_dxgi,(IUnknown *)lgi.d3d11.dev,lgi.Window.win32.handle,&sc_config_d3d,&sc_fs_config,NULL,(IDXGISwapChain1 **)&lgi.Window.Output.d3d11.stage);
+	lgi_ASSERT(SUCCEEDED(error));
+
+	IDXGIFactory_Release(factory_dxgi);
+	IDXGIAdapter_Release(adapter_dxgi);
+	IDXGIDevice_Release(device_dxgi);
 
 	ID3D11Texture2D *texture_d3d;
-	error = IDXGISwapChain_GetBuffer(rx.wnd.out.d3d11.swap_chain,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
-	lgi_ensure(SUCCEEDED(error));
-	// rxGPU_delete_texture(rx.imp.pip.out.color[0]);
-	// rxGPU_delete_texture(rx.imp.pip.out.depth);
-	// rxGPU_delete_texture(rx.wnd.out.tar);
-	// __debugbreak();
-	// ID3D11DeviceContext_ClearState(rx.d3d11.ctx);
-	// error = IDXGISwapChain_ResizeBuffers(rx.wnd.out.d3d11.swap_chain,sc_config_d3d.BufferCount,512,512,sc_config_d3d.Format,0);
+	error = IDXGISwapChain_GetBuffer(lgi.Window.Output.d3d11.stage,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
+	lgi_ASSERT(SUCCEEDED(error));
 
 
-	// rx.wnd.out.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(rx.wnd.out.d3d11.swap_chain);
+	// ID3D11DeviceContext_ClearState(lgi.d3d11.ctx);
+	// error = IDXGISwapChain_ResizeBuffers(lgi.Window.Output.d3d11.stage,sc_config_d3d.BufferCount,512,512,sc_config_d3d.Format,0);
 
-	rxGPU_TEXTURE config;
-	ZeroMemory(&config,sizeof(config));
+	// lgi.Window.Output.d3d11.frame_await = IDXGISwapChain2_GetFrameLatencyWaitableObject(lgi.Window.Output.d3d11.stage);
+
+	lgi_Texture_Config config;
+	lgi__clear_typeof(&config);
 	config.memtype = D3D11_USAGE_DEFAULT;
 	config.useflag = D3D11_BIND_RENDER_TARGET;
 	config.size_x = sc_config_d3d. Width;
@@ -790,59 +1424,57 @@ lgi_initWindowed(int window_width, int window_height, char const *window_title) 
 	config.format = sc_config_d3d.Format;
 	config.d3d11.texture_2d = texture_d3d;
 
-	rx.wnd.out.tar = rxGPU_create_texture_ex(&config);
+	lgi.Window.Output.target = lgi_createTexture(&config);
 
-	IDXGIFactory_Release(factory_dxgi);
-	IDXGIAdapter_Release(adapter_dxgi);
-	IDXGIDevice_Release(device_dxgi);
 
-	rxIMP_init();
 
-	rxGPU_set_clip(0,0,rx.wnd.size_x,rx.wnd.size_y);
+	lgi__initDefaults();
+
+	lgi_setClippingZone(0,0,lgi.Window.size_x,lgi.Window.size_y);
 
 	D3D11_VIEWPORT viewport_d3d;
 	viewport_d3d.TopLeftX=0;
 	viewport_d3d.TopLeftY=0;
-	viewport_d3d.   Width=rx.wnd.size_x;
-	viewport_d3d.  Height=rx.wnd.size_y;
+	viewport_d3d.   Width=lgi.Window.size_x;
+	viewport_d3d.  Height=lgi.Window.size_y;
 	viewport_d3d.MinDepth=0;
 	viewport_d3d.MaxDepth=1;
-	ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
+	ID3D11DeviceContext_RSSetViewports(lgi.d3d11.ctx,1,&viewport_d3d);
 
-	rx.start_ticks=lgi_OS__queryClock();
-	rx.frame_ticks=rx.start_ticks;
+	lgi.Time.start_ticks = lgi_pollTickClock();
+	lgi.Time.frame_ticks = lgi.Time.start_ticks;
 
-	lgi_poll();
+	lgi_pollInput();
+	lgi_beginMode2D();
 }
 
 LRESULT CALLBACK
-rx_window_message_callback_win32(HWND Window,UINT Message,WPARAM wParam,LPARAM lParam) {
-	LRESULT result = rx_window_message_handler_win32(Message,wParam,lParam);
+lgi_windowMessageCallback_win32(HWND Window,UINT Message,WPARAM wParam,LPARAM lParam) {
+	LRESULT result = lgi_windowMessageHandler_win32(Message,wParam,lParam);
 	if(result != TRUE) {
 		result = DefWindowProcW(Window,Message,wParam,lParam);
 	}
 	return result;
 }
 
-int
-rx_window_message_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
+int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 	switch(Message) {
 		case WM_CLOSE:
 		case WM_QUIT: {
 			PostQuitMessage(0);
-			rx.wnd.off = TRUE;
+			lgi.Window.isClosed = TRUE;
 		} break;
 		case WM_SIZE: {
 			RECT client;
-			if (GetClientRect(rx.wnd.win32.handle,&client)) {
+			if (GetClientRect(lgi.Window.win32.handle,&client)) {
 				int size_x = client. right - client.left;
 				int size_y = client.bottom - client. top;
 
-				if (rx.wnd.size_x != size_x || rx.wnd.size_y != size_y) {
-					rx.wnd.size_x = size_x;
-					rx.wnd.size_y = size_y;
-					rx.wnd.center_x=size_x>>1;
-					rx.wnd.center_y=size_y>>1;
+				if (lgi.Window.size_x != size_x || lgi.Window.size_y != size_y) {
+					lgi.Window.size_x = size_x;
+					lgi.Window.size_y = size_y;
+					lgi.Window.center_x=size_x>>1;
+					lgi.Window.center_y=size_y>>1;
 
 					D3D11_VIEWPORT viewport_d3d;
 					viewport_d3d.TopLeftX=0;
@@ -851,70 +1483,72 @@ rx_window_message_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 					viewport_d3d.  Height=size_y;
 					viewport_d3d.MinDepth=0;
 					viewport_d3d.MaxDepth=1;
-					ID3D11DeviceContext_RSSetViewports(rx.d3d11.ctx,1,&viewport_d3d);
+					ID3D11DeviceContext_RSSetViewports(lgi.d3d11.ctx,1,&viewport_d3d);
 
-					// rxGPU_delete_texture(rx.imp.pip.out.color[0]);
-					// rxGPU_delete_texture(rx.imp.pip.out.depth);
-					// rxGPU_delete_texture(rx.wnd.out.tar);
-					// HRESULT error = IDXGISwapChain_ResizeBuffers(rx.wnd.out.d3d11.swap_chain,0,size_x,size_y,DXGI_FORMAT_UNKNOWN,0);
-					// if SUCCEEDED(error) {
-					// 	// __debugbreak();
-					// } else {
-					// 	__debugbreak();
-					// }
-					rxGPU_set_clip(0,0,size_x,size_y);
+					// lgi_deleteTexture(lgi.State.pip.out.color[0]);
+					// lgi_deleteTexture(lgi.State.pip.out.depth);
+					// lgi_deleteTexture(lgi.Window.Output.target);
+
+					HRESULT error = IDXGISwapChain_ResizeBuffers(lgi.Window.Output.d3d11.stage,0,size_x,size_y,DXGI_FORMAT_UNKNOWN,0);
+					lgi_ASSERT(SUCCEEDED(error));
+
+					/* TODO: */
+					// lgi.State.pip.out.count = 1;
+					// lgi.State.pip.out.color[0] = lgi_makeColorTarget(lgi.Window.Output.target->size_x,lgi.Window.Output.target->size_y,lgi.Window.Output.target->format,lgi_MSAA,0);
+					// lgi.State.pip.out.depth    = lgi_makeDepthTarget(lgi.Window.Output.target->size_x,lgi.Window.Output.target->size_y,DXGI_FORMAT_D32_FLOAT);
+
+					lgi_setClippingZone(0,0,size_x,size_y);
+
+					#if 1
+					ID3D11Texture2D *texture_d3d;
+					error = IDXGISwapChain_GetBuffer(lgi.Window.Output.d3d11.stage,0,&IID_ID3D11Texture2D,(void **)&texture_d3d);
+					lgi_ASSERT(SUCCEEDED(error));
+
+					lgi_Texture_Config config;
+					ZeroMemory(&config,sizeof(config));
+					config.memtype = D3D11_USAGE_DEFAULT;
+					config.useflag = D3D11_BIND_RENDER_TARGET;
+					config.size_x = lgi.Window.Output.target->size_x;
+					config.size_y = lgi.Window.Output.target->size_y;
+					config.format = DXGI_FORMAT_UNKNOWN;
+					config.d3d11.texture_2d = texture_d3d;
+
+					lgi.Window.Output.target = lgi_createTexture(&config);
+					#endif
 				}
 
-				/* [[TODO]] */
-				// rx.imp.pip.out.count = 1;
-				// rx.imp.pip.out.color[0] = rxGPU_create_color_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,rx.wnd.out.tar->format,_RX_MSAA,0);
-				// rx.imp.pip.out.depth    = rxGPU_create_depth_target(rx.wnd.out.tar->size_x,rx.wnd.out.tar->size_y,DXGI_FORMAT_D32_FLOAT);
-
-
-
-
-				#if 0
-				rxGPU_TEXTURE config;
-				ZeroMemory(&config,sizeof(config));
-				config.memtype = D3D11_USAGE_DEFAULT;
-				config.useflag = D3D11_BIND_RENDER_TARGET;
-				config.size_x = sc_config_d3d. Width;
-				config.size_y = sc_config_d3d.Height;
-				config.format = sc_config_d3d.Format;
-				config.d3d11.texture_2d = texture_d3d;
-
-				rx.wnd.out.tar = rxGPU_create_texture_ex(&config);
-				#endif
 			}
 		} break;
 		case WM_MOUSEMOVE: {
+			lgi_setCursor(lgi.win32.cursor.arrow);
+
 			int xcursor=GET_X_LPARAM(lParam);
 			int ycursor=GET_Y_LPARAM(lParam);
-			rx.wnd.in.mice.xcursor=xcursor;
-			rx.wnd.in.mice.ycursor=rx.wnd.size_y-ycursor;
+			lgi.Input.Mice.xcursor=xcursor;
+			lgi.Input.Mice.ycursor=lgi.Window.size_y-ycursor;
 		} break;
 		case WM_MOUSEWHEEL: {
-			rx.wnd.in.mice.yscroll = GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA;
+			lgi.Input.Mice.yscroll = GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA;
 		} break;
-// SetCapture((HWND)rx.wnd.win32.handle);
+// SetCapture((HWND)lgi.Window.win32.handle);
 		case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP: {
-			rx.wnd.in.mice.btn_cur |= (Message!=WM_LBUTTONUP) << 0;
+			lgi.Input.Mice.newButtonState |= (Message!=WM_LBUTTONUP) << 0;
 		} break;
 		case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP: {
-			rx.wnd.in.mice.btn_cur |= (Message!=WM_RBUTTONUP) << 1;
+			lgi.Input.Mice.newButtonState |= (Message!=WM_RBUTTONUP) << 1;
 		} break;
 // ReleaseCapture();
 		case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP: {
-			rx.wnd.in.mice.btn_cur |= (Message!=WM_MBUTTONUP) << 2;
+			lgi.Input.Mice.newButtonState |= (Message!=WM_MBUTTONUP) << 2;
 		} break;
 		case WM_CHAR: {
-			rx.wnd.in.kbrd.chr = wParam;
+			lgi.Input.Keyboard.lastChar = wParam;
 		} break;
 		case WM_SYSKEYUP: case WM_SYSKEYDOWN: case WM_KEYUP: case WM_KEYDOWN: {
 			/* todo: there's probably a better way to do this */
-			rx.wnd.in.kbrd.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
-			rx.wnd.in.kbrd.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-			rx.wnd.in.kbrd.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
+			lgi.Input.Keyboard.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+			lgi.Input.Keyboard.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+			lgi.Input.Keyboard.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
 
 			int key_map = 0;
 			if isWithin3(wParam,'a','z','A','Z','0','9') {
@@ -961,13 +1595,154 @@ rx_window_message_handler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 				case VK_OEM_7:      key_map = '\''; break;
 			}
 
-			rx.wnd.in.kbrd.key[key_map] = (Message == WM_KEYDOWN) || (Message == WM_SYSKEYDOWN);
+			lgi.Input.Keyboard.newKeyState[key_map] = (Message == WM_KEYDOWN) || (Message == WM_SYSKEYDOWN);
 		} break;
 		default: {
 			return FALSE;
 		}
 	}
 	return TRUE;
+}
+
+static void lgi__initDefaults() {
+	lgi.defaultConstBlock = lgi_makeConstBuffer(sizeof(lgi_ConstSlots),NULL);
+
+	//
+	// NOTE: Create Default Programs:
+	//
+
+	// TODO:
+	// Call A Function that generates a new program,
+	// the program gets intialized to all the defaults,
+	// then you can call attach vertex/pixel shader or blend state...
+
+	lgi.defaultProgram.vertexShader = lgi_buildVertexShader(0, "default_vs", sizeof(g_MainVS),(void*)g_MainVS);
+	lgi.defaultProgram.pixelShader = lgi_buildPixelShader(0, "default_ps", sizeof(g_MainPS),(void*)g_MainPS);
+
+	lgi.lcdTextProgram.vertexShader = lgi.defaultProgram.vertexShader;
+	lgi.lcdTextProgram.pixelShader = lgi_buildPixelShader(0, "ps_txt", sizeof(g_MainPS_Text),(void*)g_MainPS_Text);
+
+	lgi.sdfTextProgram.vertexShader = lgi.defaultProgram.vertexShader;
+	lgi.sdfTextProgram.pixelShader = lgi_buildPixelShader(0, "ps_txt_sdf", sizeof(g_MainPS_TextSDF),(void*)g_MainPS_TextSDF);
+
+	lgi.sdfCircleProgram.vertexShader = lgi_buildVertexShader(0, "vs_sdf", sizeof(g_MainVS_SDF),(void*)g_MainVS_SDF);
+	lgi.sdfCircleProgram.pixelShader = lgi_buildPixelShader(0, "ps_sdf_cir", sizeof(g_MainPS_CircleSDF),(void*)g_MainPS_CircleSDF);
+
+	lgi.sdfBoxProgram.vertexShader = lgi.sdfCircleProgram.vertexShader;
+	lgi.sdfBoxProgram.pixelShader = lgi_buildPixelShader(0, "ps_sdf_box", sizeof(g_MainPS_BoxSDF),(void*)g_MainPS_BoxSDF);
+
+
+	D3D11_BLEND_DESC blendConfig; lgi__clear_typeof(&blendConfig);
+	blendConfig.RenderTarget[0].          BlendEnable=TRUE;
+	blendConfig.RenderTarget[0].             SrcBlend=D3D11_BLEND_SRC_ALPHA;
+	blendConfig.RenderTarget[0].            DestBlend=D3D11_BLEND_INV_SRC_ALPHA;
+	blendConfig.RenderTarget[0].              BlendOp=D3D11_BLEND_OP_ADD;
+	blendConfig.RenderTarget[0].        SrcBlendAlpha=D3D11_BLEND_ZERO;
+	blendConfig.RenderTarget[0].       DestBlendAlpha=D3D11_BLEND_ZERO;
+	blendConfig.RenderTarget[0].         BlendOpAlpha=D3D11_BLEND_OP_ADD;
+	blendConfig.RenderTarget[0].RenderTargetWriteMask=D3D11_COLOR_WRITE_ENABLE_ALL;
+	ID3D11Device_CreateBlendState(lgi.d3d11.dev, &blendConfig,&lgi.d3d11.defaultBlendState);
+
+	blendConfig.RenderTarget[0].BlendEnable = TRUE;
+	blendConfig.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC1_COLOR;
+	blendConfig.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC1_COLOR;
+	blendConfig.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+	blendConfig.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+	blendConfig.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+	blendConfig.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+	blendConfig.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+	ID3D11BlendState *lcdTextBlendState;
+	ID3D11Device_CreateBlendState(lgi.d3d11.dev, &blendConfig,&lcdTextBlendState);
+
+	lgi.defaultProgram.vertexShader->inputBlock = lgi.defaultConstBlock;
+	lgi.defaultProgram.pixelShader->inputBlock = lgi.defaultConstBlock;
+	lgi.lcdTextProgram.vertexShader->inputBlock = lgi.defaultConstBlock;
+	lgi.lcdTextProgram.pixelShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfTextProgram.vertexShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfTextProgram.pixelShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfCircleProgram.vertexShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfCircleProgram.pixelShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfBoxProgram.vertexShader->inputBlock = lgi.defaultConstBlock;
+	lgi.sdfBoxProgram.pixelShader->inputBlock = lgi.defaultConstBlock;
+
+	lgi.defaultProgram.d3d11.blendState = lgi.d3d11.defaultBlendState;
+	lgi.lcdTextProgram.d3d11.blendState = lcdTextBlendState;
+	lgi.sdfTextProgram.d3d11.blendState = lgi.d3d11.defaultBlendState;
+	lgi.sdfCircleProgram.d3d11.blendState = lgi.d3d11.defaultBlendState;
+	lgi.sdfBoxProgram.d3d11.blendState = lgi.d3d11.defaultBlendState;
+
+
+	lgi.State.indexBuffer = lgi_makeIndexBuffer(sizeof(lgi_Index), lgi_DEFAULT_INDEX_BUFFER_LENGTH);
+	lgi.State.vertexBuffer = lgi_makeVertexBuffer(sizeof(lgi_Vertex), lgi_DEFAULT_VERTEX_BUFFER_LENGTH);
+
+
+	lgi.whiteTexture = lgi_makeTexture(512,512,lgi_Format_R8G8B8A8_UNORM,0,NULL);
+	lgi_clearTexture(lgi.whiteTexture,0xff);
+
+	lgi.defaultColorTarget = lgi_makeColorTarget(lgi.Window.Output.target->size_x,lgi.Window.Output.target->size_y,lgi.Window.Output.target->format,lgi_MSAA,0);
+	lgi.defaultDepthTarget = lgi_makeDepthTarget(lgi.Window.Output.target->size_x,lgi.Window.Output.target->size_y,DXGI_FORMAT_D32_FLOAT);
+
+	D3D11_DEPTH_STENCIL_DESC stencil_config_d3d;
+	stencil_config_d3d.     DepthEnable=FALSE;
+	stencil_config_d3d.   StencilEnable=FALSE;
+	stencil_config_d3d.  DepthWriteMask=D3D11_DEPTH_WRITE_MASK_ALL;
+	stencil_config_d3d.       DepthFunc=D3D11_COMPARISON_LESS;
+	stencil_config_d3d. StencilReadMask=D3D11_DEFAULT_STENCIL_READ_MASK;
+	stencil_config_d3d.StencilWriteMask=D3D11_DEFAULT_STENCIL_WRITE_MASK;
+	stencil_config_d3d.FrontFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
+	stencil_config_d3d.FrontFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
+	stencil_config_d3d.FrontFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
+	stencil_config_d3d.FrontFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
+	stencil_config_d3d. BackFace.      StencilFailOp=D3D11_STENCIL_OP_KEEP;
+	stencil_config_d3d. BackFace. StencilDepthFailOp=D3D11_STENCIL_OP_DECR;
+	stencil_config_d3d. BackFace.      StencilPassOp=D3D11_STENCIL_OP_KEEP;
+	stencil_config_d3d. BackFace.        StencilFunc=D3D11_COMPARISON_ALWAYS;
+	ID3D11Device_CreateDepthStencilState(lgi.d3d11.dev,&stencil_config_d3d,&lgi.d3d11.defaultStencilState);
+
+
+	// NOTE: Create Default Rasterizer State:
+	//
+
+	D3D11_RASTERIZER_DESC2 rasterizerConfig;
+	ZeroMemory(&rasterizerConfig,sizeof(rasterizerConfig));
+	rasterizerConfig.             FillMode=D3D11_FILL_SOLID;
+	rasterizerConfig.             CullMode=D3D11_CULL_NONE;
+	rasterizerConfig.FrontCounterClockwise=FALSE;
+	rasterizerConfig.            DepthBias=D3D11_DEFAULT_DEPTH_BIAS;
+	rasterizerConfig.       DepthBiasClamp=D3D11_DEFAULT_DEPTH_BIAS_CLAMP;
+	rasterizerConfig. SlopeScaledDepthBias=D3D11_DEFAULT_SLOPE_SCALED_DEPTH_BIAS;
+	rasterizerConfig.      DepthClipEnable= FALSE;
+	rasterizerConfig.        ScissorEnable= TRUE;
+	rasterizerConfig.    MultisampleEnable=lgi_MSAA >= 2;
+	rasterizerConfig.AntialiasedLineEnable=FALSE;
+	rasterizerConfig.ConservativeRaster=D3D11_CONSERVATIVE_RASTERIZATION_MODE_OFF;
+
+	ID3D11Device3 *lpDevice3;
+	HRESULT error = IUnknown_QueryInterface(lgi.d3d11.dev,&IID_ID3D11Device3,(void**)&lpDevice3);
+	lgi_ASSERT(SUCCEEDED(error));
+
+	ID3D11RasterizerState2 *rasterizer_d3d;
+	error = lpDevice3->lpVtbl->CreateRasterizerState2(lpDevice3,&rasterizerConfig,&rasterizer_d3d);
+	lgi_ASSERT(SUCCEEDED(error));
+
+	error = IUnknown_QueryInterface(rasterizer_d3d,&IID_ID3D11RasterizerState,(void**)&lgi.d3d11.defaultRasterizerState);
+	lgi_ASSERT(SUCCEEDED(error));
+
+	IUnknown_Release(lpDevice3);
+	IUnknown_Release(rasterizer_d3d);
+
+	//
+	// TODO: Do This At The Right Place!
+	//
+	unsigned int Stride=sizeof(lgi_Vertex);
+	unsigned int Offset=0;
+	ID3D11DeviceContext_IASetVertexBuffers(lgi.d3d11.ctx,0,1,&lgi.State.vertexBuffer->d3d11.buffer,&Stride,&Offset);
+	ID3D11DeviceContext_IASetIndexBuffer(lgi.d3d11.ctx,lgi.State.indexBuffer->d3d11.buffer,DXGI_FORMAT_R32_UINT,0);
+	ID3D11DeviceContext_IASetPrimitiveTopology(lgi.d3d11.ctx,D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	ID3D11DeviceContext_RSSetState(lgi.d3d11.ctx,lgi.d3d11.defaultRasterizerState);
+	ID3D11DeviceContext_OMSetDepthStencilState(lgi.d3d11.ctx,lgi.d3d11.defaultStencilState,1);
+	ID3D11DeviceContext_OMSetRenderTargets(lgi.d3d11.ctx,1,&lgi.defaultColorTarget->d3d11.color_target,lgi.defaultDepthTarget->d3d11.depth_target);
 }
 
 #pragma warning(pop)
