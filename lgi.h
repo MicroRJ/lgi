@@ -56,14 +56,22 @@
 #define _lgi_
 
 // TODO:
+// Implement lgi_IMLEMENTATION
+
+// TODO:
 // Allocators!
 
 //
 // Basic Setup Macros:
 //
+
+// Define:
+// lgi_CLOSE_ON_ESCAPE: To Terminate the Application
+
 //
-// NOTE: These Options Can be Changed At Runtime!
+// NOTE: These Options can Also be Changed at Runtime!
 //
+
 #if !defined(lgi_DEFAULT_WINDOW_WIDTH)
 	#define lgi_DEFAULT_WINDOW_WIDTH CW_USEDEFAULT
 #endif
@@ -149,12 +157,15 @@
 #define lgi__clear_typeof(T) (lgi__clear_memory(T,sizeof(*(T))))
 
 //
+// String Formatting Utility:
+//
+
+static char *_fmt(char const *format, ...);
+
+//
 // Logging:
 //
 
-static char *lgi__StringFormat(char const *format, ...);
-static void lgi_LogFunction(int severity, char const *message);
-static void lgi_SourceLogFunction(int severity, char const *message, char const *file, char const *func, int line);
 
 //
 // NOTE: This is so that it works with d3d out of the box!
@@ -165,9 +176,12 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 #define lgi_WARNING     D3D11_MESSAGE_SEVERITY_WARNING
 #define lgi_INFO        D3D11_MESSAGE_SEVERITY_INFO
 #define lgi_MESSAGE     D3D11_MESSAGE_SEVERITY_MESSAGE
+static void lgi_logFunction(int severity, char const *message);
+
+static void lgi_appLogFunction(int severity, char const *message, char const *file, char const *func, int line);
 
 #if !defined(lgi_logSomething)
-	#define lgi_logSomething(TAG,FMT,...) (lgi_SourceLogFunction(TAG,lgi__StringFormat(FMT,__VA_ARGS__),__FILE__,__func__,__LINE__),0)
+	#define lgi_logSomething(TAG,FMT,...) (lgi_appLogFunction(TAG,_fmt(FMT,__VA_ARGS__),__FILE__,__func__,__LINE__),0)
 #endif
 #if !defined(lgi_logInfo)
 	#define lgi_logInfo(FMT,...) lgi_logSomething(lgi_INFO,FMT, __VA_ARGS__)
@@ -221,10 +235,13 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 #define lgi_TAU 6.28318
 
 //
+// Weird Macros
+//
+#define isNeitherOf3(xx,y0,y1,y2) (((xx) != (y0)) && ((xx) != (y1)) && ((xx) != (y2)))
+
+//
 // [[INCLUSIONS]]
 //
-
-// #include <stdio.h> // For: vsnprintf
 
 //
 // WINDOWS
@@ -232,14 +249,12 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 
 
 #if !defined(lgi_NO_WINDOWS)
-
 	#pragma comment(lib,"user32")
-
 	#define NOMINMAX
 	#define WIN32_LEAN_AND_MEAN
 	#define _NO_CRT_STDIO_INLINE
 	#include <windows.h>
-// #include    <Windowsx.h>
+	#include <Windowsx.h>
 # endif
 
 //
@@ -316,16 +331,15 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 	#define isWithin3(x,a0,a1,b0,b1,c0,c1) (isWithin(x,a0,a1) || isWithin(x,b0,b1) || isWithin(x,c0,c1))
 #endif
 
-#include <src/dlb.c>
 
 /* todo: this is to be embedded eventually */
-#include <src\hlsl\rxps.h>
-#include <src\hlsl\rxvs.h>
-#include <src\hlsl\rxsdf.vs.h>
-#include <src\hlsl\rxtxt.ps.h>
-#include <src\hlsl\rxtxt_sdf.ps.h>
-#include <src\hlsl\rxsdf_cir.ps.h>
-#include <src\hlsl\rxsdf_box.ps.h>
+#include <src\hlsl\lgi.ps.h>
+#include <src\hlsl\lgi.vs.h>
+#include <src\hlsl\lgi_sdf.vs.h>
+#include <src\hlsl\lgi_txt.ps.h>
+#include <src\hlsl\lgi_txt_sdf.ps.h>
+#include <src\hlsl\lgi_sdf_cir.ps.h>
+#include <src\hlsl\lgi_sdf_box.ps.h>
 
 
 //
@@ -347,24 +361,53 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 // Basic Types:
 //
 
-typedef signed int lgi_Bool;
+typedef signed long long int lgi_longInt;
+
 #define lgi_Null NULL
+#if !defined(isNull)
+	#define isNull(xx) ((xx) == lgi_Null)
+#endif
+#if !defined(isNotNull)
+	#define isNotNull(xx) ((xx) != lgi_Null)
+#endif
+#if !defined(isNotNullAnd)
+	#define isNotNullAnd(xx,yy) (isNotNull(xx) && (yy))
+#endif
+
+typedef signed int lgi_Bool;
 #define lgi_True  ((lgi_Bool) 1)
 #define lgi_False ((lgi_Bool) 0)
+
+#if !defined(isTrue)
+	#define isTrue(xx) ((xx) != lgi_False)
+#endif
+#if !defined(isFalse)
+	#define isFalse(xx) ((xx) == lgi_False)
+#endif
 
 
 typedef enum {
 	lgi_Error_NONE = 0,
 	lgi_Error_UNKNOWN,
 	lgi_Error_CREATE_TEXTURE,
+	lgi_Error_SHADER_COMPILATION,
 } lgi_Error;
+
+#if !defined(lgi_Success)
+	#define lgi_Success(xx) ((xx) == lgi_Error_NONE)
+#endif
+#if !defined(lgi_Failed)
+	#define lgi_Failed(xx) ((xx) != lgi_Error_NONE)
+#endif
 
 typedef enum {
 	lgi_Format_R8_UNORM 		  = DXGI_FORMAT_R8_UNORM,
 	lgi_Format_R8G8B8A8_UNORM = DXGI_FORMAT_R8G8B8A8_UNORM
 } lgi_Format;
 
-#include <src/vec.c>
+
+#include <src/lgi_dlb.c>
+#include <src/lgi_vec.c>
 
 /*
 **
@@ -372,7 +415,7 @@ typedef enum {
 **
 */
 
-typedef Vec4 lgi_Color;
+typedef vec4 lgi_Color;
 
 #if !defined(lgi_RGBA)
 	#define lgi_RGBA(R,G,B,A) lgi_T(lgi_Color){R,G,B,A}
@@ -382,32 +425,36 @@ typedef Vec4 lgi_Color;
 	#define lgi_RGBA_U(R,G,B,A) lgi_RGBA((R)/255.f,(G)/255.f,(B)/255.f,(A)/255.f)
 #endif
 
-#define lgi_Color__WHITE       lgi_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
-#define lgi_Color__BLACK       lgi_RGBA_U(0x00, 0x00, 0x00, 0xFF)
-#define lgi_Color__RED         lgi_RGBA_U(0xFF, 0x00, 0x00, 0xFF)
-#define lgi_Color__GREEN       lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
-#define lgi_Color__BLUE        lgi_RGBA_U(0x00, 0x00, 0xFF, 0xFF)
-#define lgi_Color__YELLOW      lgi_RGBA_U(0xFF, 0xFF, 0x00, 0xFF)
-#define lgi_Color__CYAN        lgi_RGBA_U(0x00, 0xFF, 0xFF, 0xFF)
-#define lgi_Color__MAGENTA     lgi_RGBA_U(0xFF, 0x00, 0xFF, 0xFF)
-#define lgi_Color__ORANGE      lgi_RGBA_U(0xFF, 0xA5, 0x00, 0xFF)
-#define lgi_Color__PURPLE      lgi_RGBA_U(0x80, 0x00, 0x80, 0xFF)
-#define lgi_Color__PINK        lgi_RGBA_U(0xFF, 0xC0, 0xCB, 0xFF)
-#define lgi_Color__LIME        lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
-#define lgi_Color__TEAL        lgi_RGBA_U(0x00, 0x80, 0x80, 0xFF)
-#define lgi_Color__SKY_BLUE    lgi_RGBA_U(0x87, 0xCE, 0xEB, 0xFF)
-#define lgi_Color__GOLD        lgi_RGBA_U(0xFF, 0xD7, 0x00, 0xFF)
-#define lgi_Color__INDIGO      lgi_RGBA_U(0x4B, 0x00, 0x82, 0xFF)
-#define lgi_Color__SILVER      lgi_RGBA_U(0xC0, 0xC0, 0xC0, 0xFF)
-#define lgi_Color__TURQUOISE   lgi_RGBA_U(0x40, 0xE0, 0xD0, 0xFF)
-#define lgi_Color__CORAL       lgi_RGBA_U(0xFF, 0x7F, 0x50, 0xFF)
-#define lgi_Color__ORCHID      lgi_RGBA_U(0xDA, 0x70, 0xD6, 0xFF)
-#define lgi_Color__LAVENDER    lgi_RGBA_U(0xE6, 0xE6, 0xFA, 0xFF)
-#define lgi_Color__MAROON      lgi_RGBA_U(0x80, 0x00, 0x00, 0xFF)
-#define lgi_Color__NAVY        lgi_RGBA_U(0x00, 0x00, 0x80, 0xFF)
-#define lgi_Color__OLIVE       lgi_RGBA_U(0x80, 0x80, 0x00, 0xFF)
-#define lgi_Color__SALMON      lgi_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
-#define lgi_Color__AQUAMARINE  lgi_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
+// CHANGE:
+// -- lgi_Color__XXX -> lgi_XXX
+
+#define lgi_CLEAR       lgi_RGBA_U(0xFF, 0xFF, 0xFF, 0x00)
+#define lgi_WHITE       lgi_RGBA_U(0xFF, 0xFF, 0xFF, 0xFF)
+#define lgi_BLACK       lgi_RGBA_U(0x00, 0x00, 0x00, 0xFF)
+#define lgi_RED         lgi_RGBA_U(0xFF, 0x00, 0x00, 0xFF)
+#define lgi_GREEN       lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define lgi_BLUE        lgi_RGBA_U(0x00, 0x00, 0xFF, 0xFF)
+#define lgi_YELLOW      lgi_RGBA_U(0xFF, 0xFF, 0x00, 0xFF)
+#define lgi_CYAN        lgi_RGBA_U(0x00, 0xFF, 0xFF, 0xFF)
+#define lgi_MAGENTA     lgi_RGBA_U(0xFF, 0x00, 0xFF, 0xFF)
+#define lgi_ORANGE      lgi_RGBA_U(0xFF, 0xA5, 0x00, 0xFF)
+#define lgi_PURPLE      lgi_RGBA_U(0x80, 0x00, 0x80, 0xFF)
+#define lgi_PINK        lgi_RGBA_U(0xFF, 0xC0, 0xCB, 0xFF)
+#define lgi_LIME        lgi_RGBA_U(0x00, 0xFF, 0x00, 0xFF)
+#define lgi_TEAL        lgi_RGBA_U(0x00, 0x80, 0x80, 0xFF)
+#define lgi_SKY_BLUE    lgi_RGBA_U(0x87, 0xCE, 0xEB, 0xFF)
+#define lgi_GOLD        lgi_RGBA_U(0xFF, 0xD7, 0x00, 0xFF)
+#define lgi_INDIGO      lgi_RGBA_U(0x4B, 0x00, 0x82, 0xFF)
+#define lgi_SILVER      lgi_RGBA_U(0xC0, 0xC0, 0xC0, 0xFF)
+#define lgi_TURQUOISE   lgi_RGBA_U(0x40, 0xE0, 0xD0, 0xFF)
+#define lgi_CORAL       lgi_RGBA_U(0xFF, 0x7F, 0x50, 0xFF)
+#define lgi_ORCHID      lgi_RGBA_U(0xDA, 0x70, 0xD6, 0xFF)
+#define lgi_LAVENDER    lgi_RGBA_U(0xE6, 0xE6, 0xFA, 0xFF)
+#define lgi_MAROON      lgi_RGBA_U(0x80, 0x00, 0x00, 0xFF)
+#define lgi_NAVY        lgi_RGBA_U(0x00, 0x00, 0x80, 0xFF)
+#define lgi_OLIVE       lgi_RGBA_U(0x80, 0x80, 0x00, 0xFF)
+#define lgi_SALMON      lgi_RGBA_U(0xFA, 0x80, 0x72, 0xFF)
+#define lgi_AQUAMARINE  lgi_RGBA_U(0x7F, 0xFF, 0xD4, 0xFF)
 
 //
 // Common Types:
@@ -456,7 +503,7 @@ lgi_API void lgi_flushImmediatly();
 
 // Platform API:
 
-lgi_API elBool lgi_setActiveWindow(HWND window);
+lgi_API lgi_Bool lgi_setActiveWindow(HWND window);
 lgi_API void lgi_setCursor(HCURSOR cursor);
 lgi_API unsigned __int64 lgi_queryTicksPerSecond();
 lgi_API unsigned __int64 lgi_pollTickClock();
@@ -486,7 +533,7 @@ lgi_API int lgi_lastChar();
 	automatically using the reflection API.
 	Try to pack things into bigger units if you run into alignment issues, or try
 	re-ordering the structure. */
-lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config);
+lgi_API lgi_Error lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config);
 lgi_API lgi_Shader *lgi_buildShader(int flags, char const *label, size_t length, void *memory);
 lgi_API lgi_Shader *lgi_loadShader(int flags, char const *label, char const *entry, char const *fileName);
 
@@ -574,9 +621,9 @@ typedef int lgi_Index;
 
 typedef union {
 	struct {
-		Vec4 xyzw;
-		Vec4 rgba;
-		Vec2 uv;
+		vec4 xyzw;
+		vec4 rgba;
+		vec2 uv;
 	};
 	struct {
 		float x,y,z,w;
@@ -587,21 +634,21 @@ typedef union {
 	// TODO: Remove!
 	//
 	struct {
-		Vec2 xy;
-		Vec4 xyxy;
-		Vec4 rgba;
-		Vec4 flag;
+		vec2 xy;
+		vec4 xyxy;
+		vec4 rgba;
+		vec4 flag;
 	} rect;
 } lgi_Vertex;
 
 typedef struct {
-	rxmatrix_t matrix;
-	Vec2   xyscreen;
-	Vec2   xysource;
-	Vec2   xycursor;
+	lgi_Matrix matrix;
+	vec2   xyscreen;
+	vec2   xysource;
+	vec2   xycursor;
 	double total_seconds;
 	double delta_seconds;
-} lgi_ConstSlots;
+} lgi_Uniform_Slots;
 
 typedef struct lgi_Buffer {
 	struct {
@@ -690,10 +737,10 @@ typedef struct lgi_Texture {
 
 
 enum {
-	rxGPU_kINVALID = 0 << 0,
-	rxGPU_kPIXEL_SHADER_BIT = 1 << 1,
-	rxGPU_kVERTEX_SHADER_BIT = 1 << 2,
-	rxGPU_kCOMPUTE_SHADER_BIT = 1 << 3,
+	lgi_INVALID_SHADER_TYPE = 0 << 0,
+	lgi_PIXEL_SHADER_TYPE = 1 << 1,
+	lgi_VERTEX_SHADER_TYPE = 1 << 2,
+	lgi_COMPUTE_SHADER_TYPE = 1 << 3,
 };
 
 typedef struct lgi_Shader_Config {
@@ -726,8 +773,6 @@ typedef struct lgi_Shader_Config {
 			ID3D11InputLayout *layout;
 		} d3d11;
 	} layout;
-	unsigned force_create_layout: 1;
-	unsigned donot_create_layout: 1;
 } lgi_Shader_Config;
 
 typedef struct lgi_Shader {
@@ -760,10 +805,10 @@ typedef struct {
 
 	int mode;
 
-	rxmatrix_t view_matrix;
-	rxmatrix_t world_matrix;
+	lgi_Matrix view_matrix;
+	lgi_Matrix world_matrix;
 
-	lgi_ConstSlots constSlots;
+	lgi_Uniform_Slots constSlots;
 
 
 	lgi_Shader *liveVertexShader;
@@ -924,7 +969,7 @@ lgi_Global lgi_Core rx;
 // Logging:
 //
 
-char *lgi__StringFormat(char const *format, ...) {
+char *_fmt(char const *format, ...) {
 	// TODO(RJ): Ensure we don't overflow buffer!
 	static char buffer[0x1000];
 	static char *cursor = buffer;
@@ -941,7 +986,7 @@ char *lgi__StringFormat(char const *format, ...) {
 	return result;
 }
 
-static void lgi_LogFunction(int severity, char const *message) {
+static void lgi_logFunction(int severity, char const *message) {
 	char const *name = "TRACE";
 	switch (severity) {
 		case lgi_CORRUPTION: name = "CORRUPTION";
@@ -953,7 +998,7 @@ static void lgi_LogFunction(int severity, char const *message) {
 	printf("%s => %s\n",name,message);
 }
 
-static void lgi_SourceLogFunction(int severity, char const *message, char const *file, char const *func, int line) {
+static void lgi_appLogFunction(int severity, char const *message, char const *file, char const *func, int line) {
 	char const *name = "TRACE";
 	switch (severity) {
 		case lgi_CORRUPTION: name = "CORRUPTION";
@@ -977,7 +1022,7 @@ static void lgi_SourceLogFunction(int severity, char const *message, char const 
 // Platform API:
 //
 
-lgi_API elBool lgi_setActiveWindow(HWND window) {
+lgi_API lgi_Bool lgi_setActiveWindow(HWND window) {
 	HWND lastWnd = SetActiveWindow(window);
 	return lastWnd != INVALID_HANDLE_VALUE;
 }
@@ -1147,7 +1192,7 @@ lgi_API void lgi_pollDebugMessages() {
 		D3D11_MESSAGE *message = (void *) buffer;
 		HRESULT error = ID3D11InfoQueue_GetMessage(lgi.d3d11.inf,i,message,&length);
 		if (SUCCEEDED(error)) {
-			lgi_LogFunction(message->Severity,message->pDescription);
+			lgi_logFunction(message->Severity,message->pDescription);
 		}
 	}
 
@@ -1545,6 +1590,12 @@ int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 			lgi.Input.Keyboard.lastChar = wParam;
 		} break;
 		case WM_SYSKEYUP: case WM_SYSKEYDOWN: case WM_KEYUP: case WM_KEYDOWN: {
+
+#if defined(lgi_CLOSE_ON_ESCAPE)
+			if (wParam == VK_ESCAPE) {
+				lgi.Window.isClosed = TRUE;
+			}
+#endif
 			/* todo: there's probably a better way to do this */
 			lgi.Input.Keyboard.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
 			lgi.Input.Keyboard.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
@@ -1605,7 +1656,7 @@ int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 }
 
 static void lgi__initDefaults() {
-	lgi.defaultConstBlock = lgi_makeConstBuffer(sizeof(lgi_ConstSlots),NULL);
+	lgi.defaultConstBlock = lgi_makeConstBuffer(sizeof(lgi_Uniform_Slots),NULL);
 
 	//
 	// NOTE: Create Default Programs:

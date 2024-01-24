@@ -1,6 +1,6 @@
 /*
 **
-**                      -+- rx -+-
+**                      -+- lgi -+-
 **
 **                 Mundane Graphics API.
 **
@@ -14,7 +14,7 @@
 **               HONI SOIT QUI MAL Y PENSE
 **
 **
-**                 github.com/MicroRJ/rx
+**                 github.com/MicroRJ/lgi
 **
 */
 
@@ -449,11 +449,11 @@ lgi_API lgi_Shader *lgi_loadShader(int flags, char const *label, char const *ent
 }
 
 lgi_API lgi_Shader *lgi_buildPixelShader(int flags, char const *label, size_t hlsl_length, void *hlsl_memory) {
-	return lgi_buildShader(rxGPU_kPIXEL_SHADER_BIT|flags,label,hlsl_length,hlsl_memory);
+	return lgi_buildShader(lgi_PIXEL_SHADER_TYPE|flags,label,hlsl_length,hlsl_memory);
 }
 
 lgi_API lgi_Shader *lgi_buildVertexShader(int flags, char const *label, size_t hlsl_length, void *hlsl_memory) {
-	return lgi_buildShader(rxGPU_kVERTEX_SHADER_BIT|flags,label,hlsl_length,hlsl_memory);
+	return lgi_buildShader(lgi_VERTEX_SHADER_TYPE|flags,label,hlsl_length,hlsl_memory);
 }
 
 lgi_API lgi_Shader *lgi_buildShader(int flags, char const *label, size_t hlsl_length, void *hlsl_memory) {
@@ -470,15 +470,14 @@ lgi_API lgi_Shader *lgi_buildShader(int flags, char const *label, size_t hlsl_le
 	return shader;
 }
 
-
 lgi_API char const * lgi__getShaderEntryName(int shader_flags) {
-	if(shader_flags & rxGPU_kVERTEX_SHADER_BIT) {
+	if(shader_flags & lgi_VERTEX_SHADER_TYPE) {
 		return "MainVS";
 	} else
-	if(shader_flags & rxGPU_kPIXEL_SHADER_BIT) {
+	if(shader_flags & lgi_PIXEL_SHADER_TYPE) {
 		return "MainPS";
 	} else
-	if(shader_flags & rxGPU_kCOMPUTE_SHADER_BIT) {
+	if(shader_flags & lgi_COMPUTE_SHADER_TYPE) {
 		return "MainCS";
 	}
 	return NULL;
@@ -488,79 +487,76 @@ lgi_API char const *lgi__getShaderModelName(int shader_flags) {
 	//
 	// TODO:
 	//
-	if (shader_flags & rxGPU_kVERTEX_SHADER_BIT) {
+	if (shader_flags & lgi_VERTEX_SHADER_TYPE) {
 		return "vs_5_0";
 	} else
-	if (shader_flags & rxGPU_kPIXEL_SHADER_BIT) {
+	if (shader_flags & lgi_PIXEL_SHADER_TYPE) {
 		return "ps_5_0";
 	} else
-	if (shader_flags & rxGPU_kCOMPUTE_SHADER_BIT) {
+	if (shader_flags & lgi_COMPUTE_SHADER_TYPE) {
 		return "cs_5_0";
 	}
 	return NULL;
 }
 
-lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
-	lgi__clear_typeof(shader);
-
+lgi_API lgi_Error lgi__compileShader(lgi_Shader *shader, lgi_Shader_Config *config) {
 	ID3DBlob *bytecode_blob_d3d = NULL;
 	ID3DBlob *messages_blob_d3d = NULL;
-	ID3DBlob *sig_blob_d3d = NULL;
-	ID3D11ShaderReflection *reflect_d3d = NULL;
-	ID3D11DeviceChild *shader_d3d = NULL;
 
-	if (config->source.bytecode.memory == NULL) {
+	if (config->source.compile.debug_label == NULL) {
+		config->source.compile.debug_label = config->label;
+	}
 
-		if (config->source.compile.debug_label == NULL) {
-			config->source.compile.debug_label = config->label;
+	char const *model = config->source.compile.model;
+	if (model == NULL) {
+		config->source.compile.model = model = lgi__getShaderModelName(config->flags);
+	}
+	char const *entry = config->source.compile.entry;
+	if (entry == NULL) {
+		config->source.compile.entry = entry = lgi__getShaderEntryName(config->flags);
+	}
+
+	void *memory = config->source.compile.memory;
+	size_t length = config->source.compile.length;
+	char const *debug_label = config->source.compile.debug_label;
+	lgi_ASSERT(entry != lgi_Null);
+	lgi_ASSERT(model != lgi_Null);
+	lgi_ASSERT(memory != lgi_Null);
+	lgi_ASSERT(length != 0);
+
+	HRESULT error = D3DCompile(memory,length,debug_label,0,0,entry,model,lgi_DEFAULT_SHADER_BUILD_FLAGS,0,&bytecode_blob_d3d,&messages_blob_d3d);
+	if SUCCEEDED(error) {
+		if(messages_blob_d3d != lgi_Null) {
+			lgi_logError("Shader Compilation Warning:\n%s\n",(char*)(messages_blob_d3d->lpVtbl->GetBufferPointer(messages_blob_d3d)));
 		}
-
-		char const *model = config->source.compile.model;
-		if (model == NULL) {
-			config->source.compile.model = model = lgi__getShaderModelName(config->flags);
-		}
-		char const *entry = config->source.compile.entry;
-		if (entry == NULL) {
-			config->source.compile.entry = entry = lgi__getShaderEntryName(config->flags);
-		}
-
-		void *memory = config->source.compile.memory;
-		size_t length = config->source.compile.length;
-		char const *debug_label = config->source.compile.debug_label;
-		HRESULT error = D3DCompile(memory,length,debug_label,0,0,entry,model,lgi_DEFAULT_SHADER_BUILD_FLAGS,0,&bytecode_blob_d3d,&messages_blob_d3d);
-
-		lgi_ASSERT(entry != 0);
-		lgi_ASSERT(model != 0);
-		lgi_ASSERT(memory != NULL);
-		lgi_ASSERT(length != 0);
-
-		if FAILED(error) {
-			lgi_logError("\n>>> shader compilation error\n%s\n>>> end",(char*)(messages_blob_d3d->lpVtbl->GetBufferPointer(messages_blob_d3d)));
-			goto L_leave;
-		}
-
-		if(messages_blob_d3d != NULL) {
-			lgi_logError("\n>>> shader compilation warning\n%s\n>>> end",(char*)(messages_blob_d3d->lpVtbl->GetBufferPointer(messages_blob_d3d)));
-		}
-
 		config->source.bytecode.memory=bytecode_blob_d3d->lpVtbl->GetBufferPointer(bytecode_blob_d3d);
 		config->source.bytecode.length=bytecode_blob_d3d->lpVtbl->   GetBufferSize(bytecode_blob_d3d);
+
+		if(bytecode_blob_d3d != lgi_Null) {
+			bytecode_blob_d3d->lpVtbl->Release(bytecode_blob_d3d);
+		}
+		if(messages_blob_d3d != NULL) {
+			messages_blob_d3d->lpVtbl->Release(messages_blob_d3d);
+		}
+		return lgi_Error_NONE;
+	} else {
+		lgi_logError("Shader Compilation Error:\n%s\n",(char*)(messages_blob_d3d->lpVtbl->GetBufferPointer(messages_blob_d3d)));
+		return lgi_Error_SHADER_COMPILATION;
 	}
+}
+
+lgi_API lgi_Error lgi__makeShaderInputLayout(lgi_Shader *shader, lgi_Shader_Config *config) {
+	ID3DBlob *sig_blob_d3d = NULL;
+	ID3D11ShaderReflection *reflect_d3d = NULL;
+
+	lgi_Error result = lgi_Error_NONE;
 
 	void *memory = config->source.bytecode.memory;
 	size_t length = config->source.bytecode.length;
 
 	if (config->layout.d3d11.layout == NULL) {
-		if (config->flags & rxGPU_kPIXEL_SHADER_BIT) {
-			if (config->force_create_layout != TRUE) {
-				lgi_logInfo("skipping input layout creation for pixel shaders");
-				goto L_create_shader;
-			}
-		}
-
-		if (config->donot_create_layout != FALSE) {
-			lgi_logInfo("skipping input layout creation");
-			goto L_create_shader;
+		if (config->flags & lgi_PIXEL_SHADER_TYPE) {
+			lgi_logInfo("Skipped Input Layout Creation For Pixel Shader");
 		}
 		if(config->layout.attr_count == 0) {
 	      /* ensure signature blob is present otherwise early out, in my experience
@@ -570,18 +566,12 @@ lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
 
 			HRESULT error = D3DGetBlobPart(memory,length,D3D_BLOB_INPUT_SIGNATURE_BLOB,0,&sig_blob_d3d);
 			if FAILED(error) {
-				lgi_logError(
-				"'microdev.rj@gmail.com': you've reached an unlikely point, the API has failed to acquire [[input signature blob]], this likely means the reflection "
-				"data isn't present in the bytecode, try removing the /Qstrip_reflect /Qstrip_priv compilation flags "
-				"if you have them; though this isn't expected to solve the issue");
+				result = lgi_Error_SHADER_COMPILATION;
 				goto L_leave;
 			}
 			error = D3DReflect(memory,length,&IID_ID3D11ShaderReflection,(void**)&reflect_d3d);
 			if FAILED(error) {
-				lgi_logError(
-				"'microdev.rj@gmail.com': you've reached an unlikely point, the API has failed to acquire [[reflection interface]], this likely means the reflection "
-				"data isn't present in the bytecode, try removing the /Qstrip_reflect /Qstrip_priv compilation flags "
-				"if you have them; though this isn't expected to solve the issue");
+				result = lgi_Error_SHADER_COMPILATION;
 				goto L_leave;
 			}
 
@@ -612,10 +602,12 @@ lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
 						case 0b0111: Format=0;                              break;
 						case 0b1111: Format=DXGI_FORMAT_R32G32B32A32_FLOAT; break;
 						default: {
+							result = lgi_Error_SHADER_COMPILATION;
 							lgi_ASSERT(!"not implemented");
 						} break;
 					}
 				} else {
+					result = lgi_Error_SHADER_COMPILATION;
 					lgi_ASSERT(!"not implemented");
 				}
 
@@ -634,30 +626,65 @@ lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
 		D3D11_INPUT_ELEMENT_DESC *attr_array = config->layout.attr_array;
 		HRESULT error = ID3D11Device_CreateInputLayout(rx.d3d11.dev,attr_array,attr_count,memory,length,&config->layout.d3d11.layout);
 		if FAILED(error) {
-			lgi_logError("failed to create input layout");
+			result = lgi_Error_SHADER_COMPILATION;
+			lgi_logError("Failed to Create Input Layout");
 			goto L_leave;
 		}
 	}
 
-	L_create_shader:
-	if (config->flags & rxGPU_kVERTEX_SHADER_BIT) {
+	L_leave:
+	if(sig_blob_d3d != NULL) {
+		sig_blob_d3d->lpVtbl->Release(sig_blob_d3d);
+	}
+	if(reflect_d3d != NULL) {
+		reflect_d3d->lpVtbl->Release(reflect_d3d);
+	}
+
+	return result;
+}
+
+lgi_API lgi_Error lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
+	lgi__clear_typeof(shader);
+
+
+	ID3D11DeviceChild *shader_d3d = NULL;
+
+	lgi_Error result = lgi_Error_NONE;
+	if (config->source.bytecode.memory == lgi_Null) {
+		result = lgi__compileShader(shader,config);
+		if lgi_Failed(result) {
+			goto L_leave;
+		}
+	}
+
+	if (config->layout.d3d11.layout == lgi_Null) {
+		result = lgi__makeShaderInputLayout(shader,config);
+		if lgi_Failed(result) {
+			goto L_leave;
+		}
+	}
+
+	void *memory = config->source.bytecode.memory;
+	size_t length = config->source.bytecode.length;
+
+	if (config->flags & lgi_VERTEX_SHADER_TYPE) {
 		HRESULT error = ID3D11Device_CreateVertexShader(rx.d3d11.dev,memory,length,NULL,(ID3D11VertexShader**)(&shader_d3d));
 		if FAILED(error) {
-			lgi_logError("failed to create vertex shader");
+			lgi_logError("Failed to Create Vertex Shader");
 			goto L_leave;
 		}
 	} else
-	if (config->flags & rxGPU_kPIXEL_SHADER_BIT) {
+	if (config->flags & lgi_PIXEL_SHADER_TYPE) {
 		HRESULT error = ID3D11Device_CreatePixelShader(rx.d3d11.dev,memory,length,NULL,(ID3D11PixelShader**)(&shader_d3d));
 		if FAILED(error) {
-			lgi_logError("failed to create pixel shader");
+			lgi_logError("Failed to Create Pixel Shader");
 			goto L_leave;
 		}
 	} else
-	if (config->flags & rxGPU_kCOMPUTE_SHADER_BIT) {
+	if (config->flags & lgi_COMPUTE_SHADER_TYPE) {
 		HRESULT error = ID3D11Device_CreateComputeShader(rx.d3d11.dev,memory,length,NULL,(ID3D11ComputeShader**)(&shader_d3d));
 		if FAILED(error) {
-			lgi_logError("failed to create compute shader");
+			lgi_logError("Failed to Create Compute Shader");
 			goto L_leave;
 		}
 	} else {
@@ -670,16 +697,5 @@ lgi_API void lgi_initShader(lgi_Shader *shader, lgi_Shader_Config *config) {
 	shader->d3d11.unknown = shader_d3d;
 	shader->d3d11.layout  = config->layout.d3d11.layout;
 
-	if(sig_blob_d3d != NULL) {
-		sig_blob_d3d->lpVtbl->Release(sig_blob_d3d);
-	}
-	if(reflect_d3d != NULL) {
-		reflect_d3d->lpVtbl->Release(reflect_d3d);
-	}
-	if(bytecode_blob_d3d != NULL) {
-		bytecode_blob_d3d->lpVtbl->Release(bytecode_blob_d3d);
-	}
-	if(messages_blob_d3d != NULL) {
-		messages_blob_d3d->lpVtbl->Release(messages_blob_d3d);
-	}
+	return result;
 }

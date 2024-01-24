@@ -6,22 +6,19 @@
 **
 */
 
-// From a value between 0 and 1, it returns a value between min and max
-double mix(double val, double min, double max) {
-	return min + (max - min) * val;
+lgi_API double mix(double ratio, double min, double max) {
+	return min + (max - min) * ratio;
 }
 
-// From a value between min and max, it returns a value between 0 and 1
-double unmix(double val, double min, double max) {
+lgi_API double unmix(double val, double min, double max) {
 	return (val - min) / (max - min);
 }
 
-// From a value between val_min and val_max, it returns a value between min and max
-double remix(double val, double val_min, double val_max, double min, double max) {
+lgi_API double remix(double val, double val_min, double val_max, double min, double max) {
 	return mix(unmix(val,val_min,val_max),min,max);
 }
 
-double clamp(double val, double min, double max) {
+lgi_API double clamp(double val, double min, double max) {
 	return val < min ? min : val > max ? max : val;
 }
 
@@ -83,14 +80,14 @@ rxvec3i_t  rxvec3i_z  (float z);
 
 typedef struct {
 	float x,y;
-} Vec2;
+} vec2;
 
 typedef struct {
 	union {
 		struct {
 			float x,y,z;
 		};
-		Vec2 xy;
+		vec2 xy;
 	};
 } rxvec3_t;
 
@@ -112,11 +109,11 @@ typedef struct {
 		};
 		rxvec3_t xyz;
 		rxvec3_t rgb;
-		Vec2 xy;
+		vec2 xy;
 	};
-} Vec4;
+} vec4;
 
-Vec4 Vec4_xyzw(float x, float y, float z, float w);
+vec4 Vec4_xyzw(float x, float y, float z, float w);
 
 typedef struct {
 	union {
@@ -134,10 +131,10 @@ typedef struct {
 
 typedef struct {
 	float m[4][4];
-} rxmatrix_t;
+} lgi_Matrix;
 
-rxmatrix_t lgi_Matrix__identity();
-rxmatrix_t lgi_Matrix__multiply(rxmatrix_t, rxmatrix_t);
+lgi_Matrix lgi_Matrix__identity();
+lgi_Matrix lgi_Matrix__multiply(lgi_Matrix, lgi_Matrix);
 
 
 rxvec3_t
@@ -151,11 +148,11 @@ float x, float y, float z)
 	return r;
 }
 
-Vec4
+vec4
 Vec4_xyzw(
 float x, float y, float z, float w)
 {
-	Vec4 r;
+	vec4 r;
 	r.x = x;
 	r.y = y;
 	r.z = z;
@@ -207,27 +204,27 @@ rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
  	return sqrtf(rxvector_dot(a,a));
  }
 
- float rxvec2_dot(Vec2 a, Vec2 b)
+ float vec2_dot(vec2 a, vec2 b)
  {
  	return a.x*b.x + a.y*b.y;
  }
 
- float rxvec2_len(Vec2 a)
+ float vec2_len(vec2 a)
  {
- 	return sqrtf(rxvec2_dot(a,a));
+ 	return sqrtf(vec2_dot(a,a));
  }
 
- Vec2 rxvec2_add(Vec2 a, Vec2 b)
+ vec2 vec2_add(vec2 a, vec2 b)
  {
- 	Vec2 r;
+ 	vec2 r;
  	r.x = a.x+b.x;
  	r.y = a.y+b.y;
  	return r;
  }
 
- Vec2 rxvec2_sub(Vec2 a, Vec2 b)
+ vec2 vec2_sub(vec2 a, vec2 b)
  {
- 	Vec2 r;
+ 	vec2 r;
  	r.x = a.x-b.x;
  	r.y = a.y-b.y;
  	return r;
@@ -325,9 +322,9 @@ rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
  return a;
 }
 
-rxmatrix_t lgi_Matrix__projection(double r, double v, double zmin, double zmax)
+lgi_Matrix lgi_Matrix__projection(double r, double v, double zmin, double zmax)
 {
-	rxmatrix_t m = lgi_Matrix__identity();
+	lgi_Matrix m = lgi_Matrix__identity();
 
 	v = 1. / tan(v / 180 * lgi_PI * .5);
 
@@ -340,9 +337,9 @@ rxmatrix_t lgi_Matrix__projection(double r, double v, double zmin, double zmax)
 	return m;
 }
 
-rxmatrix_t lgi_Matrix__identity()
+lgi_Matrix lgi_Matrix__identity()
 {
-	rxmatrix_t r;
+	lgi_Matrix r;
 	r.m[0][0]=1.f;r.m[1][0]=0.f;r.m[2][0]=0.f;r.m[3][0]=0.f;
 	r.m[0][1]=0.f;r.m[1][1]=1.f;r.m[2][1]=0.f;r.m[3][1]=0.f;
 	r.m[0][2]=0.f;r.m[1][2]=0.f;r.m[2][2]=1.f;r.m[3][2]=0.f;
@@ -353,8 +350,8 @@ rxmatrix_t lgi_Matrix__identity()
 
 
 // todo!!: remove loop
-rxmatrix_t lgi_Matrix__multiply(rxmatrix_t a, rxmatrix_t b)
-{ rxmatrix_t result;
+lgi_Matrix lgi_Matrix__multiply(lgi_Matrix a, lgi_Matrix b)
+{ lgi_Matrix result;
 	for(int r=0; r<4; ++r)
 	{ for(int c=0; c<4; ++c)
 		{  result.m[r][c] =
@@ -367,9 +364,9 @@ rxmatrix_t lgi_Matrix__multiply(rxmatrix_t a, rxmatrix_t b)
 	return result;
 }
 
-rxmatrix_t rxmatrix_rotZ(double angle)
+lgi_Matrix rxmatrix_rotZ(double angle)
 {
-	rxmatrix_t r = lgi_Matrix__identity();
+	lgi_Matrix r = lgi_Matrix__identity();
 	double cosres = cos(angle);
 	double sinres = sin(angle);
 	r.m[0][0]= + cosres;
@@ -379,9 +376,9 @@ rxmatrix_t rxmatrix_rotZ(double angle)
 	return r;
 }
 
-rxmatrix_t rxmatrix_rotY(double angle)
+lgi_Matrix rxmatrix_rotY(double angle)
 {
-	rxmatrix_t r = lgi_Matrix__identity();
+	lgi_Matrix r = lgi_Matrix__identity();
 	double cosres = cos(angle);
 	double sinres = sin(angle);
 	r.m[0][0] =   cosres;
@@ -391,9 +388,9 @@ rxmatrix_t rxmatrix_rotY(double angle)
 	return r;
 }
 
-rxmatrix_t rxmatrix_rotX(float angle)
+lgi_Matrix rxmatrix_rotX(float angle)
 {
-	rxmatrix_t result = lgi_Matrix__identity();
+	lgi_Matrix result = lgi_Matrix__identity();
 	float cosres = cosf(angle);
 	float sinres = sinf(angle);
 	result.m[1][1] =   cosres;
@@ -405,25 +402,25 @@ rxmatrix_t rxmatrix_rotX(float angle)
 
 
 
-rxmatrix_t rxmatrix_translate_xyz(float x, float y, float z)
-{ rxmatrix_t result=lgi_Matrix__identity();
+lgi_Matrix rxmatrix_translate_xyz(float x, float y, float z)
+{ lgi_Matrix result=lgi_Matrix__identity();
 	result.m[3][0]=x;
 	result.m[3][1]=y;
 	result.m[3][2]=z;
 	return result;
 }
 
-rxmatrix_t rxmatrix_flip_vertically()
-{ rxmatrix_t result=lgi_Matrix__identity();
+lgi_Matrix rxmatrix_flip_vertically()
+{ lgi_Matrix result=lgi_Matrix__identity();
 	result.m[1][1]=-1.f;
 	return result;
 }
 
 
 /* All this has to be worked out */
-Vec4 rxmul_matvec(rxmatrix_t m, Vec4 v)
+vec4 rxmul_matvec(lgi_Matrix m, vec4 v)
 {
-	Vec4 r;
+	vec4 r;
 	r.x = m.m[0][0] * v.x + m.m[1][0] * v.y + m.m[2][0] * v.z + m.m[3][0];
 	r.y = m.m[0][1] * v.x + m.m[1][1] * v.y + m.m[2][1] * v.z + m.m[3][1];
 	r.z = m.m[0][2] * v.x + m.m[1][2] * v.y + m.m[2][2] * v.z + m.m[3][2];
@@ -431,36 +428,46 @@ Vec4 rxmul_matvec(rxmatrix_t m, Vec4 v)
 	return r;
 }
 
-Vec2 rxadd_vec2(Vec2 v0, Vec2 v1)
+vec2 rxadd_vec2(vec2 v0, vec2 v1)
 {
-	Vec2 r;
+	vec2 r;
 	r.x = v0.x + v1.x;
 	r.y = v0.y + v1.y;
 	return r;
 }
 
-Vec2 rxmul_vec2(Vec2 v0, Vec2 v1)
+vec2 rxmul_vec2(vec2 v0, vec2 v1)
 {
-	Vec2 r;
+	vec2 r;
 	r.x = v0.x * v1.x;
 	r.y = v0.y * v1.y;
 	return r;
 }
 
-Vec2 rxvec2_xy(float x, float y)
+vec2 vec2_xy(float x, float y)
 {
 
-	Vec2 r;
+	vec2 r;
 	r.x = x;
 	r.y = y;
 
 	return r;
 }
 
-Vec2 rxvec2i_vec2(rxvec2i_t v)
+vec2 rxvec2i_vec2(rxvec2i_t v)
 {
-	Vec2 r;
+	vec2 r;
 	r.x = v.x;
 	r.y = v.y;
+	return r;
+}
+
+
+lgi_API vec4 vec4_mix(double ratio, vec4 min, vec4 max) {
+	vec4 r;
+	r.r = (float) (min.r + ratio * (max.r - min.r));
+	r.g = (float) (min.g + ratio * (max.g - min.g));
+	r.b = (float) (min.b + ratio * (max.b - min.b));
+	r.a = (float) (min.a + ratio * (max.a - min.a));
 	return r;
 }

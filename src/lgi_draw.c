@@ -101,7 +101,7 @@ void lgi_flushImmediatly() {
 		lgi.State.vertex_array=lgi_Null;
 		lgi.State.index_array=lgi_Null;
 
-		rxmatrix_t matrix = lgi_Matrix__multiply(lgi.State.world_matrix,lgi.State.view_matrix);
+		lgi_Matrix matrix = lgi_Matrix__multiply(lgi.State.world_matrix,lgi.State.view_matrix);
 		lgi.State.constSlots.matrix = matrix;
 		lgi.State.constSlots.xyscreen.x = (float)(lgi.Window.size_x);
 		lgi.State.constSlots.xyscreen.y = (float)(lgi.Window.size_y);
@@ -232,7 +232,7 @@ lgi_API void lgi_addVerticesV(int length, ...) {
 }
 
 
-lgi_API void lgi_drawCircleSDF(Vec2 center, Vec2 radius, lgi_Color color, float roundness, float softness) {
+lgi_API void lgi_drawCircleSDF(vec2 center, vec2 radius, lgi_Color color, float roundness, float softness) {
 
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
@@ -258,7 +258,16 @@ lgi_API void lgi_drawCircleSDF(Vec2 center, Vec2 radius, lgi_Color color, float 
 	lgi_endVertexArray();
 }
 
-lgi_API void lgi_drawBoxSDF(Vec2 center, Vec2 radius, lgi_Color color, float roundness, float softness) {
+lgi_API void lgi_drawBoxSDF(vec2 center, vec2 radius, lgi_Color color, float roundness, float softness);
+
+lgi_API void lgi_drawBox(vec2 xy, vec2 sz, lgi_Color color, float roundness, float softness)
+{
+	vec2 radius = {sz.x * .5, sz.y * .5};
+	vec2 center = { xy.x + radius.x, xy.y + radius.y };
+	lgi_drawBoxSDF(center,radius,color,roundness,softness);
+}
+
+lgi_API void lgi_drawBoxSDF(vec2 center, vec2 radius, lgi_Color color, float roundness, float softness) {
 
 	int x0,y0,x1,y1;
 	x0 = (int) (center.x - (1. + radius.x + softness));
@@ -286,10 +295,10 @@ lgi_API void lgi_drawBoxSDF(Vec2 center, Vec2 radius, lgi_Color color, float rou
 
 lgi_API void lgi_drawQuad(lgi_Color color, float x, float y, float w, float h) {
 
-	Vec2 xy0 = (Vec2){x+0,y+0};
-	Vec2 xy1 = (Vec2){x+w,y+h};
-	Vec2 uv0 = (Vec2){0,0};
-	Vec2 uv1 = (Vec2){1,1};
+	vec2 xy0 = (vec2){x+0,y+0};
+	vec2 xy1 = (vec2){x+w,y+h};
+	vec2 uv0 = (vec2){0,0};
+	vec2 uv1 = (vec2){1,1};
 	lgi_bindProgram(lgi.defaultProgram);
 	lgi_bindTexture(0,lgi.whiteTexture,lgi_True);
 	lgi_beginVertexArray(6,4);
@@ -308,11 +317,11 @@ lgi_API void lgi_drawQuad(lgi_Color color, float x, float y, float w, float h) {
 }
 
 lgi_API void lgi_drawQuadUV(lgi_Color color, lgi_Texture *texture, float x, float y, float w, float h) {
-	Vec2 xy0 = (Vec2){x+0,y+0};
-	Vec2 xy1 = (Vec2){x+w,y+h};
+	vec2 xy0 = (vec2){x+0,y+0};
+	vec2 xy1 = (vec2){x+w,y+h};
 
-	Vec2 uv0 = (Vec2){0,0};
-	Vec2 uv1 = (Vec2){1,1};
+	vec2 uv0 = (vec2){0,0};
+	vec2 uv1 = (vec2){1,1};
 
 	lgi_bindProgram(lgi.defaultProgram);
 	lgi_bindTexture(0,texture,TRUE);
