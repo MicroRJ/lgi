@@ -857,7 +857,10 @@ typedef struct lgi_Core {
 		unsigned __int64 delta_ticks;
 
 		double total_seconds;
-		double delta_seconds;
+		union {
+			double deltaSeconds;
+			double delta_seconds;
+		};
 	} Time;
 
 	// lgi::Input
@@ -878,9 +881,6 @@ typedef struct lgi_Core {
 			int ycursor;
 			int yscroll;
 			int xscroll;
-
-			int  xclick;
-			int  yclick;
 
 			int oldButtonState;
 			int newButtonState;
@@ -1218,7 +1218,7 @@ lgi_API int lgi_pollInput() {
 	lgi.Input.Mice.yscroll = 0;
 	lgi.Input.Mice.xscroll = 0;
 	lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
-	lgi.Input.Mice.newButtonState = 0;
+	// lgi.Input.Mice.newButtonState = 0;
 
 	MSG message;
 	while (PeekMessage(&message,NULL,0,0,PM_REMOVE)) {
@@ -1575,17 +1575,38 @@ int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 		case WM_MOUSEWHEEL: {
 			lgi.Input.Mice.yscroll = GET_WHEEL_DELTA_WPARAM(wParam)/WHEEL_DELTA;
 		} break;
+		case WM_LBUTTONDBLCLK:
+		case WM_MBUTTONDBLCLK:
+		case WM_RBUTTONDBLCLK: {
+			lgi_logInfo("Error:!");
+		} break;
+		case WM_LBUTTONUP: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState ^= 1 << 0;
+		} break;
+		case WM_RBUTTONUP: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState ^= 1 << 1;
+		} break;
+	   case WM_MBUTTONUP: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState ^= 1 << 2;
+	   } break;
+		case WM_LBUTTONDOWN: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState |= 1 << 0;
+		} break;
+		case WM_RBUTTONDOWN: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState |= 1 << 1;
+		} break;
+		case WM_MBUTTONDOWN: {
+			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
+			lgi.Input.Mice.newButtonState |= 1 << 2;
+		} break;
+
 // SetCapture((HWND)lgi.Window.win32.handle);
-		case WM_LBUTTONDOWN: case WM_LBUTTONDBLCLK: case WM_LBUTTONUP: {
-			lgi.Input.Mice.newButtonState |= (Message!=WM_LBUTTONUP) << 0;
-		} break;
-		case WM_RBUTTONDOWN: case WM_RBUTTONDBLCLK: case WM_RBUTTONUP: {
-			lgi.Input.Mice.newButtonState |= (Message!=WM_RBUTTONUP) << 1;
-		} break;
 // ReleaseCapture();
-		case WM_MBUTTONDOWN: case WM_MBUTTONDBLCLK: case WM_MBUTTONUP: {
-			lgi.Input.Mice.newButtonState |= (Message!=WM_MBUTTONUP) << 2;
-		} break;
 		case WM_CHAR: {
 			lgi.Input.Keyboard.lastChar = wParam;
 		} break;
