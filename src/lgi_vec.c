@@ -364,11 +364,10 @@ lgi_Matrix lgi_Matrix__multiply(lgi_Matrix a, lgi_Matrix b)
 	return result;
 }
 
-lgi_Matrix rxmatrix_rotZ(double angle)
-{
+lgi_Matrix lgi_Matrix_rotationZ(float angle) {
 	lgi_Matrix r = lgi_Matrix__identity();
-	double cosres = cos(angle);
-	double sinres = sin(angle);
+	float cosres = cosf(angle);
+	float sinres = sinf(angle);
 	r.m[0][0]= + cosres;
 	r.m[0][1]= + sinres;
 	r.m[1][0]= - sinres;
@@ -376,8 +375,7 @@ lgi_Matrix rxmatrix_rotZ(double angle)
 	return r;
 }
 
-lgi_Matrix rxmatrix_rotY(double angle)
-{
+lgi_Matrix rxmatrix_rotY(double angle) {
 	lgi_Matrix r = lgi_Matrix__identity();
 	double cosres = cos(angle);
 	double sinres = sin(angle);
@@ -388,8 +386,7 @@ lgi_Matrix rxmatrix_rotY(double angle)
 	return r;
 }
 
-lgi_Matrix rxmatrix_rotX(float angle)
-{
+lgi_Matrix rxmatrix_rotX(float angle) {
 	lgi_Matrix result = lgi_Matrix__identity();
 	float cosres = cosf(angle);
 	float sinres = sinf(angle);

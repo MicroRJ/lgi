@@ -855,8 +855,10 @@ typedef struct lgi_Core {
 
 		unsigned __int64 frame_ticks;
 		unsigned __int64 delta_ticks;
-
-		double total_seconds;
+		union {
+			double totalSeconds;
+			double total_seconds;
+		};
 		union {
 			double deltaSeconds;
 			double delta_seconds;
@@ -1588,10 +1590,10 @@ int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
 			lgi.Input.Mice.newButtonState ^= 1 << 1;
 		} break;
-	   case WM_MBUTTONUP: {
+		case WM_MBUTTONUP: {
 			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
 			lgi.Input.Mice.newButtonState ^= 1 << 2;
-	   } break;
+		} break;
 		case WM_LBUTTONDOWN: {
 			// lgi.Input.Mice.oldButtonState = lgi.Input.Mice.newButtonState;
 			lgi.Input.Mice.newButtonState |= 1 << 0;

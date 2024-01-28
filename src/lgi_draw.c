@@ -75,7 +75,7 @@ lgi_API void lgi_bindTexture(int slot, lgi_Texture *texture, int flush) {
 		lgi_flushImmediatly();
 
 		lgi.State.liveTextures[slot] = texture;
-		// NOTE:
+		// TODO:
 		if (slot == 0) {
 			lgi.State.constSlots.xysource.x = texture->size_x;
 			lgi.State.constSlots.xysource.y = texture->size_y;
@@ -260,8 +260,7 @@ lgi_API void lgi_drawCircleSDF(vec2 center, vec2 radius, lgi_Color color, float 
 
 lgi_API void lgi_drawBoxSDF(vec2 center, vec2 radius, lgi_Color color, float roundness, float softness);
 
-lgi_API void lgi_drawBox(vec2 xy, vec2 sz, lgi_Color color, float roundness, float softness)
-{
+lgi_API void lgi_drawBox(vec2 xy, vec2 sz, lgi_Color color, float roundness, float softness) {
 	vec2 radius = {sz.x * .5, sz.y * .5};
 	vec2 center = { xy.x + radius.x, xy.y + radius.y };
 	lgi_drawBoxSDF(center,radius,color,roundness,softness);
@@ -349,6 +348,7 @@ lgi_API void lgi_drawLine(lgi_Color color, float thickness, float x0, float y0, 
 	float ynormal=.5f * thickness * +xdist/length;
 
 	lgi_bindProgram(lgi.defaultProgram);
+	lgi_bindTexture(0,lgi.whiteTexture,lgi_True);
 	lgi_beginVertexArray(6,4);
 	{
 		/* Set Shared Attributes */
