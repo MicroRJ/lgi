@@ -363,9 +363,16 @@ lgi_API void lgi_drawLine(lgi_Color color, float thickness, float x0, float y0, 
 	lgi_endVertexArray();
 }
 
-lgi_API void lgi_drawOutline(lgi_Color color, float x, float y, float w, float h) {
-	lgi_drawQuad(color,x-.5,y+h-.5,w+.5,1.);
-	lgi_drawQuad(color,x-.5,y+0-.5,w+.5,1.);
-	lgi_drawQuad(color,x+0-.5,y-.5,1.,h+.5);
-	lgi_drawQuad(color,x+w-.5,y-.5,1.,h+.5);
+
+lgi_API void lgi_drawOutline(float x, float y, float zx, float zy, float thickness, lgi_Color color) {
+	float x0 = x - thickness;
+	float y0 = y - thickness;
+	float x1 = x + zx;
+	float y1 = y + zy;
+
+	lgi_drawQuad(color,x0,y1,zx+thickness*2,thickness);
+	lgi_drawQuad(color,x0,y0,zx+thickness*2,thickness);
+
+	lgi_drawQuad(color,x0,y,thickness,zy);
+	lgi_drawQuad(color,x1,y,thickness,zy);
 }

@@ -364,6 +364,20 @@ static void lgi_appLogFunction(int severity, char const *message, char const *fi
 typedef signed long long int lgi_longInt;
 
 #define lgi_Null NULL
+
+typedef signed int lgi_Bool;
+#define lgi_True  ((lgi_Bool) 1)
+#define lgi_False ((lgi_Bool) 0)
+
+/* remove this please! */
+#if !defined(isTrue)
+	#define isTrue(xx) ((xx) != lgi_False)
+#endif
+#if !defined(isFalse)
+	#define isFalse(xx) ((xx) == lgi_False)
+#endif
+
+/* remove this please! */
 #if !defined(isNull)
 	#define isNull(xx) ((xx) == lgi_Null)
 #endif
@@ -374,16 +388,6 @@ typedef signed long long int lgi_longInt;
 	#define isNotNullAnd(xx,yy) (isNotNull(xx) && (yy))
 #endif
 
-typedef signed int lgi_Bool;
-#define lgi_True  ((lgi_Bool) 1)
-#define lgi_False ((lgi_Bool) 0)
-
-#if !defined(isTrue)
-	#define isTrue(xx) ((xx) != lgi_False)
-#endif
-#if !defined(isFalse)
-	#define isFalse(xx) ((xx) == lgi_False)
-#endif
 
 
 typedef enum {
@@ -407,6 +411,18 @@ typedef enum {
 
 
 #include <src/lgi_dlb.c>
+
+//
+// MATH STUFF:
+//
+
+lgi_API float lgi_mix(float ratio, float min, float max);
+lgi_API float lgi_unmix(float val, float min, float max);
+lgi_API float lgi_remix(float val, float val_min, float val_max, float min, float max);
+lgi_API float lgi_clamp(float val, float min, float max);
+
+
+
 #include <src/lgi_vec.c>
 
 /*
@@ -503,10 +519,14 @@ lgi_API void lgi_flushImmediatly();
 
 // Platform API:
 
+
+/* timing functions have been renamed */
+lgi_API lgi_longInt lgi_queryClockHz();
+lgi_API lgi_longInt lgi_pollClock();
+
 lgi_API lgi_Bool lgi_setActiveWindow(HWND window);
 lgi_API void lgi_setCursor(HCURSOR cursor);
-lgi_API unsigned __int64 lgi_queryTicksPerSecond();
-lgi_API unsigned __int64 lgi_pollTickClock();
+
 
 lgi_API void lgi_unloadFileContents(void *fileContents);
 lgi_API void *lgi_loadFileContents(char const *fileName, int *length);
@@ -1033,7 +1053,7 @@ lgi_API void lgi_setCursor(HCURSOR cur) {
 	SetCursor(cur);
 }
 
-lgi_API unsigned __int64 lgi_queryTicksPerSecond() {
+lgi_API lgi_longInt lgi_queryClockHz() {
 #if defined(_WIN32)
 	LARGE_INTEGER l;
 	QueryPerformanceFrequency(&l);
@@ -1043,7 +1063,7 @@ lgi_API unsigned __int64 lgi_queryTicksPerSecond() {
 #endif
 }
 
-lgi_API unsigned __int64 lgi_pollTickClock() {
+lgi_API lgi_longInt lgi_pollClock() {
 #if defined(_WIN32)
 	LARGE_INTEGER l;
 	QueryPerformanceCounter(&l);
@@ -1202,7 +1222,7 @@ lgi_API void lgi_pollDebugMessages() {
 }
 
 lgi_API void lgi_pollTime() {
-	unsigned __int64 ticks = lgi_pollTickClock();
+	unsigned __int64 ticks = lgi_pollClock();
 	lgi.Time.total_ticks = ticks - lgi.Time.start_ticks;
 	lgi.Time.delta_ticks = ticks - lgi.Time.frame_ticks;
 	lgi.Time.frame_ticks = ticks;
@@ -1288,7 +1308,7 @@ static void lgi__initDefaults();
 
 lgi_API void lgi_initWindowed(int window_width, int window_height, char const *window_title) {
 
-	lgi.Time.ticksPerSecond = lgi_queryTicksPerSecond();
+	lgi.Time.ticksPerSecond = lgi_queryClockHz();
 
 	//
 	// NOTE: Look more into this because I really don't even know whether this works
@@ -1488,7 +1508,7 @@ lgi_API void lgi_initWindowed(int window_width, int window_height, char const *w
 	viewport_d3d.MaxDepth=1;
 	ID3D11DeviceContext_RSSetViewports(lgi.d3d11.ctx,1,&viewport_d3d);
 
-	lgi.Time.start_ticks = lgi_pollTickClock();
+	lgi.Time.start_ticks = lgi_pollClock();
 	lgi.Time.frame_ticks = lgi.Time.start_ticks;
 
 	lgi_pollInput();
@@ -1614,15 +1634,15 @@ int lgi_windowMessageHandler_win32(UINT Message, WPARAM wParam, LPARAM lParam) {
 		} break;
 		case WM_SYSKEYUP: case WM_SYSKEYDOWN: case WM_KEYUP: case WM_KEYDOWN: {
 
+			lgi.Input.Keyboard.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
+			lgi.Input.Keyboard.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+			lgi.Input.Keyboard.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
 #if defined(lgi_CLOSE_ON_ESCAPE)
 			if (wParam == VK_ESCAPE) {
 				lgi.Window.isClosed = TRUE;
 			}
 #endif
 			/* todo: there's probably a better way to do this */
-			lgi.Input.Keyboard.is_shft = (GetKeyState(VK_SHIFT)   & 0x8000) != 0;
-			lgi.Input.Keyboard.is_ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-			lgi.Input.Keyboard.is_menu = (GetKeyState(VK_MENU)    & 0x8000) != 0;
 
 			int key_map = 0;
 			if isWithin3(wParam,'a','z','A','Z','0','9') {

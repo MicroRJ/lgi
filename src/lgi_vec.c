@@ -6,19 +6,16 @@
 **
 */
 
-lgi_API double mix(double ratio, double min, double max) {
+lgi_API float lgi_mix(float ratio, float min, float max) {
 	return min + (max - min) * ratio;
 }
-
-lgi_API double unmix(double val, double min, double max) {
+lgi_API float lgi_unmix(float val, float min, float max) {
 	return (val - min) / (max - min);
 }
-
-lgi_API double remix(double val, double val_min, double val_max, double min, double max) {
-	return mix(unmix(val,val_min,val_max),min,max);
+lgi_API float lgi_remix(float val, float val_min, float val_max, float min, float max) {
+	return lgi_mix(lgi_unmix(val,val_min,val_max),min,max);
 }
-
-lgi_API double clamp(double val, double min, double max) {
+lgi_API float lgi_clamp(float val, float min, float max) {
 	return val < min ? min : val > max ? max : val;
 }
 
@@ -26,57 +23,57 @@ int iclamp(int val, int min, int max) {
 	return val<min?min: val>max?max: val;
 }
 
-#ifndef max
-float max(float x, float y) {
-	return x>y?x:y;
-}
-float fmin(float x, float y) {
-	return x<y?x:y;
-}
-#endif
-#ifndef min
-float min(float x, float y) {
-	return x<y?x:y;
-}
-float fmax(float x, float y) {
-	return x>y?x:y;
-}
-#endif
+// #ifndef max
+// float max(float x, float y) {
+// 	return x>y?x:y;
+// }
+// float fmin(float x, float y) {
+// 	return x<y?x:y;
+// }
+// #endif
+// #ifndef min
+// float min(float x, float y) {
+// 	return x<y?x:y;
+// }
+// float fmax(float x, float y) {
+// 	return x>y?x:y;
+// }
+// #endif
 
 
-int imax(int x, int y) {
-	return x>y?x:y;
-}
+// int imax(int x, int y) {
+// 	return x>y?x:y;
+// }
 
-int imin(int x, int y) {
-	return x<y?x:y;
-}
+// int imin(int x, int y) {
+// 	return x<y?x:y;
+// }
 
 
 
-typedef struct {
-	short x,y;
-} rxvec2i16_t;
+// typedef struct {
+// 	short x,y;
+// } rxvec2i16_t;
 
-typedef struct {
-	int x,y;
-} rxvec2i_t;
+// typedef struct {
+// 	int x,y;
+// } rxvec2i_t;
 
-typedef struct {
-	union {
-		struct {
-			int x,y,z;
-		};
-		rxvec2i_t xy;
-	};
-} rxvec3i_t;
+// typedef struct {
+// 	union {
+// 		struct {
+// 			int x,y,z;
+// 		};
+// 		rxvec2i_t xy;
+// 	};
+// } rxvec3i_t;
 
-rxvec3i_t  rxvec3i    (float xyz);
-rxvec3i_t  rxvec3i_xyz(float x, float y, float z);
-rxvec3i_t  rxvec3i_xy (float x, float y);
-rxvec3i_t  rxvec3i_x  (float x);
-rxvec3i_t  rxvec3i_y  (float y);
-rxvec3i_t  rxvec3i_z  (float z);
+// rxvec3i_t  rxvec3i    (float xyz);
+// rxvec3i_t  rxvec3i_xyz(float x, float y, float z);
+// rxvec3i_t  rxvec3i_xy (float x, float y);
+// rxvec3i_t  rxvec3i_x  (float x);
+// rxvec3i_t  rxvec3i_y  (float y);
+// rxvec3i_t  rxvec3i_z  (float z);
 
 typedef struct {
 	float x,y;
@@ -115,19 +112,19 @@ typedef struct {
 
 vec4 Vec4_xyzw(float x, float y, float z, float w);
 
-typedef struct {
-	union {
-		struct {
-			int x,y,z,w;
-		};
-		struct {
-			int r,g,b,a;
-		};
-		rxvec3i_t xyz;
-		rxvec3i_t rgb;
-		rxvec2i_t xy;
-	};
-} rxvec4i_t;
+// typedef struct {
+// 	union {
+// 		struct {
+// 			int x,y,z,w;
+// 		};
+// 		struct {
+// 			int r,g,b,a;
+// 		};
+// 		rxvec3i_t xyz;
+// 		rxvec3i_t rgb;
+// 		rxvec2i_t xy;
+// 	};
+// } rxvec4i_t;
 
 typedef struct {
 	float m[4][4];
@@ -160,30 +157,30 @@ float x, float y, float z, float w)
 	return r;
 }
 
-rxvec3_t rxvec3_xy(float x, float y)
-{
-	return rxvec3_xyz(x,y,0);
-}
+// rxvec3_t rxvec3_xy(float x, float y)
+// {
+// 	return rxvec3_xyz(x,y,0);
+// }
 
-rxvec3_t rxvec3_x(float x)
-{
-	return rxvec3_xyz(x,0,0);
-}
+// rxvec3_t rxvec3_x(float x)
+// {
+// 	return rxvec3_xyz(x,0,0);
+// }
 
-rxvec3_t rxvec3_y(float y)
-{
-	return rxvec3_xyz(0,y,0);
-}
+// rxvec3_t rxvec3_y(float y)
+// {
+// 	return rxvec3_xyz(0,y,0);
+// }
 
-rxvec3_t rxvec3_z(float z)
-{
-	return rxvec3_xyz(0,0,z);
-}
+// rxvec3_t rxvec3_z(float z)
+// {
+// 	return rxvec3_xyz(0,0,z);
+// }
 
-rxvec3_t rxvec3(float xyz)
-{
-	return rxvec3_xyz(xyz,xyz,xyz);
-}
+// rxvec3_t rxvec3(float xyz)
+// {
+// 	return rxvec3_xyz(xyz,xyz,xyz);
+// }
 
 float rxvector_dot(rxvec3_t a, rxvec3_t b)
 {
@@ -192,7 +189,13 @@ float rxvector_dot(rxvec3_t a, rxvec3_t b)
 
 rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
 {
-  // note: this is how I memorize the cross product formula, think of rotations around an axis.
+	/* sometimes I leave comments like these ones around, I spend so much
+	time in front of a computer that the only photographs that I have of me
+	are these comments. I don't know why I wrote it, nor how old it is,
+	but is here, and so am I, for now - 1/29/24 */
+
+  	// note: this is how I memorize the cross product formula, think of rotations around an axis.
+
 	return rxvec3_xyz
     ( a.y*b.z - a.z*b.y,    // x-axis -> z/y plane
       a.z*b.x - a.x*b.z,    // y-axis -> x/z plane
@@ -322,7 +325,7 @@ rxvec3_t rxvector_cross(rxvec3_t a, rxvec3_t b)
  return a;
 }
 
-lgi_Matrix lgi_Matrix__projection(double r, double v, double zmin, double zmax)
+lgi_Matrix lgi_Matrix__projection(float r, float v, float zmin, float zmax)
 {
 	lgi_Matrix m = lgi_Matrix__identity();
 
@@ -375,10 +378,10 @@ lgi_Matrix lgi_Matrix_rotationZ(float angle) {
 	return r;
 }
 
-lgi_Matrix rxmatrix_rotY(double angle) {
+lgi_Matrix rxmatrix_rotY(float angle) {
 	lgi_Matrix r = lgi_Matrix__identity();
-	double cosres = cos(angle);
-	double sinres = sin(angle);
+	float cosres = cos(angle);
+	float sinres = sin(angle);
 	r.m[0][0] =   cosres;
 	r.m[0][2] = - sinres;
 	r.m[2][0] =   sinres;
@@ -451,16 +454,16 @@ vec2 vec2_xy(float x, float y)
 	return r;
 }
 
-vec2 rxvec2i_vec2(rxvec2i_t v)
-{
-	vec2 r;
-	r.x = v.x;
-	r.y = v.y;
-	return r;
-}
+// vec2 rxvec2i_vec2(rxvec2i_t v)
+// {
+// 	vec2 r;
+// 	r.x = v.x;
+// 	r.y = v.y;
+// 	return r;
+// }
 
 
-lgi_API vec4 vec4_mix(double ratio, vec4 min, vec4 max) {
+lgi_API vec4 vec4_mix(float ratio, vec4 min, vec4 max) {
 	vec4 r;
 	r.r = (float) (min.r + ratio * (max.r - min.r));
 	r.g = (float) (min.g + ratio * (max.g - min.g));
