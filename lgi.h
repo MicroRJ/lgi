@@ -1,6 +1,6 @@
 /*
 **
-**                      -+- rx -+-
+**                      -+- lgi -+-
 **
 **                 Mundane Graphics API.
 **
@@ -13,7 +13,7 @@
 **
 **               HONI SOIT QUI MAL Y PENSE
 **
-**                 github.com/MicroRJ/rx
+**                 github.com/MicroRJ/lgi
 **
 */
 
@@ -1293,7 +1293,9 @@ lgi_API int lgi_tick() {
 	lgi_clearBackground(lgi_Color__BLACK);
 #endif
 
-	lgi_pollDebugMessages();
+	if (lgi_False) {
+		lgi_pollDebugMessages();
+	}
 	lgi_pollInput();
 	lgi_pollTime();
 
